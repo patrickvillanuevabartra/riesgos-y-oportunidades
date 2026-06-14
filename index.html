@@ -71,8 +71,19 @@
 
   .hidden{display:none!important}
 
-  /* Multi-selección (checkboxes desplegables) */
-  .multiselect{position:relative}
+  /* Filtros avanzados */
+  .filtros-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+  .filtros-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+  .filtros-head>span{font-family:'Fraunces',serif;font-weight:600;font-size:15px}
+  .filtros-head>div{display:flex;align-items:center;gap:10px}
+  .filtros-logica{font-size:13px;color:var(--slate);display:flex;align-items:center;gap:6px}
+  .filtros-logica select{padding:5px 8px;font-size:13px;width:auto}
+  .filtro-cond{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+  .filtro-cond select,.filtro-cond input{padding:7px 9px;font-size:13px;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .filtro-cond select{width:auto;min-width:140px}
+  .filtro-cond input{flex:1;min-width:160px}
+
+  /* Multi-selección (checkboxes desplegables) */  .multiselect{position:relative}
   .ms-box{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:#fff;cursor:pointer;font-size:14px}
   .ms-box:hover{border-color:var(--brand-2)}
   .ms-label{color:var(--ink)}
@@ -329,9 +340,27 @@
       <h1>Seguimiento</h1>
       <p>Registra el avance de las medidas de respuesta. Cada riesgo muestra cuántos reportes tiene; abre uno para ver su historial y añadir nuevos reportes.</p>
     </div>
-    <div class="conn" style="margin-bottom:16px">
+    <div class="conn" style="margin-bottom:12px">
       <input id="segBuscar" placeholder="Buscar riesgo por descripción o proceso…" style="border:0;background:transparent;flex:1;padding:0">
     </div>
+
+    <!-- Filtros avanzados -->
+    <div class="filtros-card">
+      <div class="filtros-head">
+        <span>Filtros avanzados</span>
+        <div>
+          <label class="filtros-logica">Combinar con:
+            <select id="filtroLogica" onchange="renderSeguimiento()">
+              <option value="AND">Y (todas)</option>
+              <option value="OR">O (alguna)</option>
+            </select>
+          </label>
+          <button class="btn btn-ghost" style="padding:6px 12px;font-size:13px" onclick="agregarCondicion()">+ Condición</button>
+        </div>
+      </div>
+      <div id="filtrosLista"></div>
+    </div>
+
     <div class="card"><div style="padding:6px 4px"><table>
       <thead><tr><th>Riesgo</th><th>Proceso</th><th>Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
       <tbody id="tablaSeguimiento"><tr><td colspan="7" class="empty"><h3>Cargando…</h3></td></tr></tbody>
@@ -457,7 +486,7 @@ document.querySelectorAll('nav button').forEach(b => {
     b.classList.add('active');
     document.getElementById('view-' + b.dataset.view).classList.add('active');
     if (b.dataset.view === 'dashboard') renderDashboard();
-    if (b.dataset.view === 'seguimiento') renderSeguimiento();
+    if (b.dataset.view === 'seguimiento') { renderFiltros(); renderSeguimiento(); }
     if (b.dataset.view === 'reevaluar') renderReeval();
   };
 });
@@ -1004,6 +1033,68 @@ function nivelInherenteDe(r){
   return { idx, nivel: nivelDe(idx) };
 }
 
+/* ===== FILTROS AVANZADOS ===== */
+// Campos disponibles para filtrar y cómo obtener su valor de cada riesgo.
+const FILTRO_CAMPOS = {
+  oficina:      { label:'Oficina responsable', get:r=>oficinaDe(r) },
+  proceso:      { label:'Proceso (ruta)',       get:r=>rutaProcesoDe(r) },
+  nivel:        { label:'Nivel inherente',      get:r=>String(nivelInherenteDe(r).nivel||''), opciones:['1','2','3','4'] },
+  procede:      { label:'¿Procede reevaluación?',get:r=>procedeReeval(r).procede?'Sí':'No', opciones:['Sí','No'] },
+  tipo:         { label:'Tipo de proceso',       get:r=>{const x=(r.values||{})['Tipo de proceso'];return (x&&x!=='Tipo de proceso')?x:'';} },
+  ro:           { label:'¿Riesgo u oportunidad?',get:r=>{const x=(r.values||{})['¿Riesgo u oportunidad?'];return (x&&x!=='¿Riesgo u oportunidad?')?x:'';}, opciones:['Riesgo','Oportunidad'] },
+  respuesta:    { label:'Respuesta',             get:r=>{const x=(r.values||{})['Respuesta al riesgo u oportunidad'];return (x&&!x.includes('Respuesta'))?x:'';}, opciones:['Eliminar','Mitigar','Trasladar','Asumir'] },
+  certificacion:{ label:'Certificación control', get:r=>{const x=(r.values||{})['Certificación de Implementación del Control'];return (x&&!x.includes('Certificación'))?x:'';}, opciones:['No Implementado','Implementado sin validar','Certificado/Operativo'] }
+};
+const FILTRO_OPERADORES = { contiene:'contiene', es:'es igual a', noes:'no es' };
+let CONDICIONES = []; // [{campo, op, valor}]
+
+function agregarCondicion(){
+  CONDICIONES.push({ campo:'oficina', op:'contiene', valor:'' });
+  renderFiltros();
+}
+function quitarCondicion(i){ CONDICIONES.splice(i,1); renderFiltros(); renderSeguimiento(); }
+function actualizarCondicion(i, prop, val){ CONDICIONES[i][prop]=val; if(prop==='campo'){CONDICIONES[i].valor='';} renderFiltros(); renderSeguimiento(); }
+window.agregarCondicion=agregarCondicion;
+window.quitarCondicion=quitarCondicion;
+window.actualizarCondicion=actualizarCondicion;
+
+function renderFiltros(){
+  const cont=document.getElementById('filtrosLista');
+  if(!CONDICIONES.length){ cont.innerHTML='<p class="hint" style="padding:4px 0">Sin condiciones. Agrega una para filtrar.</p>'; return; }
+  cont.innerHTML = CONDICIONES.map((c,i)=>{
+    const def=FILTRO_CAMPOS[c.campo];
+    const campoSel = Object.entries(FILTRO_CAMPOS).map(([k,v])=>`<option value="${k}" ${k===c.campo?'selected':''}>${v.label}</option>`).join('');
+    const opSel = Object.entries(FILTRO_OPERADORES).map(([k,v])=>`<option value="${k}" ${k===c.op?'selected':''}>${v}</option>`).join('');
+    // valor: si el campo tiene opciones fijas, mostrar select; si no, input texto
+    const valInput = def.opciones
+      ? `<select onchange="actualizarCondicion(${i},'valor',this.value)"><option value="">—</option>${def.opciones.map(o=>`<option ${o===c.valor?'selected':''}>${o}</option>`).join('')}</select>`
+      : `<input value="${(c.valor||'').replace(/"/g,'&quot;')}" placeholder="valor…" oninput="CONDICIONES[${i}].valor=this.value" onkeyup="renderSeguimiento()">`;
+    return `<div class="filtro-cond">
+      <select onchange="actualizarCondicion(${i},'campo',this.value)">${campoSel}</select>
+      <select onchange="actualizarCondicion(${i},'op',this.value)">${opSel}</select>
+      ${valInput}
+      <button class="icon-btn" title="Quitar" onclick="quitarCondicion(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// Evalúa si un riesgo pasa las condiciones según la lógica AND/OR
+function pasaFiltros(r){
+  if(!CONDICIONES.length) return true;
+  const logica=document.getElementById('filtroLogica').value;
+  const resultados = CONDICIONES.map(c=>{
+    if(!c.valor) return logica==='AND'; // condición sin valor: no restringe en AND, no aporta en OR
+    const def=FILTRO_CAMPOS[c.campo];
+    const valor=String(def.get(r)||'').toLowerCase();
+    const buscado=String(c.valor).toLowerCase();
+    if(c.op==='contiene') return valor.includes(buscado);
+    if(c.op==='es')       return valor===buscado;
+    if(c.op==='noes')     return valor!==buscado;
+    return true;
+  });
+  return logica==='AND' ? resultados.every(Boolean) : resultados.some(Boolean);
+}
+
 async function renderSeguimiento() {
   const tb = document.getElementById('tablaSeguimiento');
   try {
@@ -1013,7 +1104,7 @@ async function renderSeguimiento() {
     if(!recs.length){ tb.innerHTML='<tr><td colspan="7"><div class="empty"><h3>Sin riesgos</h3></div></td></tr>'; return; }
 
     const filtro = (document.getElementById('segBuscar').value||'').toLowerCase();
-    const filas = recs.map(r=>{
+    const filas = recs.filter(pasaFiltros).map(r=>{
       const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
       const proc=rutaProcesoDe(r) || '—';
       const oficina=oficinaDe(r);
