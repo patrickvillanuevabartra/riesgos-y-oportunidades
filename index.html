@@ -71,6 +71,18 @@
 
   .hidden{display:none!important}
 
+  /* Multi-selección (checkboxes desplegables) */
+  .multiselect{position:relative}
+  .ms-box{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:#fff;cursor:pointer;font-size:14px}
+  .ms-box:hover{border-color:var(--brand-2)}
+  .ms-label{color:var(--ink)}
+  .ms-arrow{color:var(--mist);font-size:12px}
+  .ms-panel{display:none;position:absolute;top:100%;left:0;right:0;z-index:30;background:#fff;border:1px solid var(--line);border-radius:9px;margin-top:4px;max-height:260px;overflow:auto;box-shadow:var(--shadow)}
+  .multiselect.open .ms-panel{display:block}
+  .ms-item{display:flex;align-items:flex-start;gap:8px;padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid var(--paper);line-height:1.4}
+  .ms-item:hover{background:var(--paper)}
+  .ms-item input{width:auto;margin-top:2px;flex:none}
+
   /* Índice/Nivel calculados */
   .calc-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
   .calc{flex:1;min-width:150px;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
@@ -238,8 +250,8 @@
           </div>
 
           <!-- Origen: Contexto -->
-          <div class="field origin contexto hidden"><label>Amenaza</label><select id="f_amenaza"></select></div>
-          <div class="field origin contexto hidden"><label>Oportunidad</label><select id="f_oportunidad_rel"></select></div>
+          <div class="field origin contexto hidden"><label>Amenaza(s)</label><div id="f_amenaza" class="multiselect"></div></div>
+          <div class="field origin contexto hidden"><label>Oportunidad(es)</label><div id="f_oportunidad_rel" class="multiselect"></div></div>
 
           <!-- Origen: Partes interesadas -->
           <div class="field origin partes hidden"><label>Parte interesada</label><select id="f_parte"></select></div>
@@ -428,7 +440,9 @@ const API = {
   },
   createRecord(entityId, values, rel_values) {
     const body = { values };
-    if (rel_values) body.rel_values = rel_values;
+    // rel_values puede contener arrays (relaciones múltiples). Se envía como
+    // JSON serializado para que QuintaDB lo interprete correctamente.
+    if (rel_values) body.json_rel_values = JSON.stringify(rel_values);
     return this.call(`/apps/${CONFIG.APP_ID}/dtypes/entity/${entityId}.json`, 'POST', body);
   }
 };
@@ -506,26 +520,30 @@ function fillSelect(el, options, placeholder='Seleccione…') {
 }
 
 // Construye opciones desde registros de una tabla maestra.
-// Toma el primer campo de texto significativo como etiqueta.
-function recordsToOptions(records) {
+// Si se indica labelCol, usa esa columna como etiqueta; si no, toma el primer texto legible.
+function recordsToOptions(records, labelCol) {
   return records.map(r => {
     const vals = r.values || {};
-    // buscamos un valor legible (no vacío) que no sea un id
     let label = '';
-    for (const k in vals) {
-      const v = vals[k];
-      if (typeof v === 'string' && v && !/^[a-zA-Z0-9_\-]{22}$/.test(v)) { label = v; break; }
+    if (labelCol && vals[labelCol] && vals[labelCol]!==labelCol) {
+      label = vals[labelCol];
+    } else {
+      for (const k in vals) {
+        const v = vals[k];
+        if (typeof v === 'string' && v && v!==k && !/^[a-zA-Z0-9_\-]{22}$/.test(v)) { label = v; break; }
+      }
     }
     return { value: r.id, label: label || r.id };
   });
 }
 
-async function loadMaestra(entityKey) {
-  if (STATE.maestras[entityKey]) return STATE.maestras[entityKey];
+async function loadMaestra(entityKey, labelCol) {
+  const cacheKey = entityKey + (labelCol?(':'+labelCol):'');
+  if (STATE.maestras[cacheKey]) return STATE.maestras[cacheKey];
   const entityId = CONFIG.ENTITIES[entityKey];
   const data = await API.records(entityId);
-  const opts = recordsToOptions(data.records || []);
-  STATE.maestras[entityKey] = opts;
+  const opts = recordsToOptions(data.records || [], labelCol);
+  STATE.maestras[cacheKey] = opts;
   return opts;
 }
 
@@ -543,15 +561,43 @@ function initStaticSelects() {
 async function ensureRelOptions() {
   try {
     const tasks = [];
-    const setOpts = (id, key) => loadMaestra(key).then(o => fillSelect(document.getElementById(id), o));
-    tasks.push(setOpts('f_amenaza','AMENAZAS'));
-    tasks.push(setOpts('f_oportunidad_rel','OPORTUNIDADES'));
+    const setOpts = (id, key, col) => loadMaestra(key, col).then(o => fillSelect(document.getElementById(id), o));
+    // Amenaza y Oportunidad: multi-selección con descripción
+    tasks.push(loadMaestra('AMENAZAS','Amenaza').then(o => fillMultiselect('f_amenaza', o)));
+    tasks.push(loadMaestra('OPORTUNIDADES','Oportunidad').then(o => fillMultiselect('f_oportunidad_rel', o)));
+    // Selección única
     tasks.push(setOpts('f_parte','PARTES'));
     tasks.push(setOpts('f_responsable','RESPONSABLES'));
     // Nota: f_tipo (Tipo de proceso) NO se llena aquí; lo gestiona la cascada
     // desde el inventario para garantizar coherencia de etiquetas.
     await Promise.all(tasks);
   } catch(e){ toast('No se pudieron cargar las listas: '+e.message, true); }
+}
+
+// Rellena un contenedor multi-selección con checkboxes (desplegable).
+function fillMultiselect(containerId, options){
+  const cont = document.getElementById(containerId);
+  if(!cont) return;
+  cont.innerHTML = `
+    <div class="ms-box" onclick="this.parentElement.classList.toggle('open')">
+      <span class="ms-label">Seleccione…</span><span class="ms-arrow">▾</span>
+    </div>
+    <div class="ms-panel">
+      ${options.map(o=>`<label class="ms-item"><input type="checkbox" value="${o.value}" onchange="actualizarMsLabel('${containerId}')"> ${o.label}</label>`).join('')}
+    </div>`;
+}
+// Actualiza la etiqueta del multiselect según lo marcado
+function actualizarMsLabel(containerId){
+  const cont=document.getElementById(containerId);
+  const marcados=[...cont.querySelectorAll('input:checked')];
+  const lbl=cont.querySelector('.ms-label');
+  lbl.textContent = marcados.length ? `${marcados.length} seleccionada(s)` : 'Seleccione…';
+}
+window.actualizarMsLabel = actualizarMsLabel;
+// Devuelve array de IDs seleccionados en un multiselect
+function getMultiselect(containerId){
+  const cont=document.getElementById(containerId);
+  return cont ? [...cont.querySelectorAll('input:checked')].map(c=>c.value) : [];
 }
 
 /* ============================================================
@@ -648,7 +694,12 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
 
   // Origen según fuente
   const fuente = v('f_fuente');
-  if (fuente === 'Contexto') { putRel(F.amenaza, v('f_amenaza')); putRel(F.oportunidad_rel, v('f_oportunidad_rel')); }
+  if (fuente === 'Contexto') {
+    const ams = getMultiselect('f_amenaza');
+    const ops = getMultiselect('f_oportunidad_rel');
+    if (ams.length) rel[F.amenaza.id] = ams;            // array de IDs (multi)
+    if (ops.length) rel[F.oportunidad_rel.id] = ops;    // array de IDs (multi)
+  }
   if (fuente === 'Partes interesadas') putRel(F.parte_interesada, v('f_parte'));
   if (fuente === 'Proceso') {
     // Los desplegables de proceso manejan TEXTO; la matriz espera el ID del
@@ -686,6 +737,7 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
     await API.createRecord(CONFIG.ENTITIES.MATRIZ, values, Object.keys(rel).length ? rel : null);
     toast('Registro guardado correctamente.');
     document.getElementById('formRiesgo').reset();
+    limpiarMultiselects();
     showOrigin(''); showEval(''); calcIndice();
     STATE.matriz = []; // invalidar caché
   } catch(err) {
@@ -694,8 +746,16 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
     btn.disabled = false; btn.textContent = 'Guardar registro';
   }
 });
+function limpiarMultiselects(){
+  ['f_amenaza','f_oportunidad_rel'].forEach(id=>{
+    const c=document.getElementById(id); if(!c) return;
+    c.querySelectorAll('input:checked').forEach(ch=>ch.checked=false);
+    const lbl=c.querySelector('.ms-label'); if(lbl) lbl.textContent='Seleccione…';
+    c.classList.remove('open');
+  });
+}
 document.getElementById('btnReset').onclick = () => {
-  document.getElementById('formRiesgo').reset(); showOrigin(''); showEval(''); calcIndice();
+  document.getElementById('formRiesgo').reset(); limpiarMultiselects(); showOrigin(''); showEval(''); calcIndice();
 };
 
 /* ============================================================
