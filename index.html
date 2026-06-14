@@ -144,6 +144,24 @@
   .rep-evid{margin-top:8px;display:flex;gap:14px;flex-wrap:wrap}
   .rep-evid a{font-size:12px;color:var(--brand-2);text-decoration:none;font-weight:500}
   .rep-evid a:hover{text-decoration:underline}
+
+  /* Nombre de riesgo clicable */
+  .riesgo-link{color:var(--brand);font-weight:500;cursor:pointer;text-decoration:none;border-bottom:1px dashed var(--brand-2)}
+  .riesgo-link:hover{color:var(--brand-2)}
+  /* Botón de ícono (ojo) */
+  .icon-btn{background:#fff;border:1px solid var(--line);border-radius:8px;width:36px;height:32px;cursor:pointer;font-size:16px;line-height:1;transition:.15s}
+  .icon-btn:hover{border-color:var(--brand-2);background:var(--paper)}
+  /* Panel de historial (acordeón bajo el riesgo) */
+  .hist-panel{padding:18px 20px}
+  .hist-head{font-family:'Fraunces',serif;font-weight:600;font-size:15px;margin-bottom:14px}
+  .add-rep{margin-top:16px;border-top:1px solid var(--line);padding-top:8px}
+  .add-rep summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--brand);padding:8px 0}
+  .add-rep summary:hover{color:var(--brand-2)}
+  /* Filas de detalle en el modal */
+  .det-row{display:flex;gap:14px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .det-row:last-child{border-bottom:0}
+  .det-k{flex:0 0 200px;font-size:13px;font-weight:600;color:var(--slate)}
+  .det-v{flex:1;font-size:14px;color:var(--ink)}
   .est-pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:6px}
   .est-pend{background:#fdf0e6;color:var(--n3)} .est-proc{background:#fdf8e6;color:var(--n2)} .est-culm{background:#e8f3ec;color:var(--n1)}
 
@@ -298,36 +316,23 @@
       <input id="segBuscar" placeholder="Buscar riesgo por descripción o proceso…" style="border:0;background:transparent;flex:1;padding:0">
     </div>
     <div class="card"><div style="padding:6px 4px"><table>
-      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Reportes</th><th>Último estado</th><th></th></tr></thead>
+      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Reportes</th><th>Último estado</th><th style="text-align:right">Acciones</th></tr></thead>
       <tbody id="tablaSeguimiento"><tr><td colspan="5" class="empty"><h3>Cargando…</h3></td></tr></tbody>
     </table></div></div>
   </section>
 
-  <!-- Modal de reportes -->
+  <!-- Modal de detalle del riesgo (ícono ojo) -->
   <div id="modalSeg" class="modal-overlay hidden">
     <div class="modal">
       <div class="modal-head">
         <div>
-          <div class="eyebrow">Reportes de acción</div>
+          <div class="eyebrow">Detalle del riesgo</div>
           <h2 id="modalTitulo" style="font-size:18px">Riesgo</h2>
         </div>
         <button class="modal-close" id="modalCerrar">&times;</button>
       </div>
       <div class="modal-body">
-        <h3 style="font-size:14px;margin-bottom:10px">Historial de reportes</h3>
         <div id="modalHistorial"></div>
-        <h3 style="font-size:14px;margin:22px 0 12px">Añadir reporte</h3>
-        <div class="grid">
-          <div class="field"><label>Fecha de reporte</label><input type="date" id="rep_fecha"></div>
-          <div class="field"><label>Estado</label><select id="rep_estado"><option value="">Seleccione…</option><option>Pendiente</option><option>En Proceso</option><option>Culminado/Ejecutado</option></select></div>
-          <div class="field full"><label>Acción desarrollada</label><textarea id="rep_accion"></textarea></div>
-          <div class="field full"><label>Observación</label><textarea id="rep_obs"></textarea></div>
-          <div class="field full"><label>Evidencia (enlace)</label><input id="rep_evid" placeholder="https://…"></div>
-        </div>
-      </div>
-      <div class="actions" style="border-radius:0">
-        <button class="btn btn-ghost" id="repCancelar">Cancelar</button>
-        <button class="btn btn-primary" id="repGuardar">Guardar reporte</button>
       </div>
     </div>
   </div>
@@ -777,6 +782,16 @@ function oficinaDe(r){
   return (x && x!=='Responsable') ? x : 'Sin oficina asignada';
 }
 
+// Formatea una fecha a dd/mm/aaaa (acepta '2026-06-13', '13-06-2026', etc.)
+function fmtFecha(s){
+  if(!s) return 'sin fecha';
+  const m = String(s).match(/(\d{4})-(\d{2})-(\d{2})/);     // aaaa-mm-dd
+  if(m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const m2 = String(s).match(/(\d{2})-(\d{2})-(\d{4})/);    // dd-mm-aaaa
+  if(m2) return `${m2[1]}/${m2[2]}/${m2[3]}`;
+  return s;
+}
+
 async function renderSeguimiento() {
   const tb = document.getElementById('tablaSeguimiento');
   try {
@@ -801,12 +816,17 @@ async function renderSeguimiento() {
 
     const filaHTML = f => `
       <tr>
-        <td style="max-width:300px" title="${(f.desc||'').replace(/"/g,'&quot;')}">${f.desc.length>90?f.desc.slice(0,90)+'…':f.desc}</td>
+        <td style="max-width:300px">
+          <a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>90?f.desc.slice(0,90)+'…':f.desc}</a>
+        </td>
         <td title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>34?f.proc.slice(0,34)+'…':f.proc}</td>
         <td><strong>${f.nReportes}</strong></td>
         <td id="estado-${f.id}" class="mono" style="font-size:12px;color:var(--mist)">${f.nReportes?'…':'—'}</td>
-        <td><button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="abrirReportes('${f.id}')">+ Reporte</button></td>
-      </tr>`;
+        <td style="text-align:right;white-space:nowrap">
+          <button class="icon-btn" title="Ver detalle del riesgo" onclick="verDetalle('${f.id}')">👁</button>
+        </td>
+      </tr>
+      <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="5" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
 
     tb.innerHTML = oficinasOrdenadas.length ? oficinasOrdenadas.map(of => `
       <tr class="grupo-row"><td colspan="5">
@@ -842,97 +862,157 @@ async function cargarUltimosEstados(filasConReportes) {
 }
 
 // Abre el modal y carga el historial de reportes de ese riesgo
-async function abrirReportes(riesgoId) {
-  const recs = STATE.matriz;
-  const r = recs.find(x=>x.id===riesgoId);
-  const F = CONFIG.MATRIZ_FIELDS;
-  const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
-  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
+// === Render del historial de reportes (HTML) para un riesgo ===
+async function renderHistorialHTML(subIds){
+  if(!subIds.length) return '<p class="hint">Este riesgo aún no tiene reportes.</p>';
+  const reps = await Promise.all(subIds.map(id =>
+    API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+id+'.json','GET',{name_value:1})
+      .then(d=>d.record).catch(()=>null)
+  ));
+  const RF = CONFIG.REPORTE_FIELDS;
+  const val=(rec,col)=> rec && rec.values ? (rec.values[col]||'') : '';
+  return reps.filter(Boolean).map(rec=>{
+    const est=val(rec,RF.estado.col);
+    const ev1=val(rec,'Evidencia 1');
+    const ev2=val(rec,RF.evidencia2.col);
+    const evHtml = (ev1||ev2) ? `<div class="rep-evid">${
+      ev1 ? `<a href="${ev1}" target="_blank" rel="noopener">📎 Evidencia 1</a>` : ''
+    }${ev2 ? `<a href="${ev2}" target="_blank" rel="noopener">🔗 Evidencia 2</a>` : ''}</div>` : '';
+    return `<div class="rep-item">
+      <div class="top"><span class="fecha">${fmtFecha(val(rec,RF.fecha_reporte.col))}</span>${estadoPill(est)}</div>
+      <div class="acc">${val(rec,RF.accion.col)||'(sin descripción de acción)'}</div>
+      ${val(rec,RF.observacion.col)?`<div class="obs">Obs: ${val(rec,RF.observacion.col)}</div>`:''}
+      ${evHtml}
+    </div>`;
+  }).join('') || '<p class="hint">No se pudieron leer los reportes.</p>';
+}
+
+// === Clic en el nombre del riesgo → despliega/oculta historial + formulario añadir ===
+async function toggleHistorial(riesgoId){
+  const row = document.getElementById('hist-'+riesgoId);
+  const cont = document.getElementById('hist-cont-'+riesgoId);
+  if(!row) return;
+  // Si ya está abierto, cerrar
+  if(row.style.display !== 'none'){ row.style.display='none'; return; }
+  // Cerrar otros abiertos
+  document.querySelectorAll('.hist-row').forEach(r=>r.style.display='none');
+  row.style.display='';
+  SEG_RIESGO_ACTUAL = { id: riesgoId };
+
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
   const subIds=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
-  SEG_RIESGO_ACTUAL = { id: riesgoId, subIds };
+  SEG_RIESGO_ACTUAL.subIds = subIds;
 
-  document.getElementById('modalTitulo').textContent = desc.length>80?desc.slice(0,80)+'…':desc;
-  document.getElementById('modalSeg').classList.remove('hidden');
-  const hist = document.getElementById('modalHistorial');
-  hist.innerHTML = subIds.length ? '<p class="hint">Cargando reportes…</p>' : '<p class="hint">Este riesgo aún no tiene reportes.</p>';
+  cont.innerHTML = `<div class="hist-panel">
+    <div class="hist-head">Reportes de avance <span class="grupo-count" style="color:var(--mist)">${subIds.length} reporte${subIds.length!==1?'s':''}</span></div>
+    <div id="histlist-${riesgoId}">${subIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes aún.</p>'}</div>
+    <details class="add-rep"><summary>+ Añadir reporte</summary>
+      <div class="grid" style="margin-top:14px">
+        <div class="field"><label>Fecha de reporte</label><input type="date" id="add_fecha_${riesgoId}"></div>
+        <div class="field"><label>Estado</label><select id="add_estado_${riesgoId}"><option value="">Seleccione…</option><option>Pendiente</option><option>En Proceso</option><option>Culminado/Ejecutado</option></select></div>
+        <div class="field full"><label>Acción desarrollada</label><textarea id="add_accion_${riesgoId}"></textarea></div>
+        <div class="field full"><label>Observación</label><textarea id="add_obs_${riesgoId}"></textarea></div>
+        <div class="field full"><label>Evidencia (enlace)</label><input id="add_evid_${riesgoId}" placeholder="https://…"></div>
+      </div>
+      <div style="text-align:right;margin-top:12px">
+        <button class="btn btn-primary" onclick="guardarReporte('${riesgoId}')" id="addbtn-${riesgoId}">Guardar reporte</button>
+      </div>
+    </details>
+  </div>`;
 
-  // Leer cada reporte por su ID (name_value=1 → nombres de columna)
-  if (subIds.length) {
-    try {
-      const reps = await Promise.all(subIds.map(id =>
-        API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+id+'.json','GET',{name_value:1})
-          .then(d=>d.record).catch(()=>null)
-      ));
-      const RF = CONFIG.REPORTE_FIELDS;
-      const val=(rec,col)=> rec && rec.values ? (rec.values[col]||'') : '';
-      hist.innerHTML = reps.filter(Boolean).map(rec=>{
-        const est=val(rec,RF.estado.col);
-        const ev1=val(rec,'Evidencia 1');      // archivo (puede ser URL o nombre)
-        const ev2=val(rec,RF.evidencia2.col);  // enlace
-        const evHtml = (ev1||ev2) ? `<div class="rep-evid">${
-          ev1 ? `<a href="${ev1}" target="_blank" rel="noopener">📎 Evidencia 1</a>` : ''
-        }${ev2 ? `<a href="${ev2}" target="_blank" rel="noopener">🔗 Evidencia 2</a>` : ''}</div>` : '';
-        return `<div class="rep-item">
-          <div class="top"><span class="fecha">${val(rec,RF.fecha_reporte.col)||'sin fecha'}</span>${estadoPill(est)}</div>
-          <div class="acc">${val(rec,RF.accion.col)||'(sin descripción de acción)'}</div>
-          ${val(rec,RF.observacion.col)?`<div class="obs">Obs: ${val(rec,RF.observacion.col)}</div>`:''}
-          ${evHtml}
-        </div>`;
-      }).join('') || '<p class="hint">No se pudieron leer los reportes.</p>';
-    } catch(e){ hist.innerHTML='<p class="hint">Error al leer reportes: '+e.message+'</p>'; }
+  if(subIds.length){
+    try { document.getElementById('histlist-'+riesgoId).innerHTML = await renderHistorialHTML(subIds); }
+    catch(e){ document.getElementById('histlist-'+riesgoId).innerHTML = '<p class="hint">Error: '+e.message+'</p>'; }
   }
 }
-window.abrirReportes = abrirReportes;
+window.toggleHistorial = toggleHistorial;
 
-function cerrarModal(){ document.getElementById('modalSeg').classList.add('hidden');
-  ['rep_fecha','rep_accion','rep_obs','rep_evid'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('rep_estado').value=''; }
-document.getElementById('modalCerrar').onclick = cerrarModal;
-document.getElementById('repCancelar').onclick = cerrarModal;
-document.getElementById('modalSeg').onclick = (e)=>{ if(e.target.id==='modalSeg') cerrarModal(); };
-
-// Guardar un nuevo reporte vinculado al riesgo
-document.getElementById('repGuardar').addEventListener('click', async ()=>{
-  if(!SEG_RIESGO_ACTUAL) return;
-  const btn=document.getElementById('repGuardar');
+// === Guardar reporte (desde el acordeón) ===
+async function guardarReporte(riesgoId){
   const RF=CONFIG.REPORTE_FIELDS;
-  const v=id=>document.getElementById(id).value;
-  if(!v('rep_estado') && !v('rep_accion')){ toast('Indica al menos la acción o el estado.',true); return; }
+  const g=id=>document.getElementById(id+'_'+riesgoId).value;
+  if(!g('add_estado') && !g('add_accion')){ toast('Indica al menos la acción o el estado.',true); return; }
+  const btn=document.getElementById('addbtn-'+riesgoId);
 
-  // Valores del nuevo reporte (por field_id real)
   const repVals={};
-  if(v('rep_fecha'))  repVals[RF.fecha_reporte.id]=v('rep_fecha');
-  if(v('rep_accion')) repVals[RF.accion.id]=v('rep_accion');
-  if(v('rep_obs'))    repVals[RF.observacion.id]=v('rep_obs');
-  if(v('rep_evid'))   repVals[RF.evidencia2.id]=v('rep_evid');
-  if(v('rep_estado')) repVals[RF.estado.id]=v('rep_estado');
+  if(g('add_fecha'))  repVals[RF.fecha_reporte.id]=g('add_fecha');
+  if(g('add_accion')) repVals[RF.accion.id]=g('add_accion');
+  if(g('add_obs'))    repVals[RF.observacion.id]=g('add_obs');
+  if(g('add_evid'))   repVals[RF.evidencia2.id]=g('add_evid');
+  if(g('add_estado')) repVals[RF.estado.id]=g('add_estado');
 
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
-  try {
-    // Generar un ID nuevo para el registro de subformulario (22 chars base64-url)
+  try{
     const newId = genId22();
-    // Estructura subforms_values: { subform_field_id: { entity_id: SUB_ENTITY, newRecId: {campos} } }
     const subforms = {};
     subforms[SUBFORM_FIELD_ID] = { entity_id: CONFIG.ENTITIES.REPORTES };
     subforms[SUBFORM_FIELD_ID][newId] = repVals;
-
-    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+SEG_RIESGO_ACTUAL.id+'.json','PUT',
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT',
       { json_subforms_values: JSON.stringify(subforms) });
-
     toast('Reporte agregado correctamente.');
-    // Limpiar el formulario del reporte
-    ['rep_fecha','rep_accion','rep_obs','rep_evid'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('rep_estado').value='';
-    // Invalidar caché y recargar el historial del mismo riesgo en el modal
     STATE.matriz=[];
     await loadMatriz();
-    await abrirReportes(SEG_RIESGO_ACTUAL.id); // recarga historial actualizado
-    btn.disabled=false; btn.textContent='Guardar reporte';
-  } catch(err){
+    await renderSeguimiento();
+    // reabrir el historial del mismo riesgo
+    setTimeout(()=>toggleHistorial(riesgoId), 100);
+  }catch(err){
     toast('Error al guardar el reporte: '+err.message, true);
     btn.disabled=false; btn.textContent='Guardar reporte';
   }
-});
+}
+window.guardarReporte = guardarReporte;
+
+// === Ícono de ojo → modal con el detalle completo del riesgo ===
+function verDetalle(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  if(!r) return;
+  const v = r.values||{};
+  // Campos a mostrar (nombre legible → valor), omitiendo vacíos y los que repiten el nombre del campo
+  const filas = [
+    ['Fecha de evaluación','Fecha de evaluación'],
+    ['Fuente de identificación','Fuente de identificación del riesgo u oportunidad'],
+    ['¿Riesgo u oportunidad?','¿Riesgo u oportunidad?'],
+    ['Riesgo','Riesgo'],
+    ['Oportunidad','Oportunidad'],
+    ['Causas','Causas'],
+    ['Consecuencias','Consecuencias'],
+    ['Proceso','__proceso__'],
+    ['Actividad específica','Actividad específica'],
+    ['Probabilidad inherente','Probabilidad riesgo inherente'],
+    ['Impacto inherente','Impacto riesgo inherente'],
+    ['Índice inherente','Índice de prioridad riesgo inherente'],
+    ['Nivel inherente','Nivel de riesgo inherente'],
+    ['¿Existen controles?','¿Existen controles?'],
+    ['Control establecido','Control establecido'],
+    ['Respuesta','Respuesta al riesgo u oportunidad'],
+    ['Responsable (oficina)','Responsable'],
+    ['Medida(s) de respuesta','Medida(s) de respuesta'],
+    ['Certificación del control','Certificación de Implementación del Control'],
+    ['Nivel residual','Nivel de riesgo residual'],
+  ];
+  const limpio = (col)=>{
+    if(col==='__proceso__') return procesoDe(r);
+    const val = v[col];
+    if(!val || val===col) return '';
+    return val;
+  };
+  const html = filas.map(([etq,col])=>{
+    const val = limpio(col);
+    if(!val) return '';
+    return `<div class="det-row"><div class="det-k">${etq}</div><div class="det-v">${val}</div></div>`;
+  }).filter(Boolean).join('');
+
+  const desc=limpio('Riesgo')||limpio('Oportunidad')||'(sin descripción)';
+  document.getElementById('modalTitulo').textContent = desc.length>80?desc.slice(0,80)+'…':desc;
+  document.getElementById('modalHistorial').innerHTML = html || '<p class="hint">Sin datos.</p>';
+  // Ocultar el formulario "añadir reporte" del modal viejo (en detalle no aplica)
+  document.getElementById('modalSeg').classList.remove('hidden');
+}
+window.verDetalle = verDetalle;
+
+function cerrarModal(){ document.getElementById('modalSeg').classList.add('hidden'); }
+document.getElementById('modalCerrar').onclick = cerrarModal;
+document.getElementById('modalSeg').onclick = (e)=>{ if(e.target.id==='modalSeg') cerrarModal(); };
 
 // Genera un identificador de 22 caracteres URL-safe (como usa QuintaDB)
 function genId22(){
