@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gestión de Riesgos y Oportunidades</title>
+<title>Matriz de Riesgos y Oportunidades</title>
 <script src="config.js"></script>
 <style>
   /* ===== Identidad visual: "Centro de control de riesgos" =====
@@ -131,7 +131,7 @@
   <div class="bar">
     <div class="logo">
       <div class="logo-mark">R</div>
-      <div><b>Matriz de Riesgos</b><span>Sistema de Gestión · ISO 31000</span></div>
+      <div><b>Matriz de Riesgos y Oportunidades</b><span>Sistema de Gestión · ISO 31000</span></div>
     </div>
     <nav>
       <button data-view="dashboard" class="active">Tablero</button>
@@ -423,54 +423,76 @@ async function ensureRelOptions() {
     tasks.push(setOpts('f_amenaza','AMENAZAS'));
     tasks.push(setOpts('f_oportunidad_rel','OPORTUNIDADES'));
     tasks.push(setOpts('f_parte','PARTES'));
-    tasks.push(setOpts('f_tipo','TIPO_PROCESO'));
     tasks.push(setOpts('f_responsable','RESPONSABLES'));
+    // Nota: f_tipo (Tipo de proceso) NO se llena aquí; lo gestiona la cascada
+    // desde el inventario para garantizar coherencia de etiquetas.
     await Promise.all(tasks);
   } catch(e){ toast('No se pudieron cargar las listas: '+e.message, true); }
 }
 
 /* ============================================================
    CASCADA de procesos (Tipo → N0 → N1 → N2 → N3 → Proc)
-   Se filtra usando los registros del INVENTARIO como puente.
+   TODO se llena desde el INVENTARIO (fuente única y coherente),
+   filtrando por los nombres de columna reales que devuelve QuintaDB.
    ============================================================ */
-const INV = CONFIG.INVENTARIO_FIELDS;
+// Nombres EXACTOS de columna en el inventario (verificados con datos reales).
+// Ojo: nivel 1 viene como "Procesos nivel 1" (plural).
+const INV_COLS = {
+  tipo: 'Tipo de proceso',
+  n0:   'Proceso nivel 0',
+  n1:   'Procesos nivel 1',
+  n2:   'Proceso nivel 2',
+  n3:   'Proceso nivel 3',
+  proc: 'Procedimiento'
+};
+
 async function loadInventario() {
   if (STATE.inventario.length) return STATE.inventario;
   const data = await API.records(CONFIG.ENTITIES.INVENTARIO);
   STATE.inventario = data.records || [];
   return STATE.inventario;
 }
-// dado un nivel previo seleccionado, devuelve las opciones válidas del siguiente
-function cascadaOpciones(inv, filtros, campoSiguiente) {
-  const set = new Map();
+
+// Opciones únicas y ordenadas de una columna del inventario, según filtros previos.
+function opcionesInv(inv, filtros, columnaSiguiente) {
+  const set = new Set();
   inv.forEach(r => {
     const v = r.values || {};
-    const ok = Object.entries(filtros).every(([campo, val]) => !val || v[campo] === val);
-    if (ok && v[campoSiguiente]) set.set(v[campoSiguiente], v[campoSiguiente]);
+    const ok = Object.entries(filtros).every(([col, val]) => !val || v[col] === val);
+    if (ok && v[columnaSiguiente]) set.add(v[columnaSiguiente]);
   });
-  return [...set.keys()].map(x => ({ value:x, label:x }));
+  return [...set].sort().map(x => ({ value: x, label: x }));
 }
+
 async function initCascada() {
   const inv = await loadInventario();
   const fTipo=document.getElementById('f_tipo'), n0=document.getElementById('f_n0'),
         n1=document.getElementById('f_n1'), n2=document.getElementById('f_n2'),
         n3=document.getElementById('f_n3'), pr=document.getElementById('f_proc');
-  // nombres de campo (name_value=1 → las claves son los NOMBRES de columna)
-  const C = { tipo:'Tipo de proceso', n0:'Proceso nivel 0', n1:'Procesos nivel 1',
-              n2:'Proceso nivel 2', n3:'Proceso nivel 3', proc:'Procedimiento' };
-  const reset = (el)=>{el.innerHTML='<option value="">Seleccione…</option>';el.disabled=true;};
+  const C = INV_COLS;
+  const reset = (el)=>{ el.innerHTML='<option value="">Seleccione…</option>'; el.disabled=true; };
+
+  // El desplegable de Tipo se llena DESDE el inventario (no desde la tabla maestra),
+  // para que sus etiquetas coincidan exactamente con el filtrado de la cascada.
+  fillSelect(fTipo, opcionesInv(inv, {}, C.tipo));
+
   fTipo.onchange = () => {
     [n0,n1,n2,n3,pr].forEach(reset);
-    fillSelect(n0, cascadaOpciones(inv,{[C.tipo]:fTipo.value},C.n0)); n0.disabled=false;
+    if(!fTipo.value) return;
+    fillSelect(n0, opcionesInv(inv, {[C.tipo]:fTipo.value}, C.n0)); n0.disabled=false;
   };
   n0.onchange = () => { [n1,n2,n3,pr].forEach(reset);
-    fillSelect(n1, cascadaOpciones(inv,{[C.tipo]:fTipo.value,[C.n0]:n0.value},C.n1)); n1.disabled=false; };
+    if(!n0.value) return;
+    fillSelect(n1, opcionesInv(inv, {[C.tipo]:fTipo.value,[C.n0]:n0.value}, C.n1)); n1.disabled=false; };
   n1.onchange = () => { [n2,n3,pr].forEach(reset);
-    fillSelect(n2, cascadaOpciones(inv,{[C.n0]:n0.value,[C.n1]:n1.value},C.n2)); n2.disabled=false; };
+    if(!n1.value) return;
+    fillSelect(n2, opcionesInv(inv, {[C.n0]:n0.value,[C.n1]:n1.value}, C.n2)); n2.disabled=false; };
   n2.onchange = () => { [n3,pr].forEach(reset);
-    fillSelect(n3, cascadaOpciones(inv,{[C.n1]:n1.value,[C.n2]:n2.value},C.n3)); n3.disabled=false; };
+    if(!n2.value) return;
+    fillSelect(n3, opcionesInv(inv, {[C.n1]:n1.value,[C.n2]:n2.value}, C.n3)); n3.disabled=false; };
   n3.onchange = () => { reset(pr);
-    fillSelect(pr, cascadaOpciones(inv,{[C.n2]:n2.value,[C.n3]:n3.value},C.proc)); pr.disabled=false; };
+    if(!n3.value) return;
+    fillSelect(pr, opcionesInv(inv, {[C.n2]:n2.value,[C.n3]:n3.value}, C.proc)); pr.disabled=false; };
 }
 
 /* ============================================================
@@ -505,8 +527,25 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   if (fuente === 'Contexto') { putRel(F.amenaza, v('f_amenaza')); putRel(F.oportunidad_rel, v('f_oportunidad_rel')); }
   if (fuente === 'Partes interesadas') putRel(F.parte_interesada, v('f_parte'));
   if (fuente === 'Proceso') {
-    putRel(F.tipo_proceso, v('f_tipo')); putRel(F.proceso_n0, v('f_n0'));
-    putRel(F.proceso_n1, v('f_n1')); putRel(F.proceso_n2, v('f_n2'));
+    // Los desplegables de proceso manejan TEXTO; la matriz espera el ID del
+    // registro relacionado. Buscamos en el inventario la fila que coincide con
+    // la selección y tomamos los IDs de sus rel_values.
+    const fila = (STATE.inventario || []).find(r => {
+      const vv = r.values || {};
+      return vv[INV_COLS.tipo] === v('f_tipo')
+          && (!v('f_n0') || vv[INV_COLS.n0] === v('f_n0'))
+          && (!v('f_n1') || vv[INV_COLS.n1] === v('f_n1'))
+          && (!v('f_n2') || vv[INV_COLS.n2] === v('f_n2'));
+    });
+    if (fila && fila.rel_values) {
+      const RV = fila.rel_values;
+      const first = a => Array.isArray(a) ? a[0] : a;
+      // Mapear cada nivel al field_id de la MATRIZ con el ID del registro maestro.
+      if (RV[CONFIG.INVENTARIO_FIELDS.tipo_proceso.id]) rel[F.tipo_proceso.id] = first(RV[CONFIG.INVENTARIO_FIELDS.tipo_proceso.id]);
+      if (RV[CONFIG.INVENTARIO_FIELDS.proceso_n0.id])   rel[F.proceso_n0.id]   = first(RV[CONFIG.INVENTARIO_FIELDS.proceso_n0.id]);
+      if (RV[CONFIG.INVENTARIO_FIELDS.proceso_n1.id])   rel[F.proceso_n1.id]   = first(RV[CONFIG.INVENTARIO_FIELDS.proceso_n1.id]);
+      if (RV[CONFIG.INVENTARIO_FIELDS.proceso_n2.id])   rel[F.proceso_n2.id]   = first(RV[CONFIG.INVENTARIO_FIELDS.proceso_n2.id]);
+    }
   }
   // Naturaleza
   if (tipo === 'Riesgo') {
