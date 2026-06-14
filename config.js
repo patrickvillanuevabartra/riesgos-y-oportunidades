@@ -70,7 +70,7 @@ const CONFIG = {
     medida_respuesta:        { id: "caWPnqWPrhW5FcRvSPW70I", type: "text" },
 
     // --- Seguimiento / habilitación del residual ---
-    reporte_acciones:        { id: "bfyfuPWQ9ggRmWk8o4qmkr", type: "subform", entity: "REPORTES" },
+    reporte_acciones:        { id: "bfyfuPWQ9gWPv5nfNdHmoh", type: "subform", entity: "REPORTES" },
     certificacion_control:   { id: "ddN8kJW5vdKjWNcY4BpmoP", type: "select", options: ["No Implementado","Implementado sin validar","Certificado/Operativo"] },
     estado_reevaluacion:     { id: "ddSXZcNmnbWQhdMCkoW7Pd", type: "select", options: ["Sí procede","No procede"] },
     fecha_reevaluacion:      { id: "dcU8oTm8ngW6lcK8kDW4rr", type: "date" },
