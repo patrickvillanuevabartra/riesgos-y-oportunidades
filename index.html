@@ -138,6 +138,9 @@
   .rep-item .fecha{font-size:12px;color:var(--mist);font-family:'IBM Plex Mono',monospace}
   .rep-item .acc{font-size:14px;color:var(--ink)}
   .rep-item .obs{font-size:13px;color:var(--mist);margin-top:4px}
+  .rep-evid{margin-top:8px;display:flex;gap:14px;flex-wrap:wrap}
+  .rep-evid a{font-size:12px;color:var(--brand-2);text-decoration:none;font-weight:500}
+  .rep-evid a:hover{text-decoration:underline}
   .est-pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:6px}
   .est-pend{background:#fdf0e6;color:var(--n3)} .est-proc{background:#fdf8e6;color:var(--n2)} .est-culm{background:#e8f3ec;color:var(--n1)}
 
@@ -809,10 +812,16 @@ async function abrirReportes(riesgoId) {
       const val=(rec,col)=> rec && rec.values ? (rec.values[col]||'') : '';
       hist.innerHTML = reps.filter(Boolean).map(rec=>{
         const est=val(rec,RF.estado.col);
+        const ev1=val(rec,'Evidencia 1');      // archivo (puede ser URL o nombre)
+        const ev2=val(rec,RF.evidencia2.col);  // enlace
+        const evHtml = (ev1||ev2) ? `<div class="rep-evid">${
+          ev1 ? `<a href="${ev1}" target="_blank" rel="noopener">📎 Evidencia 1</a>` : ''
+        }${ev2 ? `<a href="${ev2}" target="_blank" rel="noopener">🔗 Evidencia 2</a>` : ''}</div>` : '';
         return `<div class="rep-item">
           <div class="top"><span class="fecha">${val(rec,RF.fecha_reporte.col)||'sin fecha'}</span>${estadoPill(est)}</div>
           <div class="acc">${val(rec,RF.accion.col)||'(sin descripción de acción)'}</div>
-          ${val(rec,RF.observacion.col)?`<div class="obs">${val(rec,RF.observacion.col)}</div>`:''}
+          ${val(rec,RF.observacion.col)?`<div class="obs">Obs: ${val(rec,RF.observacion.col)}</div>`:''}
+          ${evHtml}
         </div>`;
       }).join('') || '<p class="hint">No se pudieron leer los reportes.</p>';
     } catch(e){ hist.innerHTML='<p class="hint">Error al leer reportes: '+e.message+'</p>'; }
