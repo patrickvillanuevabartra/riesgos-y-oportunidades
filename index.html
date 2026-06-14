@@ -201,7 +201,7 @@
     <div class="dash-grid">
       <div class="panel"><h3>Distribución por nivel · inherente vs. residual</h3><div id="distNiveles"></div></div>
       <div class="panel"><h3>Avance de medidas de respuesta</h3><div id="estadoMedidas"></div></div>
-      <div class="panel"><h3>Riesgos por proceso</h3><div id="porProceso"></div></div>
+      <div class="panel"><h3>Riesgos por proceso (nivel 1)</h3><div id="porProceso"></div></div>
       <div class="panel"><h3>Riesgos por oficina responsable</h3><div id="porOficina"></div></div>
       <div class="panel"><h3>Mapa de calor · probabilidad × impacto</h3><div id="heatmap"></div></div>
     </div>
@@ -712,7 +712,7 @@ async function renderDashboard() {
       if(nInh) sumInh+=idxInh;
       const p=num(get(r,F.prob_riesgo_inh,'Probabilidad riesgo inherente')), i=num(get(r,F.imp_riesgo_inh,'Impacto riesgo inherente'));
       if(p&&i){ const k=p+'-'+i; heat[k]=(heat[k]||0)+1; }
-      const proc=procesoDe(r);
+      const proc=nivel1De(r);
       porProc[proc]=(porProc[proc]||0)+1;
       const ofi=oficinaDe(r);
       porOfi[ofi]=(porOfi[ofi]||0)+1;
@@ -800,14 +800,27 @@ function procesoDe(r) {
 function rutaProcesoDe(r){
   const v = r.values || {};
   const limpio = (col) => { const x=v[col]; return (x && x!==col) ? x : ''; };
+  const nivel1 = limpio('Procesos nivel 1') || limpio('Proceso nivel 1'); // singular o plural
   const partes = [
     limpio('Tipo de proceso'),
     limpio('Proceso nivel 0'),
-    limpio('Procesos nivel 1'),
+    nivel1,
     limpio('Proceso nivel 2'),
     limpio('Proceso nivel 3')
   ].filter(Boolean);
   return partes.join(' › ');
+}
+
+// Proceso de NIVEL 1 (para agrupar en el dashboard). Prueba ambas grafías
+// porque la matriz y el inventario pueden nombrarlo distinto (singular/plural).
+function nivel1De(r){
+  const v=r.values||{};
+  const cand=['Procesos nivel 1','Proceso nivel 1'];
+  for(const c of cand){ if(v[c] && v[c]!==c) return v[c]; }
+  // si no hay nivel 1, cae al nivel 0 o tipo
+  return (v['Proceso nivel 0']&&v['Proceso nivel 0']!=='Proceso nivel 0'?v['Proceso nivel 0']:null)
+      || (v['Tipo de proceso']&&v['Tipo de proceso']!=='Tipo de proceso'?v['Tipo de proceso']:null)
+      || 'Sin proceso';
 }
 
 function estadoPill(est){
