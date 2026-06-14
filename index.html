@@ -674,7 +674,7 @@ async function renderDashboard() {
       if(nInh) sumInh+=idxInh;
       const p=num(get(r,F.prob_riesgo_inh,'Probabilidad riesgo inherente')), i=num(get(r,F.imp_riesgo_inh,'Impacto riesgo inherente'));
       if(p&&i){ const k=p+'-'+i; heat[k]=(heat[k]||0)+1; }
-      const proc=get(r,F.tipo_proceso,'Tipo de proceso')||'Sin proceso';
+      const proc=procesoDe(r);
       porProc[proc]=(porProc[proc]||0)+1;
     });
 
@@ -731,6 +731,22 @@ function emptyCard(t,m){ return `<div class="empty" style="grid-column:1/-1"><h3
 const SUBFORM_FIELD_ID = CONFIG.MATRIZ_FIELDS.reporte_acciones.id; // bfyfu...
 let SEG_RIESGO_ACTUAL = null; // {id, subIds:[]}
 
+// Devuelve el proceso MÁS ESPECÍFICO que tenga el riesgo (n2 → n1 → n0 → tipo).
+// Lee por nombre de columna; ignora valores que sean el propio nombre del campo.
+function procesoDe(r) {
+  const v = r.values || {};
+  const limpio = (x, nombreCampo) => {
+    // descarta vacíos y el caso en que QuintaDB devuelve el nombre del campo como valor
+    if (!x || x === nombreCampo) return '';
+    return x;
+  };
+  return limpio(v['Proceso nivel 2'],'Proceso nivel 2')
+      || limpio(v['Procesos nivel 1'],'Procesos nivel 1')
+      || limpio(v['Proceso nivel 0'],'Proceso nivel 0')
+      || limpio(v['Tipo de proceso'],'Tipo de proceso')
+      || '—';
+}
+
 function estadoPill(est){
   const c = est==='Culminado/Ejecutado'?'est-culm':est==='En Proceso'?'est-proc':'est-pend';
   return `<span class="est-pill ${c}">${est||'—'}</span>`;
@@ -747,7 +763,7 @@ async function renderSeguimiento() {
     const filtro = (document.getElementById('segBuscar').value||'').toLowerCase();
     const filas = recs.map(r=>{
       const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
-      const proc=get(r,F.tipo_proceso,'Tipo de proceso')||'—';
+      const proc=procesoDe(r);
       const sub=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
       return {id:r.id, desc, proc, nReportes:sub.length, subIds:sub};
     }).filter(f => !filtro || f.desc.toLowerCase().includes(filtro) || f.proc.toLowerCase().includes(filtro));
@@ -755,7 +771,7 @@ async function renderSeguimiento() {
     tb.innerHTML = filas.map(f=>`
       <tr>
         <td style="max-width:300px">${f.desc.length>90?f.desc.slice(0,90)+'…':f.desc}</td>
-        <td>${f.proc.length>26?f.proc.slice(0,26)+'…':f.proc}</td>
+        <td>${f.proc.length>34?f.proc.slice(0,34)+'…':f.proc}</td>
         <td><strong>${f.nReportes}</strong></td>
         <td id="estado-${f.id}" class="mono" style="font-size:12px;color:var(--mist)">${f.nReportes?'…':'—'}</td>
         <td><button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="abrirReportes('${f.id}')">+ Reporte</button></td>
@@ -840,9 +856,14 @@ document.getElementById('repGuardar').addEventListener('click', async ()=>{
       { json_subforms_values: JSON.stringify(subforms) });
 
     toast('Reporte agregado correctamente.');
-    STATE.matriz=[]; // invalidar caché para refrescar conteos
-    cerrarModal();
-    renderSeguimiento();
+    // Limpiar el formulario del reporte
+    ['rep_fecha','rep_accion','rep_obs','rep_evid'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('rep_estado').value='';
+    // Invalidar caché y recargar el historial del mismo riesgo en el modal
+    STATE.matriz=[];
+    await loadMatriz();
+    await abrirReportes(SEG_RIESGO_ACTUAL.id); // recarga historial actualizado
+    btn.disabled=false; btn.textContent='Guardar reporte';
   } catch(err){
     toast('Error al guardar el reporte: '+err.message, true);
     btn.disabled=false; btn.textContent='Guardar reporte';
@@ -866,7 +887,7 @@ async function renderReeval() {
     if(!recs.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty"><h3>Sin riesgos</h3><p>Registra el primero en la pestaña Registrar.</p></div></td></tr>'; return; }
     tb.innerHTML = recs.map(r=>{
       const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
-      const proc=get(r,F.tipo_proceso,'Tipo de proceso')||'—';
+      const proc=procesoDe(r);
       const idxInh=num(get(r,F.indice_riesgo_inh,'Índice de prioridad riesgo inherente'));
       const nInh=nivelDe(idxInh);
       const cert=get(r,F.certificacion_control,'Certificación de Implementación del Control');
