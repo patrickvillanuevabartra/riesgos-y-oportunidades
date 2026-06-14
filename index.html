@@ -321,8 +321,8 @@
       <input id="segBuscar" placeholder="Buscar riesgo por descripción o proceso…" style="border:0;background:transparent;flex:1;padding:0">
     </div>
     <div class="card"><div style="padding:6px 4px"><table>
-      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Reportes</th><th>Último estado</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
-      <tbody id="tablaSeguimiento"><tr><td colspan="6" class="empty"><h3>Cargando…</h3></td></tr></tbody>
+      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
+      <tbody id="tablaSeguimiento"><tr><td colspan="7" class="empty"><h3>Cargando…</h3></td></tr></tbody>
     </table></div></div>
   </section>
 
@@ -811,18 +811,28 @@ async function renderDashboard() {
     document.getElementById('kpis').innerHTML = emptyCard('No se pudo cargar el tablero', e.message); }
 }
 
-// Lee toda la subtabla de reportes y cuenta los estados para el panel de avance.
+// Cuenta RIESGOS por estado derivado: sin reportes = Pendiente;
+// con reportes = estado del último reporte.
 async function cargarAvanceMedidas(){
   try {
-    const d = await API.records(CONFIG.ENTITIES.REPORTES);
+    const recs = STATE.matriz.length ? STATE.matriz : (await loadMatriz());
     const RF = CONFIG.REPORTE_FIELDS;
-    const recs = d.records || [];
+    // Mapa de reportId → estado (leyendo toda la subtabla de una vez)
+    const d = await API.records(CONFIG.ENTITIES.REPORTES);
+    const estadoPorReporte = {};
+    (d.records||[]).forEach(r=>{ estadoPorReporte[r.id] = (r.values||{})[RF.estado.col] || ''; });
+
     const cont = { 'Pendiente':0, 'En Proceso':0, 'Culminado/Ejecutado':0 };
     recs.forEach(r=>{
-      const est = (r.values||{})[RF.estado.col] || '';
-      if(cont[est]!==undefined) cont[est]++;
+      const subIds=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
+      let estado='Pendiente';
+      if(subIds.length){
+        // estado del último reporte vinculado
+        const ultId = subIds[subIds.length-1];
+        estado = estadoPorReporte[ultId] || 'Pendiente';
+      }
+      if(cont[estado]!==undefined) cont[estado]++;
     });
-    const total = recs.length || 1;
     const filas = [
       ['Culminado/Ejecutado', cont['Culminado/Ejecutado'], 'var(--n1)'],
       ['En Proceso',          cont['En Proceso'],          'var(--n2)'],
@@ -830,7 +840,7 @@ async function cargarAvanceMedidas(){
     ];
     const maxV = Math.max(1, ...filas.map(f=>f[1]));
     document.getElementById('estadoMedidas').innerHTML =
-      `<p class="hint" style="margin-bottom:14px">${recs.length} reporte${recs.length!==1?'s':''} de acción en total</p>` +
+      `<p class="hint" style="margin-bottom:14px">${recs.length} riesgos según el estado de su última acción</p>` +
       filas.map(([lbl,v,color])=>`
         <div class="bar-row"><div class="lbl">${lbl}</div>
           <div class="bar-track"><div class="bar-fill" style="width:${(v/maxV*100)||2}%;background:${color}">${v||''}</div></div>
@@ -925,13 +935,22 @@ function fmtFecha(s){
   return s;
 }
 
+// Índice y nivel inherente del riesgo (P×I → nivel 1-4)
+function nivelInherenteDe(r){
+  const v=r.values||{};
+  const n=x=>{const m=String(x||'').match(/^(\d+)/);return m?+m[1]:0;};
+  let idx = n(v['Índice de prioridad riesgo inherente']);
+  if(!idx) idx = n(v['Probabilidad riesgo inherente'])*n(v['Impacto riesgo inherente']);
+  return { idx, nivel: nivelDe(idx) };
+}
+
 async function renderSeguimiento() {
   const tb = document.getElementById('tablaSeguimiento');
   try {
     const recs = await loadMatriz();
     const F = CONFIG.MATRIZ_FIELDS;
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
-    if(!recs.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty"><h3>Sin riesgos</h3></div></td></tr>'; return; }
+    if(!recs.length){ tb.innerHTML='<tr><td colspan="7"><div class="empty"><h3>Sin riesgos</h3></div></td></tr>'; return; }
 
     const filtro = (document.getElementById('segBuscar').value||'').toLowerCase();
     const filas = recs.map(r=>{
@@ -940,22 +959,27 @@ async function renderSeguimiento() {
       const oficina=oficinaDe(r);
       const sub=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
       const pr=procedeReeval(r);
-      return {id:r.id, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto};
+      const ni=nivelInherenteDe(r);
+      return {id:r.id, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx};
     }).filter(f => !filtro || f.desc.toLowerCase().includes(filtro) || f.proc.toLowerCase().includes(filtro) || f.oficina.toLowerCase().includes(filtro));
 
-    // Agrupar por oficina y ordenar alfabéticamente
+    // Agrupar por oficina; dentro de cada grupo ordenar por nivel inherente (mayor arriba)
     const grupos = {};
     filas.forEach(f => { (grupos[f.oficina] = grupos[f.oficina] || []).push(f); });
+    Object.values(grupos).forEach(arr => arr.sort((a,b)=> (b.idx-a.idx) || (b.nivel-a.nivel)));
     const oficinasOrdenadas = Object.keys(grupos).sort();
+
+    const nivelBadge = n => n ? `<span class="lvl-badge lvl-${n}">Nivel ${n}</span>` : '<span class="hint" style="font-size:12px">—</span>';
 
     const filaHTML = f => `
       <tr>
-        <td style="max-width:300px">
-          <a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>90?f.desc.slice(0,90)+'…':f.desc}</a>
+        <td style="max-width:280px">
+          <a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>80?f.desc.slice(0,80)+'…':f.desc}</a>
         </td>
-        <td title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>40?f.proc.slice(0,40)+'…':f.proc}</td>
+        <td title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>36?f.proc.slice(0,36)+'…':f.proc}</td>
+        <td>${nivelBadge(f.nivel)}</td>
         <td><strong>${f.nReportes}</strong></td>
-        <td id="estado-${f.id}" class="mono" style="font-size:12px;color:var(--mist)">${f.nReportes?'…':'—'}</td>
+        <td id="estado-${f.id}" style="font-size:12px">${f.nReportes?'<span class="hint">…</span>':estadoPill('Pendiente')}</td>
         <td title="${(f.procedeTexto||'').replace(/"/g,'&quot;')}">${
           f.procede
             ? '<span class="tag tag-proc">✓ Procede</span>'
@@ -967,22 +991,22 @@ async function renderSeguimiento() {
           <button class="icon-btn" title="Eliminar riesgo" onclick="eliminarRiesgo('${f.id}')">🗑️</button>
         </td>
       </tr>
-      <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="6" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
+      <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="7" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
 
     tb.innerHTML = oficinasOrdenadas.length ? oficinasOrdenadas.map(of => `
-      <tr class="grupo-row"><td colspan="6">
+      <tr class="grupo-row"><td colspan="7">
         <span class="grupo-nombre">${of}</span>
         <span class="grupo-count">${grupos[of].length} riesgo${grupos[of].length!==1?'s':''}</span>
       </td></tr>
       ${grupos[of].map(filaHTML).join('')}
-    `).join('') : '<tr><td colspan="6"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
+    `).join('') : '<tr><td colspan="7"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
 
     setConn(true);
 
     // Cargar "último estado" de forma diferida (solo riesgos con reportes)
     cargarUltimosEstados(filas.filter(f=>f.subIds.length));
   } catch(e){ setConn(false,e.message);
-    tb.innerHTML=`<tr><td colspan="6"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
+    tb.innerHTML=`<tr><td colspan="7"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
 }
 
 // Lee el último reporte de cada riesgo con reportes y muestra su estado en la columna.
