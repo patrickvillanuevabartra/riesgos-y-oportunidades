@@ -70,7 +70,7 @@ const CONFIG = {
     medida_respuesta:        { id: "caWPnqWPrhW5FcRvSPW70I", type: "text" },
 
     // --- Seguimiento / habilitación del residual ---
-    reporte_acciones:        { id: "bfyfuPWQ9gWPv5nfNdHmoh", type: "subform", entity: "REPORTES" },
+    reporte_acciones:        { id: "bfyfuPWQ9ggRmWk8o4qmkr", type: "subform", entity: "REPORTES" },
     certificacion_control:   { id: "ddN8kJW5vdKjWNcY4BpmoP", type: "select", options: ["No Implementado","Implementado sin validar","Certificado/Operativo"] },
     estado_reevaluacion:     { id: "ddSXZcNmnbWQhdMCkoW7Pd", type: "select", options: ["Sí procede","No procede"] },
     fecha_reevaluacion:      { id: "dcU8oTm8ngW6lcK8kDW4rr", type: "date" },
@@ -82,14 +82,13 @@ const CONFIG = {
     nivel_riesgo_res:        { id: "c4WPpcNSncW5LrW40KtSk5", type: "formula", readOnly: true }
   },
 
-  // ---- Campos de la SUBTABLA Reporte de acciones -------------------------
+  // ---- Campos de la SUBTABLA Reporte de acciones (IDs reales verificados) ----
   REPORTE_FIELDS: {
-    fecha_reporte:  { id: "ddSIRdSSnoiikenSogsuLu", type: "date" },
-    accion:         { id: "crsCo9n8jbf5O0emo4g8kA", type: "text" },
-    evidencia1:     { id: "chWPhcStXcTyuBvwaEWRSQ", type: "file" },
-    evidencia2:     { id: "aIWRX9W7TmW5TbwmoXcszL", type: "url" },
-    observacion:    { id: "aQWOHyWRvcSiotbeSqWOen", type: "text" },
-    estado:         { id: "ddGIWLW6PcGikeWO88W6mU", type: "select", options: ["Pendiente","En Proceso","Culminado/Ejecutado"] }
+    fecha_reporte:  { id: "ddSIRdSSnoiikenSogsuLu", type: "date", col: "Fecha de reporte" },
+    accion:         { id: "crsCo9n8jbf500emo4g8kA", type: "text", col: "Acción desarrollada" },
+    evidencia2:     { id: "aIWRX9W7TmW5TbwmoXcszL", type: "url",  col: "Evidencia 2" },
+    observacion:    { id: "aQWOHyWRvcSiotbeSqWOen", type: "text", col: "Observación" },
+    estado:         { id: "ddGIWLW6PcGikeWO88W6mU", type: "select", col: "Estado medida(s) de respuesta", options: ["Pendiente","En Proceso","Culminado/Ejecutado"] }
   },
 
   // ---- Campos del INVENTARIO (para la cascada) ---------------------------
