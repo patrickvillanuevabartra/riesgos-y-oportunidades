@@ -801,8 +801,8 @@ async function renderSeguimiento() {
 
     const filaHTML = f => `
       <tr>
-        <td style="max-width:300px">${f.desc.length>90?f.desc.slice(0,90)+'…':f.desc}</td>
-        <td>${f.proc.length>34?f.proc.slice(0,34)+'…':f.proc}</td>
+        <td style="max-width:300px" title="${(f.desc||'').replace(/"/g,'&quot;')}">${f.desc.length>90?f.desc.slice(0,90)+'…':f.desc}</td>
+        <td title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>34?f.proc.slice(0,34)+'…':f.proc}</td>
         <td><strong>${f.nReportes}</strong></td>
         <td id="estado-${f.id}" class="mono" style="font-size:12px;color:var(--mist)">${f.nReportes?'…':'—'}</td>
         <td><button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="abrirReportes('${f.id}')">+ Reporte</button></td>
@@ -817,10 +817,29 @@ async function renderSeguimiento() {
     `).join('') : '<tr><td colspan="5"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
 
     setConn(true);
+
+    // Cargar "último estado" de forma diferida (solo riesgos con reportes)
+    cargarUltimosEstados(filas.filter(f=>f.subIds.length));
   } catch(e){ setConn(false,e.message);
     tb.innerHTML=`<tr><td colspan="5"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
 }
-document.getElementById('segBuscar').addEventListener('input', ()=>renderSeguimiento());
+
+// Lee el último reporte de cada riesgo con reportes y muestra su estado en la columna.
+async function cargarUltimosEstados(filasConReportes) {
+  const RF = CONFIG.REPORTE_FIELDS;
+  for (const f of filasConReportes) {
+    try {
+      const ultimoId = f.subIds[f.subIds.length - 1]; // el último vinculado
+      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+ultimoId+'.json','GET',{name_value:1});
+      const est = (d.record && d.record.values) ? (d.record.values[RF.estado.col]||'') : '';
+      const cel = document.getElementById('estado-'+f.id);
+      if (cel) cel.innerHTML = est ? estadoPill(est) : '—';
+    } catch(_) {
+      const cel = document.getElementById('estado-'+f.id);
+      if (cel) cel.textContent = '—';
+    }
+  }
+}
 
 // Abre el modal y carga el historial de reportes de ese riesgo
 async function abrirReportes(riesgoId) {
@@ -941,8 +960,8 @@ async function renderReeval() {
       const idxRes=num(get(r,F.indice_riesgo_res,'Índice de prioridad riesgo residual'));
       const nRes=nivelDe(idxRes);
       return `<tr>
-        <td style="max-width:280px">${desc.length>90?desc.slice(0,90)+'…':desc}</td>
-        <td>${proc}</td>
+        <td style="max-width:280px" title="${(desc||'').replace(/"/g,'&quot;')}">${desc.length>90?desc.slice(0,90)+'…':desc}</td>
+        <td title="${(proc||'').replace(/"/g,'&quot;')}">${proc.length>34?proc.slice(0,34)+'…':proc}</td>
         <td>${nInh?`<span class="lvl-badge lvl-${nInh}">Nivel ${nInh}</span>`:'—'}</td>
         <td>${procede?'<span class="tag tag-proc">Procede</span>':'<span class="tag tag-noproc">No procede</span>'}</td>
         <td>${nRes?`<span class="lvl-badge lvl-${nRes}">Nivel ${nRes}</span>`:'—'}</td>
