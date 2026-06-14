@@ -316,8 +316,8 @@
       <input id="segBuscar" placeholder="Buscar riesgo por descripción o proceso…" style="border:0;background:transparent;flex:1;padding:0">
     </div>
     <div class="card"><div style="padding:6px 4px"><table>
-      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Reportes</th><th>Último estado</th><th style="text-align:right">Acciones</th></tr></thead>
-      <tbody id="tablaSeguimiento"><tr><td colspan="5" class="empty"><h3>Cargando…</h3></td></tr></tbody>
+      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Reportes</th><th>Último estado</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
+      <tbody id="tablaSeguimiento"><tr><td colspan="6" class="empty"><h3>Cargando…</h3></td></tr></tbody>
     </table></div></div>
   </section>
 
@@ -333,6 +333,31 @@
       </div>
       <div class="modal-body">
         <div id="modalHistorial"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de reevaluación (riesgo residual) -->
+  <div id="reevalModal" class="modal-overlay hidden">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-head">
+        <div>
+          <div class="eyebrow">Riesgo residual</div>
+          <h2 id="reevalTitulo" style="font-size:18px">Reevaluar</h2>
+        </div>
+        <button class="modal-close" onclick="cerrarReeval()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint" style="margin-bottom:16px">Captura la evaluación posterior al tratamiento. El índice y el nivel residual los calcula QuintaDB automáticamente.</p>
+        <div class="grid">
+          <div class="field"><label>Probabilidad residual</label><select id="reevalProb"></select></div>
+          <div class="field"><label>Impacto residual</label><select id="reevalImp"></select></div>
+          <div class="field full"><label>Fecha de reevaluación</label><input type="date" id="reevalFecha"></div>
+        </div>
+      </div>
+      <div class="actions" style="border-radius:0">
+        <button class="btn btn-ghost" onclick="cerrarReeval()">Cancelar</button>
+        <button class="btn btn-primary" id="reevalGuardar" onclick="guardarReeval()">Guardar reevaluación</button>
       </div>
     </div>
   </div>
@@ -770,9 +795,35 @@ function procesoDe(r) {
       || '—';
 }
 
+// Ruta COMPLETA del proceso: Tipo › Nivel 0 › Nivel 1 › Nivel 2 › Nivel 3
+// (solo los niveles que tengan dato). Devuelve '' si no hay ninguno.
+function rutaProcesoDe(r){
+  const v = r.values || {};
+  const limpio = (col) => { const x=v[col]; return (x && x!==col) ? x : ''; };
+  const partes = [
+    limpio('Tipo de proceso'),
+    limpio('Proceso nivel 0'),
+    limpio('Procesos nivel 1'),
+    limpio('Proceso nivel 2'),
+    limpio('Proceso nivel 3')
+  ].filter(Boolean);
+  return partes.join(' › ');
+}
+
 function estadoPill(est){
   const c = est==='Culminado/Ejecutado'?'est-culm':est==='En Proceso'?'est-proc':'est-pend';
   return `<span class="est-pill ${c}">${est||'—'}</span>`;
+}
+
+// Lee el campo oficial de QuintaDB "¿Procede reevalaución?" (calcula las 2 condiciones:
+// estado del reporte Culminado/Ejecutado + certificación Certificado/Operativo).
+// Devuelve {procede:bool, texto:string}.
+const CAMPO_PROCEDE = '¿Procede reevalaución?'; // grafía exacta en QuintaDB
+function procedeReeval(r){
+  const v = r.values || {};
+  const t = String(v[CAMPO_PROCEDE] || '');
+  const procede = /^s[ií]\s*procede/i.test(t.trim()); // empieza con "Sí procede"
+  return { procede, texto: (t && t!==CAMPO_PROCEDE) ? t : '' };
 }
 
 // Oficina/dependencia responsable del riesgo (viene directa en el campo 'Responsable').
@@ -798,15 +849,16 @@ async function renderSeguimiento() {
     const recs = await loadMatriz();
     const F = CONFIG.MATRIZ_FIELDS;
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
-    if(!recs.length){ tb.innerHTML='<tr><td colspan="5"><div class="empty"><h3>Sin riesgos</h3></div></td></tr>'; return; }
+    if(!recs.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty"><h3>Sin riesgos</h3></div></td></tr>'; return; }
 
     const filtro = (document.getElementById('segBuscar').value||'').toLowerCase();
     const filas = recs.map(r=>{
       const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
-      const proc=procesoDe(r);
+      const proc=rutaProcesoDe(r) || '—';
       const oficina=oficinaDe(r);
       const sub=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
-      return {id:r.id, desc, proc, oficina, nReportes:sub.length, subIds:sub};
+      const pr=procedeReeval(r);
+      return {id:r.id, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto};
     }).filter(f => !filtro || f.desc.toLowerCase().includes(filtro) || f.proc.toLowerCase().includes(filtro) || f.oficina.toLowerCase().includes(filtro));
 
     // Agrupar por oficina y ordenar alfabéticamente
@@ -819,29 +871,34 @@ async function renderSeguimiento() {
         <td style="max-width:300px">
           <a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>90?f.desc.slice(0,90)+'…':f.desc}</a>
         </td>
-        <td title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>34?f.proc.slice(0,34)+'…':f.proc}</td>
+        <td title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>40?f.proc.slice(0,40)+'…':f.proc}</td>
         <td><strong>${f.nReportes}</strong></td>
         <td id="estado-${f.id}" class="mono" style="font-size:12px;color:var(--mist)">${f.nReportes?'…':'—'}</td>
+        <td title="${(f.procedeTexto||'').replace(/"/g,'&quot;')}">${
+          f.procede
+            ? '<span class="tag tag-proc">✓ Procede</span>'
+            : '<span class="tag tag-noproc">No procede</span>'
+        }</td>
         <td style="text-align:right;white-space:nowrap">
           <button class="icon-btn" title="Ver detalle del riesgo" onclick="verDetalle('${f.id}')">👁</button>
         </td>
       </tr>
-      <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="5" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
+      <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="6" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
 
     tb.innerHTML = oficinasOrdenadas.length ? oficinasOrdenadas.map(of => `
-      <tr class="grupo-row"><td colspan="5">
+      <tr class="grupo-row"><td colspan="6">
         <span class="grupo-nombre">${of}</span>
         <span class="grupo-count">${grupos[of].length} riesgo${grupos[of].length!==1?'s':''}</span>
       </td></tr>
       ${grupos[of].map(filaHTML).join('')}
-    `).join('') : '<tr><td colspan="5"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
+    `).join('') : '<tr><td colspan="6"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
 
     setConn(true);
 
     // Cargar "último estado" de forma diferida (solo riesgos con reportes)
     cargarUltimosEstados(filas.filter(f=>f.subIds.length));
   } catch(e){ setConn(false,e.message);
-    tb.innerHTML=`<tr><td colspan="5"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
+    tb.innerHTML=`<tr><td colspan="6"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
 }
 
 // Lee el último reporte de cada riesgo con reportes y muestra su estado en la columna.
@@ -976,7 +1033,7 @@ function verDetalle(riesgoId){
     ['Oportunidad','Oportunidad'],
     ['Causas','Causas'],
     ['Consecuencias','Consecuencias'],
-    ['Proceso','__proceso__'],
+    ['Ruta del proceso','__proceso__'],
     ['Actividad específica','Actividad específica'],
     ['Probabilidad inherente','Probabilidad riesgo inherente'],
     ['Impacto inherente','Impacto riesgo inherente'],
@@ -991,7 +1048,7 @@ function verDetalle(riesgoId){
     ['Nivel residual','Nivel de riesgo residual'],
   ];
   const limpio = (col)=>{
-    if(col==='__proceso__') return procesoDe(r);
+    if(col==='__proceso__') return rutaProcesoDe(r);
     const val = v[col];
     if(!val || val===col) return '';
     return val;
@@ -1031,12 +1088,12 @@ async function renderReeval() {
     if(!recs.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty"><h3>Sin riesgos</h3><p>Registra el primero en la pestaña Registrar.</p></div></td></tr>'; return; }
     tb.innerHTML = recs.map(r=>{
       const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
-      const proc=procesoDe(r);
+      const proc=rutaProcesoDe(r) || '—';
       const idxInh=num(get(r,F.indice_riesgo_inh,'Índice de prioridad riesgo inherente'));
       const nInh=nivelDe(idxInh);
       const cert=get(r,F.certificacion_control,'Certificación de Implementación del Control');
-      // condición 1 (cond 2 requiere subtabla; se evalúa al conectar)
-      const procede = cert===CONFIG.REGLAS.residual.certificacionRequerida;
+      // Usa el campo oficial de QuintaDB que ya evalúa las 2 condiciones
+      const procede = procedeReeval(r).procede;
       const idxRes=num(get(r,F.indice_riesgo_res,'Índice de prioridad riesgo residual'));
       const nRes=nivelDe(idxRes);
       return `<tr>
@@ -1045,13 +1102,67 @@ async function renderReeval() {
         <td>${nInh?`<span class="lvl-badge lvl-${nInh}">Nivel ${nInh}</span>`:'—'}</td>
         <td>${procede?'<span class="tag tag-proc">Procede</span>':'<span class="tag tag-noproc">No procede</span>'}</td>
         <td>${nRes?`<span class="lvl-badge lvl-${nRes}">Nivel ${nRes}</span>`:'—'}</td>
-        <td>${procede?'<button class="btn btn-ghost" style="padding:6px 14px;font-size:13px">Reevaluar</button>':''}</td>
+        <td>${procede?`<button class="btn btn-primary" style="padding:6px 14px;font-size:13px" onclick="abrirReeval('${r.id}')">Reevaluar</button>`:'<span class="hint" style="font-size:12px">Bloqueado</span>'}</td>
       </tr>`;
     }).join('');
     setConn(true);
   } catch(e){ setConn(false,e.message);
     tb.innerHTML=`<tr><td colspan="6"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
 }
+
+// === Modal de reevaluación (capturar riesgo residual) ===
+function abrirReeval(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  if(!r) return;
+  REEVAL_ACTUAL = riesgoId;
+  const F=CONFIG.MATRIZ_FIELDS;
+  const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
+  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
+  const esRiesgo = (get(r,F.riesgo_u_oportunidad,'¿Riesgo u oportunidad?')||'Riesgo')!=='Oportunidad';
+
+  document.getElementById('reevalTitulo').textContent = desc.length>70?desc.slice(0,70)+'…':desc;
+  const probOpts = ['1: Muy raro','2: Ocasionalmente','3: Frecuente','4: Muy frecuente'];
+  const impOpts = esRiesgo ? ['1: Muy bajo','2: Bajo','3: Moderado','4: Alto'] : ['1: Bajo','2: Moderado','3: Alto'];
+  const opt = arr => '<option value="">Seleccione…</option>'+arr.map(o=>`<option>${o}</option>`).join('');
+  document.getElementById('reevalProb').innerHTML = opt(probOpts);
+  document.getElementById('reevalImp').innerHTML = opt(impOpts);
+  document.getElementById('reevalFecha').value='';
+  document.getElementById('reevalModal').classList.remove('hidden');
+}
+window.abrirReeval = abrirReeval;
+
+function cerrarReeval(){ document.getElementById('reevalModal').classList.add('hidden'); }
+
+// Guardar la reevaluación residual
+async function guardarReeval(){
+  if(!REEVAL_ACTUAL) return;
+  const F=CONFIG.MATRIZ_FIELDS;
+  const prob=document.getElementById('reevalProb').value;
+  const imp=document.getElementById('reevalImp').value;
+  const fecha=document.getElementById('reevalFecha').value;
+  if(!prob||!imp){ toast('Indica probabilidad e impacto residual.',true); return; }
+  const btn=document.getElementById('reevalGuardar');
+
+  const values={};
+  values[F.prob_riesgo_res.id]=prob;
+  values[F.imp_riesgo_res.id]=imp;
+  if(fecha) values[F.fecha_reevaluacion.id]=fecha;
+  values[F.estado_reevaluacion.id]='Sí procede';
+
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
+  try{
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+REEVAL_ACTUAL+'.json','PUT',
+      { json_values: JSON.stringify(values) });
+    toast('Reevaluación guardada.');
+    STATE.matriz=[]; await loadMatriz();
+    cerrarReeval(); renderReeval();
+  }catch(err){
+    toast('Error al guardar: '+err.message, true);
+    btn.disabled=false; btn.textContent='Guardar reevaluación';
+  }
+}
+window.guardarReeval = guardarReeval;
+let REEVAL_ACTUAL = null;
 
 /* ============================================================
    CONEXIÓN — indicador de estado
