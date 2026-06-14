@@ -123,6 +123,24 @@
   @keyframes spin{to{transform:rotate(360deg)}}
 
   @media(max-width:900px){.grid,.dash-grid,.kpis{grid-template-columns:1fr}.bar-row .lbl{width:110px}}
+
+  /* Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(16,22,29,.5);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
+  .modal-overlay.hidden{display:none}
+  .modal{background:var(--card);border-radius:16px;width:100%;max-width:640px;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal-head{display:flex;align-items:flex-start;justify-content:space-between;padding:22px 24px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card);z-index:1}
+  .modal-head h2{font-family:'Fraunces',serif}
+  .modal-close{background:none;border:0;font-size:28px;line-height:1;color:var(--mist);cursor:pointer;padding:0 4px}
+  .modal-close:hover{color:var(--ink)}
+  .modal-body{padding:22px 24px}
+  .rep-item{border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-bottom:10px}
+  .rep-item .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .rep-item .fecha{font-size:12px;color:var(--mist);font-family:'IBM Plex Mono',monospace}
+  .rep-item .acc{font-size:14px;color:var(--ink)}
+  .rep-item .obs{font-size:13px;color:var(--mist);margin-top:4px}
+  .est-pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:6px}
+  .est-pend{background:#fdf0e6;color:var(--n3)} .est-proc{background:#fdf8e6;color:var(--n2)} .est-culm{background:#e8f3ec;color:var(--n1)}
+
 </style>
 </head>
 <body>
@@ -136,6 +154,7 @@
     <nav>
       <button data-view="dashboard" class="active">Tablero</button>
       <button data-view="registrar">Registrar</button>
+      <button data-view="seguimiento">Seguimiento</button>
       <button data-view="reevaluar">Reevaluación</button>
     </nav>
   </div>
@@ -261,7 +280,52 @@
     </form>
   </section>
 
-  <!-- ===================== REEVALUACIÓN ===================== -->
+  <!-- ===================== SEGUIMIENTO ===================== -->
+  <section class="view" id="view-seguimiento">
+    <div class="page-head">
+      <div class="eyebrow">Acciones de respuesta</div>
+      <h1>Seguimiento</h1>
+      <p>Registra el avance de las medidas de respuesta. Cada riesgo muestra cuántos reportes tiene; abre uno para ver su historial y añadir nuevos reportes.</p>
+    </div>
+    <div class="conn" style="margin-bottom:16px">
+      <input id="segBuscar" placeholder="Buscar riesgo por descripción o proceso…" style="border:0;background:transparent;flex:1;padding:0">
+    </div>
+    <div class="card"><div style="padding:6px 4px"><table>
+      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Reportes</th><th>Último estado</th><th></th></tr></thead>
+      <tbody id="tablaSeguimiento"><tr><td colspan="5" class="empty"><h3>Cargando…</h3></td></tr></tbody>
+    </table></div></div>
+  </section>
+
+  <!-- Modal de reportes -->
+  <div id="modalSeg" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <div class="eyebrow">Reportes de acción</div>
+          <h2 id="modalTitulo" style="font-size:18px">Riesgo</h2>
+        </div>
+        <button class="modal-close" id="modalCerrar">&times;</button>
+      </div>
+      <div class="modal-body">
+        <h3 style="font-size:14px;margin-bottom:10px">Historial de reportes</h3>
+        <div id="modalHistorial"></div>
+        <h3 style="font-size:14px;margin:22px 0 12px">Añadir reporte</h3>
+        <div class="grid">
+          <div class="field"><label>Fecha de reporte</label><input type="date" id="rep_fecha"></div>
+          <div class="field"><label>Estado</label><select id="rep_estado"><option value="">Seleccione…</option><option>Pendiente</option><option>En Proceso</option><option>Culminado/Ejecutado</option></select></div>
+          <div class="field full"><label>Acción desarrollada</label><textarea id="rep_accion"></textarea></div>
+          <div class="field full"><label>Observación</label><textarea id="rep_obs"></textarea></div>
+          <div class="field full"><label>Evidencia (enlace)</label><input id="rep_evid" placeholder="https://…"></div>
+        </div>
+      </div>
+      <div class="actions" style="border-radius:0">
+        <button class="btn btn-ghost" id="repCancelar">Cancelar</button>
+        <button class="btn btn-primary" id="repGuardar">Guardar reporte</button>
+      </div>
+    </div>
+  </div>
+
+
   <section class="view" id="view-reevaluar">
     <div class="page-head">
       <div class="eyebrow">Riesgo residual</div>
@@ -320,6 +384,7 @@ document.querySelectorAll('nav button').forEach(b => {
     b.classList.add('active');
     document.getElementById('view-' + b.dataset.view).classList.add('active');
     if (b.dataset.view === 'dashboard') renderDashboard();
+    if (b.dataset.view === 'seguimiento') renderSeguimiento();
     if (b.dataset.view === 'reevaluar') renderReeval();
   };
 });
@@ -661,8 +726,137 @@ function kpi(k,v,sub,color){ return `<div class="kpi"><div class="k">${k}</div><
 function emptyCard(t,m){ return `<div class="empty" style="grid-column:1/-1"><h3>${t}</h3><p>${m}</p></div>`; }
 
 /* ============================================================
-   REEVALUACIÓN — lista con habilitación según reglas
+   SEGUIMIENTO — listado de riesgos + reportes de acción
    ============================================================ */
+const SUBFORM_FIELD_ID = CONFIG.MATRIZ_FIELDS.reporte_acciones.id; // bfyfu...
+let SEG_RIESGO_ACTUAL = null; // {id, subIds:[]}
+
+function estadoPill(est){
+  const c = est==='Culminado/Ejecutado'?'est-culm':est==='En Proceso'?'est-proc':'est-pend';
+  return `<span class="est-pill ${c}">${est||'—'}</span>`;
+}
+
+async function renderSeguimiento() {
+  const tb = document.getElementById('tablaSeguimiento');
+  try {
+    const recs = await loadMatriz();
+    const F = CONFIG.MATRIZ_FIELDS;
+    const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
+    if(!recs.length){ tb.innerHTML='<tr><td colspan="5"><div class="empty"><h3>Sin riesgos</h3></div></td></tr>'; return; }
+
+    const filtro = (document.getElementById('segBuscar').value||'').toLowerCase();
+    const filas = recs.map(r=>{
+      const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
+      const proc=get(r,F.tipo_proceso,'Tipo de proceso')||'—';
+      const sub=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
+      return {id:r.id, desc, proc, nReportes:sub.length, subIds:sub};
+    }).filter(f => !filtro || f.desc.toLowerCase().includes(filtro) || f.proc.toLowerCase().includes(filtro));
+
+    tb.innerHTML = filas.map(f=>`
+      <tr>
+        <td style="max-width:300px">${f.desc.length>90?f.desc.slice(0,90)+'…':f.desc}</td>
+        <td>${f.proc.length>26?f.proc.slice(0,26)+'…':f.proc}</td>
+        <td><strong>${f.nReportes}</strong></td>
+        <td id="estado-${f.id}" class="mono" style="font-size:12px;color:var(--mist)">${f.nReportes?'…':'—'}</td>
+        <td><button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="abrirReportes('${f.id}')">+ Reporte</button></td>
+      </tr>`).join('') || '<tr><td colspan="5"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
+
+    setConn(true);
+  } catch(e){ setConn(false,e.message);
+    tb.innerHTML=`<tr><td colspan="5"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
+}
+document.getElementById('segBuscar').addEventListener('input', ()=>renderSeguimiento());
+
+// Abre el modal y carga el historial de reportes de ese riesgo
+async function abrirReportes(riesgoId) {
+  const recs = STATE.matriz;
+  const r = recs.find(x=>x.id===riesgoId);
+  const F = CONFIG.MATRIZ_FIELDS;
+  const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
+  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
+  const subIds=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
+  SEG_RIESGO_ACTUAL = { id: riesgoId, subIds };
+
+  document.getElementById('modalTitulo').textContent = desc.length>80?desc.slice(0,80)+'…':desc;
+  document.getElementById('modalSeg').classList.remove('hidden');
+  const hist = document.getElementById('modalHistorial');
+  hist.innerHTML = subIds.length ? '<p class="hint">Cargando reportes…</p>' : '<p class="hint">Este riesgo aún no tiene reportes.</p>';
+
+  // Leer cada reporte por su ID (name_value=1 → nombres de columna)
+  if (subIds.length) {
+    try {
+      const reps = await Promise.all(subIds.map(id =>
+        API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+id+'.json','GET',{name_value:1})
+          .then(d=>d.record).catch(()=>null)
+      ));
+      const RF = CONFIG.REPORTE_FIELDS;
+      const val=(rec,col)=> rec && rec.values ? (rec.values[col]||'') : '';
+      hist.innerHTML = reps.filter(Boolean).map(rec=>{
+        const est=val(rec,RF.estado.col);
+        return `<div class="rep-item">
+          <div class="top"><span class="fecha">${val(rec,RF.fecha_reporte.col)||'sin fecha'}</span>${estadoPill(est)}</div>
+          <div class="acc">${val(rec,RF.accion.col)||'(sin descripción de acción)'}</div>
+          ${val(rec,RF.observacion.col)?`<div class="obs">${val(rec,RF.observacion.col)}</div>`:''}
+        </div>`;
+      }).join('') || '<p class="hint">No se pudieron leer los reportes.</p>';
+    } catch(e){ hist.innerHTML='<p class="hint">Error al leer reportes: '+e.message+'</p>'; }
+  }
+}
+window.abrirReportes = abrirReportes;
+
+function cerrarModal(){ document.getElementById('modalSeg').classList.add('hidden');
+  ['rep_fecha','rep_accion','rep_obs','rep_evid'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('rep_estado').value=''; }
+document.getElementById('modalCerrar').onclick = cerrarModal;
+document.getElementById('repCancelar').onclick = cerrarModal;
+document.getElementById('modalSeg').onclick = (e)=>{ if(e.target.id==='modalSeg') cerrarModal(); };
+
+// Guardar un nuevo reporte vinculado al riesgo
+document.getElementById('repGuardar').addEventListener('click', async ()=>{
+  if(!SEG_RIESGO_ACTUAL) return;
+  const btn=document.getElementById('repGuardar');
+  const RF=CONFIG.REPORTE_FIELDS;
+  const v=id=>document.getElementById(id).value;
+  if(!v('rep_estado') && !v('rep_accion')){ toast('Indica al menos la acción o el estado.',true); return; }
+
+  // Valores del nuevo reporte (por field_id real)
+  const repVals={};
+  if(v('rep_fecha'))  repVals[RF.fecha_reporte.id]=v('rep_fecha');
+  if(v('rep_accion')) repVals[RF.accion.id]=v('rep_accion');
+  if(v('rep_obs'))    repVals[RF.observacion.id]=v('rep_obs');
+  if(v('rep_evid'))   repVals[RF.evidencia2.id]=v('rep_evid');
+  if(v('rep_estado')) repVals[RF.estado.id]=v('rep_estado');
+
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
+  try {
+    // Generar un ID nuevo para el registro de subformulario (22 chars base64-url)
+    const newId = genId22();
+    // Estructura subforms_values: { subform_field_id: { entity_id: SUB_ENTITY, newRecId: {campos} } }
+    const subforms = {};
+    subforms[SUBFORM_FIELD_ID] = { entity_id: CONFIG.ENTITIES.REPORTES };
+    subforms[SUBFORM_FIELD_ID][newId] = repVals;
+
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+SEG_RIESGO_ACTUAL.id+'.json','PUT',
+      { json_subforms_values: JSON.stringify(subforms) });
+
+    toast('Reporte agregado correctamente.');
+    STATE.matriz=[]; // invalidar caché para refrescar conteos
+    cerrarModal();
+    renderSeguimiento();
+  } catch(err){
+    toast('Error al guardar el reporte: '+err.message, true);
+    btn.disabled=false; btn.textContent='Guardar reporte';
+  }
+});
+
+// Genera un identificador de 22 caracteres URL-safe (como usa QuintaDB)
+function genId22(){
+  const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  let s=''; for(let i=0;i<22;i++) s+=chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+
+
 async function renderReeval() {
   const tb = document.getElementById('tablaReeval');
   try {
