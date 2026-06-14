@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestión de Riesgos y Oportunidades</title>
+<script src="config.js"></script>
+<style>
+  /* ===== Identidad visual: "Centro de control de riesgos" =====
+     Paleta sobria institucional con acentos semafóricos para niveles de riesgo.
+     Display: Fraunces (serif con carácter) · Body/UI: Inter · Data: IBM Plex Mono */
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root{
+    --ink:#11161d; --slate:#3a4754; --mist:#6b7785; --line:#e2e6ea;
+    --paper:#f7f8fa; --card:#ffffff; --brand:#1f3a5f; --brand-2:#2c5e8f;
+    --n1:#3a8c5f; --n2:#c9a227; --n3:#d97706; --n4:#c0392b; /* niveles 1-4 */
+    --ok:#3a8c5f; --warn:#d97706; --shadow:0 1px 2px rgba(16,22,29,.04),0 4px 16px rgba(16,22,29,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;color:var(--ink);background:var(--paper);line-height:1.5;-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:'Fraunces',Georgia,serif;font-weight:600;letter-spacing:-.01em;line-height:1.15}
+  .mono{font-family:'IBM Plex Mono',monospace}
+
+  /* Topbar */
+  header{background:var(--brand);color:#fff;padding:0;position:sticky;top:0;z-index:50;box-shadow:var(--shadow)}
+  .bar{max-width:1280px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:20px}
+  .logo{display:flex;align-items:center;gap:11px}
+  .logo-mark{width:30px;height:30px;border:2px solid #fff;border-radius:7px;display:grid;place-items:center;font-family:'Fraunces',serif;font-weight:600;font-size:16px}
+  .logo b{font-family:'Fraunces',serif;font-weight:600;font-size:18px;letter-spacing:-.01em}
+  .logo span{display:block;font-size:11px;opacity:.7;font-weight:400;letter-spacing:.02em}
+  nav{margin-left:auto;display:flex;gap:2px}
+  nav button{background:transparent;border:0;color:#fff;opacity:.72;font-family:inherit;font-size:14px;font-weight:500;padding:9px 16px;border-radius:8px;cursor:pointer;transition:.15s}
+  nav button:hover{opacity:1;background:rgba(255,255,255,.08)}
+  nav button.active{opacity:1;background:rgba(255,255,255,.16)}
+
+  main{max-width:1280px;margin:0 auto;padding:28px 24px 80px}
+  .view{display:none;animation:fade .25s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* Conexión banner */
+  .conn{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--mist);margin-bottom:20px;padding:9px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--mist);flex:none}
+  .dot.on{background:var(--ok)} .dot.off{background:var(--n4)}
+
+  .page-head{margin-bottom:24px}
+  .eyebrow{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--brand-2);margin-bottom:6px}
+  .page-head h1{font-size:30px;color:var(--ink)}
+  .page-head p{color:var(--mist);font-size:15px;margin-top:6px;max-width:60ch}
+
+  /* Cards / form */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
+  .section{padding:22px 24px;border-bottom:1px solid var(--line)}
+  .section:last-child{border-bottom:0}
+  .section-title{display:flex;align-items:center;gap:10px;font-family:'Fraunces',serif;font-weight:600;font-size:17px;margin-bottom:4px}
+  .section-num{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#fff;background:var(--brand-2);width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex:none}
+  .section-desc{font-size:13px;color:var(--mist);margin-bottom:18px}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px 20px}
+  .grid .full{grid-column:1/-1}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:13px;font-weight:500;color:var(--slate)}
+  .field label .req{color:var(--n4)}
+  .hint{font-size:12px;color:var(--mist)}
+  input,select,textarea{font-family:inherit;font-size:14px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%;transition:.15s}
+  input:focus,select:focus,textarea:focus{outline:0;border-color:var(--brand-2);box-shadow:0 0 0 3px rgba(44,94,143,.12)}
+  textarea{resize:vertical;min-height:64px}
+  select:disabled,input:disabled{background:var(--paper);color:var(--mist);cursor:not-allowed}
+  .readonly-pill{font-size:13px;background:var(--paper);border:1px dashed var(--line);border-radius:9px;padding:9px 11px;color:var(--mist);min-height:38px;display:flex;align-items:center}
+
+  .hidden{display:none!important}
+
+  /* Índice/Nivel calculados */
+  .calc-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
+  .calc{flex:1;min-width:150px;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
+  .calc .k{font-size:12px;color:var(--mist);font-weight:500}
+  .calc .v{font-family:'Fraunces',serif;font-size:26px;font-weight:600;margin-top:3px}
+  .lvl-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;color:#fff;margin-top:4px}
+  .lvl-1{background:var(--n1)} .lvl-2{background:var(--n2)} .lvl-3{background:var(--n3)} .lvl-4{background:var(--n4)}
+
+  /* Botones */
+  .actions{display:flex;gap:12px;justify-content:flex-end;padding:20px 24px;background:var(--paper);border-radius:0 0 14px 14px}
+  .btn{font-family:inherit;font-size:14px;font-weight:600;padding:11px 22px;border-radius:10px;border:1px solid transparent;cursor:pointer;transition:.15s}
+  .btn-primary{background:var(--brand);color:#fff}
+  .btn-primary:hover{background:var(--brand-2)}
+  .btn-primary:disabled{background:var(--mist);cursor:not-allowed}
+  .btn-ghost{background:#fff;border-color:var(--line);color:var(--slate)}
+  .btn-ghost:hover{border-color:var(--brand-2);color:var(--brand)}
+
+  /* Dashboard */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow)}
+  .kpi .k{font-size:12px;color:var(--mist);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .kpi .v{font-family:'Fraunces',serif;font-size:34px;font-weight:600;margin-top:6px}
+  .kpi .sub{font-size:12px;color:var(--mist);margin-top:2px}
+  .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:20px 22px}
+  .panel h3{font-size:16px;margin-bottom:16px}
+  .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:11px;font-size:13px}
+  .bar-row .lbl{width:160px;flex:none;color:var(--slate)}
+  .bar-track{flex:1;height:22px;background:var(--paper);border-radius:6px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:12px;font-weight:600;min-width:24px}
+  .matrix{display:grid;grid-template-columns:auto repeat(4,1fr);gap:4px;font-size:12px}
+  .matrix .cell{aspect-ratio:1.6;border-radius:7px;display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-weight:500;color:#fff}
+  .matrix .axis{display:grid;place-items:center;color:var(--mist);font-weight:600}
+
+  /* Tabla reevaluación */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mist);font-weight:600;padding:10px 12px;border-bottom:2px solid var(--line)}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);color:var(--slate)}
+  tr:hover td{background:var(--paper)}
+  .tag{display:inline-block;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600}
+  .tag-proc{background:#e8f3ec;color:var(--n1)} .tag-noproc{background:var(--paper);color:var(--mist)}
+
+  .empty{text-align:center;padding:60px 20px;color:var(--mist)}
+  .empty h3{color:var(--slate);margin-bottom:8px}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:14px 22px;border-radius:11px;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);transition:.3s;z-index:100;opacity:0}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+  .toast.err{background:var(--n4)}
+
+  .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .7s linear infinite;vertical-align:-2px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  @media(max-width:900px){.grid,.dash-grid,.kpis{grid-template-columns:1fr}.bar-row .lbl{width:110px}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <div class="logo">
+      <div class="logo-mark">R</div>
+      <div><b>Matriz de Riesgos</b><span>Sistema de Gestión · ISO 31000</span></div>
+    </div>
+    <nav>
+      <button data-view="dashboard" class="active">Tablero</button>
+      <button data-view="registrar">Registrar</button>
+      <button data-view="reevaluar">Reevaluación</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="conn" id="conn">
+    <span class="dot" id="connDot"></span>
+    <span id="connText">Verificando conexión con QuintaDB…</span>
+  </div>
+
+  <!-- ===================== TABLERO ===================== -->
+  <section class="view active" id="view-dashboard">
+    <div class="page-head">
+      <div class="eyebrow">Panorama general</div>
+      <h1>Tablero de riesgos</h1>
+      <p>Estado consolidado de la matriz: cuánto se ha reducido el riesgo tras el tratamiento, distribución por nivel y avance de las medidas de respuesta.</p>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="dash-grid">
+      <div class="panel"><h3>Distribución por nivel · inherente vs. residual</h3><div id="distNiveles"></div></div>
+      <div class="panel"><h3>Avance de medidas de respuesta</h3><div id="estadoMedidas"></div></div>
+      <div class="panel"><h3>Riesgos por proceso</h3><div id="porProceso"></div></div>
+      <div class="panel"><h3>Mapa de calor · probabilidad × impacto</h3><div id="heatmap"></div></div>
+    </div>
+  </section>
+
+  <!-- ===================== REGISTRAR ===================== -->
+  <section class="view" id="view-registrar">
+    <div class="page-head">
+      <div class="eyebrow">Nuevo registro</div>
+      <h1>Registrar riesgo u oportunidad</h1>
+      <p>El formulario se adapta a la fuente de identificación que elijas. Los campos de índice y nivel se calculan automáticamente al guardar.</p>
+    </div>
+    <form id="formRiesgo" class="card">
+
+      <div class="section">
+        <div class="section-title"><span class="section-num">1</span>Identificación</div>
+        <div class="section-desc">Origen del riesgo u oportunidad y su contexto.</div>
+        <div class="grid">
+          <div class="field">
+            <label>Fecha de evaluación <span class="req">*</span></label>
+            <input type="date" id="f_fecha" required>
+          </div>
+          <div class="field">
+            <label>Fuente de identificación <span class="req">*</span></label>
+            <select id="f_fuente" required>
+              <option value="">Seleccione…</option>
+              <option>Contexto</option><option>Partes interesadas</option><option>Proceso</option>
+            </select>
+          </div>
+
+          <!-- Origen: Contexto -->
+          <div class="field origin contexto hidden"><label>Amenaza</label><select id="f_amenaza"></select></div>
+          <div class="field origin contexto hidden"><label>Oportunidad</label><select id="f_oportunidad_rel"></select></div>
+
+          <!-- Origen: Partes interesadas -->
+          <div class="field origin partes hidden"><label>Parte interesada</label><select id="f_parte"></select></div>
+          <div class="field origin partes hidden"><label>Requisitos principales</label><div class="readonly-pill" id="f_requisitos">Se autocompleta según la parte interesada</div></div>
+          <div class="field origin partes hidden full"><label>Expectativas</label><div class="readonly-pill" id="f_expectativas">Se autocompleta según la parte interesada</div></div>
+
+          <!-- Origen: Proceso (cascada) -->
+          <div class="field origin proceso hidden"><label>Tipo de proceso</label><select id="f_tipo"></select></div>
+          <div class="field origin proceso hidden"><label>Proceso nivel 0</label><select id="f_n0" disabled></select></div>
+          <div class="field origin proceso hidden"><label>Proceso nivel 1</label><select id="f_n1" disabled></select></div>
+          <div class="field origin proceso hidden"><label>Proceso nivel 2</label><select id="f_n2" disabled></select></div>
+          <div class="field origin proceso hidden"><label>Proceso nivel 3</label><select id="f_n3" disabled></select></div>
+          <div class="field origin proceso hidden"><label>Procedimiento</label><select id="f_proc" disabled></select></div>
+
+          <div class="field"><label>Actividad específica</label><input id="f_actividad" placeholder="Actividad donde se presenta"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span class="section-num">2</span>Naturaleza y descripción</div>
+        <div class="grid">
+          <div class="field">
+            <label>¿Riesgo u oportunidad? <span class="req">*</span></label>
+            <select id="f_tipo_ro" required><option value="">Seleccione…</option><option>Riesgo</option><option>Oportunidad</option></select>
+          </div>
+          <div class="field"></div>
+          <div class="field full ro-riesgo hidden"><label>Descripción del riesgo</label><textarea id="f_riesgo_desc"></textarea></div>
+          <div class="field full ro-oport hidden"><label>Descripción de la oportunidad</label><textarea id="f_oport_desc"></textarea></div>
+          <div class="field full"><label>Causas</label><textarea id="f_causas"></textarea></div>
+          <div class="field full"><label>Consecuencias</label><textarea id="f_consec"></textarea></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span class="section-num">3</span>Evaluación inherente</div>
+        <div class="section-desc">Calificación inicial, sin considerar la efectividad de las medidas. El índice y el nivel se calculan al guardar.</div>
+        <div class="grid">
+          <!-- riesgo -->
+          <div class="field eval-riesgo hidden"><label>Probabilidad (riesgo)</label><select id="f_prob_r_inh"></select></div>
+          <div class="field eval-riesgo hidden"><label>Impacto (riesgo)</label><select id="f_imp_r_inh"></select></div>
+          <!-- oportunidad -->
+          <div class="field eval-oport hidden"><label>Probabilidad (oportunidad)</label><select id="f_prob_o_inh"></select></div>
+          <div class="field eval-oport hidden"><label>Impacto (oportunidad)</label><select id="f_imp_o_inh"></select></div>
+        </div>
+        <div class="calc-row">
+          <div class="calc"><div class="k">Índice de prioridad (P × I)</div><div class="v mono" id="calc_indice">—</div></div>
+          <div class="calc"><div class="k">Nivel estimado</div><div id="calc_nivel"><span class="lvl-badge" style="background:var(--mist)">Pendiente</span></div></div>
+        </div>
+        <p class="hint" style="margin-top:10px">Vista previa local. El valor oficial lo calcula QuintaDB al guardar.</p>
+      </div>
+
+      <div class="section">
+        <div class="section-title"><span class="section-num">4</span>Controles y tratamiento</div>
+        <div class="grid">
+          <div class="field"><label>¿Existen controles?</label><select id="f_existe_ctrl"><option value="">Seleccione…</option><option>Sí</option><option>No</option></select></div>
+          <div class="field"><label>Respuesta</label><select id="f_respuesta"><option value="">Seleccione…</option><option>Eliminar</option><option>Mitigar</option><option>Trasladar</option><option>Asumir</option></select></div>
+          <div class="field full"><label>Control establecido</label><textarea id="f_control"></textarea></div>
+          <div class="field"><label>Responsable</label><select id="f_responsable"></select></div>
+          <div class="field"></div>
+          <div class="field full"><label>Medida(s) de respuesta</label><textarea id="f_medida"></textarea></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn btn-ghost" id="btnReset">Limpiar</button>
+        <button type="submit" class="btn btn-primary" id="btnGuardar">Guardar registro</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- ===================== REEVALUACIÓN ===================== -->
+  <section class="view" id="view-reevaluar">
+    <div class="page-head">
+      <div class="eyebrow">Riesgo residual</div>
+      <h1>Reevaluación</h1>
+      <p>Solo procede cuando el control está <strong>Certificado/Operativo</strong> y al menos una acción de respuesta está <strong>Culminada/Ejecutada</strong>. El resto permanece bloqueado hasta cumplir ambas condiciones.</p>
+    </div>
+    <div class="card"><div style="padding:6px 4px"><table>
+      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Nivel inherente</th><th>¿Procede?</th><th>Nivel residual</th><th></th></tr></thead>
+      <tbody id="tablaReeval"><tr><td colspan="6" class="empty"><h3>Cargando…</h3></td></tr></tbody>
+    </table></div></div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   CLIENTE DEL PROXY — todas las llamadas pasan por Apps Script
+   ============================================================ */
+const API = {
+  async call(path, method = 'GET', body = {}) {
+    if (!CONFIG.PROXY_URL || CONFIG.PROXY_URL.startsWith('PEGA')) {
+      throw new Error('Configura PROXY_URL en config.js');
+    }
+    const payload = { path, method, body };
+    if (CONFIG.PROXY_TOKEN) payload.token = CONFIG.PROXY_TOKEN;
+    const r = await fetch(CONFIG.PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
+      body: JSON.stringify(payload)
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  },
+  records(entityId) {
+    return this.call(
+      `/apps/${CONFIG.APP_ID}/dtypes/entity/${entityId}.json`,
+      'GET', { name_value: 1, fetch_all: true, per_page: 2000 }
+    );
+  },
+  createRecord(entityId, values, rel_values) {
+    const body = { values };
+    if (rel_values) body.rel_values = rel_values;
+    return this.call(`/apps/${CONFIG.APP_ID}/dtypes/entity/${entityId}.json`, 'POST', body);
+  }
+};
+
+/* ============================================================
+   NAVEGACIÓN entre vistas
+   ============================================================ */
+document.querySelectorAll('nav button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('nav button').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('view-' + b.dataset.view).classList.add('active');
+    if (b.dataset.view === 'dashboard') renderDashboard();
+    if (b.dataset.view === 'reevaluar') renderReeval();
+  };
+});
+
+/* ============================================================
+   ESTADO en memoria
+   ============================================================ */
+const STATE = { matriz: [], maestras: {}, inventario: [] };
+
+function toast(msg, isErr) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show' + (isErr ? ' err' : '');
+  setTimeout(() => t.className = 'toast', 3200);
+}
+
+/* ============================================================
+   FORMULARIO DINÁMICO — lógica de Fuente y Riesgo/Oportunidad
+   ============================================================ */
+function showOrigin(fuente) {
+  document.querySelectorAll('.origin').forEach(e => e.classList.add('hidden'));
+  const map = { 'Contexto':'contexto', 'Partes interesadas':'partes', 'Proceso':'proceso' };
+  if (map[fuente]) document.querySelectorAll('.origin.' + map[fuente]).forEach(e => e.classList.remove('hidden'));
+}
+function showEval(tipo) {
+  const esR = tipo === 'Riesgo', esO = tipo === 'Oportunidad';
+  document.querySelectorAll('.ro-riesgo').forEach(e=>e.classList.toggle('hidden',!esR));
+  document.querySelectorAll('.ro-oport').forEach(e=>e.classList.toggle('hidden',!esO));
+  document.querySelectorAll('.eval-riesgo').forEach(e=>e.classList.toggle('hidden',!esR));
+  document.querySelectorAll('.eval-oport').forEach(e=>e.classList.toggle('hidden',!esO));
+  calcIndice();
+}
+document.getElementById('f_fuente').onchange = e => showOrigin(e.target.value);
+document.getElementById('f_tipo_ro').onchange = e => showEval(e.target.value);
+
+// Cálculo local del índice P×I (vista previa)
+function num(v){ const m = String(v).match(/^(\d+)/); return m ? +m[1] : 0; }
+function calcIndice() {
+  const tipo = document.getElementById('f_tipo_ro').value;
+  let p=0, i=0;
+  if (tipo === 'Riesgo') { p=num(document.getElementById('f_prob_r_inh').value); i=num(document.getElementById('f_imp_r_inh').value); }
+  else if (tipo === 'Oportunidad') { p=num(document.getElementById('f_prob_o_inh').value); i=num(document.getElementById('f_imp_o_inh').value); }
+  const idx = p*i;
+  document.getElementById('calc_indice').textContent = idx || '—';
+  const badge = document.getElementById('calc_nivel');
+  if (!idx) { badge.innerHTML = '<span class="lvl-badge" style="background:var(--mist)">Pendiente</span>'; return; }
+  let lvl=1, txt='Bajo';
+  if (idx>12){lvl=4;txt='Intolerable';} else if(idx>9){lvl=3;txt='Alto';} else if(idx>4){lvl=2;txt='Medio';}
+  badge.innerHTML = `<span class="lvl-badge lvl-${lvl}">Nivel ${lvl} · ${txt}</span>`;
+}
+['f_prob_r_inh','f_imp_r_inh','f_prob_o_inh','f_imp_o_inh'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', calcIndice);
+});
+
+/* ============================================================
+   CARGA de opciones en desplegables (select y rel)
+   ============================================================ */
+function fillSelect(el, options, placeholder='Seleccione…') {
+  el.innerHTML = `<option value="">${placeholder}</option>` +
+    options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+}
+
+// Construye opciones desde registros de una tabla maestra.
+// Toma el primer campo de texto significativo como etiqueta.
+function recordsToOptions(records) {
+  return records.map(r => {
+    const vals = r.values || {};
+    // buscamos un valor legible (no vacío) que no sea un id
+    let label = '';
+    for (const k in vals) {
+      const v = vals[k];
+      if (typeof v === 'string' && v && !/^[a-zA-Z0-9_\-]{22}$/.test(v)) { label = v; break; }
+    }
+    return { value: r.id, label: label || r.id };
+  });
+}
+
+async function loadMaestra(entityKey) {
+  if (STATE.maestras[entityKey]) return STATE.maestras[entityKey];
+  const entityId = CONFIG.ENTITIES[entityKey];
+  const data = await API.records(entityId);
+  const opts = recordsToOptions(data.records || []);
+  STATE.maestras[entityKey] = opts;
+  return opts;
+}
+
+// Carga inicial de selects estáticos (con opciones fijas del config)
+function initStaticSelects() {
+  const F = CONFIG.MATRIZ_FIELDS;
+  const map = [
+    ['f_prob_r_inh', F.prob_riesgo_inh], ['f_imp_r_inh', F.imp_riesgo_inh],
+    ['f_prob_o_inh', F.prob_oport_inh], ['f_imp_o_inh', F.imp_oport_inh]
+  ];
+  map.forEach(([id, def]) => fillSelect(document.getElementById(id), (def.options||[]).map(o=>({value:o,label:o}))));
+}
+
+// Carga selects de relación bajo demanda al elegir fuente/naturaleza
+async function ensureRelOptions() {
+  try {
+    const tasks = [];
+    const setOpts = (id, key) => loadMaestra(key).then(o => fillSelect(document.getElementById(id), o));
+    tasks.push(setOpts('f_amenaza','AMENAZAS'));
+    tasks.push(setOpts('f_oportunidad_rel','OPORTUNIDADES'));
+    tasks.push(setOpts('f_parte','PARTES'));
+    tasks.push(setOpts('f_tipo','TIPO_PROCESO'));
+    tasks.push(setOpts('f_responsable','RESPONSABLES'));
+    await Promise.all(tasks);
+  } catch(e){ toast('No se pudieron cargar las listas: '+e.message, true); }
+}
+
+/* ============================================================
+   CASCADA de procesos (Tipo → N0 → N1 → N2 → N3 → Proc)
+   Se filtra usando los registros del INVENTARIO como puente.
+   ============================================================ */
+const INV = CONFIG.INVENTARIO_FIELDS;
+async function loadInventario() {
+  if (STATE.inventario.length) return STATE.inventario;
+  const data = await API.records(CONFIG.ENTITIES.INVENTARIO);
+  STATE.inventario = data.records || [];
+  return STATE.inventario;
+}
+// dado un nivel previo seleccionado, devuelve las opciones válidas del siguiente
+function cascadaOpciones(inv, filtros, campoSiguiente) {
+  const set = new Map();
+  inv.forEach(r => {
+    const v = r.values || {};
+    const ok = Object.entries(filtros).every(([campo, val]) => !val || v[campo] === val);
+    if (ok && v[campoSiguiente]) set.set(v[campoSiguiente], v[campoSiguiente]);
+  });
+  return [...set.keys()].map(x => ({ value:x, label:x }));
+}
+async function initCascada() {
+  const inv = await loadInventario();
+  const fTipo=document.getElementById('f_tipo'), n0=document.getElementById('f_n0'),
+        n1=document.getElementById('f_n1'), n2=document.getElementById('f_n2'),
+        n3=document.getElementById('f_n3'), pr=document.getElementById('f_proc');
+  // nombres de campo (name_value=1 → las claves son los NOMBRES de columna)
+  const C = { tipo:'Tipo de proceso', n0:'Proceso nivel 0', n1:'Procesos nivel 1',
+              n2:'Proceso nivel 2', n3:'Proceso nivel 3', proc:'Procedimiento' };
+  const reset = (el)=>{el.innerHTML='<option value="">Seleccione…</option>';el.disabled=true;};
+  fTipo.onchange = () => {
+    [n0,n1,n2,n3,pr].forEach(reset);
+    fillSelect(n0, cascadaOpciones(inv,{[C.tipo]:fTipo.value},C.n0)); n0.disabled=false;
+  };
+  n0.onchange = () => { [n1,n2,n3,pr].forEach(reset);
+    fillSelect(n1, cascadaOpciones(inv,{[C.tipo]:fTipo.value,[C.n0]:n0.value},C.n1)); n1.disabled=false; };
+  n1.onchange = () => { [n2,n3,pr].forEach(reset);
+    fillSelect(n2, cascadaOpciones(inv,{[C.n0]:n0.value,[C.n1]:n1.value},C.n2)); n2.disabled=false; };
+  n2.onchange = () => { [n3,pr].forEach(reset);
+    fillSelect(n3, cascadaOpciones(inv,{[C.n1]:n1.value,[C.n2]:n2.value},C.n3)); n3.disabled=false; };
+  n3.onchange = () => { reset(pr);
+    fillSelect(pr, cascadaOpciones(inv,{[C.n2]:n2.value,[C.n3]:n3.value},C.proc)); pr.disabled=false; };
+}
+
+/* ============================================================
+   GUARDAR (crear registro en la matriz)
+   Solo enviamos campos editables; los formula los calcula QuintaDB.
+   ============================================================ */
+document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btnGuardar');
+  const F = CONFIG.MATRIZ_FIELDS;
+  const v = id => document.getElementById(id).value;
+  const tipo = v('f_tipo_ro');
+
+  const values = {};
+  const rel = {};
+  const put = (def, val) => { if (val) values[def.id] = val; };
+  const putRel = (def, val) => { if (val) rel[def.id] = val; };
+
+  put(F.fecha_evaluacion, v('f_fecha'));
+  put(F.fuente, v('f_fuente'));
+  put(F.riesgo_u_oportunidad, tipo);
+  put(F.actividad, v('f_actividad'));
+  put(F.causas, v('f_causas'));
+  put(F.consecuencias, v('f_consec'));
+  put(F.existen_controles, v('f_existe_ctrl'));
+  put(F.respuesta, v('f_respuesta'));
+  put(F.control_establecido, v('f_control'));
+  put(F.medida_respuesta, v('f_medida'));
+
+  // Origen según fuente
+  const fuente = v('f_fuente');
+  if (fuente === 'Contexto') { putRel(F.amenaza, v('f_amenaza')); putRel(F.oportunidad_rel, v('f_oportunidad_rel')); }
+  if (fuente === 'Partes interesadas') putRel(F.parte_interesada, v('f_parte'));
+  if (fuente === 'Proceso') {
+    putRel(F.tipo_proceso, v('f_tipo')); putRel(F.proceso_n0, v('f_n0'));
+    putRel(F.proceso_n1, v('f_n1')); putRel(F.proceso_n2, v('f_n2'));
+  }
+  // Naturaleza
+  if (tipo === 'Riesgo') {
+    put(F.riesgo_desc, v('f_riesgo_desc'));
+    put(F.prob_riesgo_inh, v('f_prob_r_inh')); put(F.imp_riesgo_inh, v('f_imp_r_inh'));
+  } else if (tipo === 'Oportunidad') {
+    put(F.oportunidad_desc, v('f_oport_desc'));
+    put(F.prob_oport_inh, v('f_prob_o_inh')); put(F.imp_oport_inh, v('f_imp_o_inh'));
+  }
+  putRel(F.responsable, v('f_responsable')); // responsable es relación
+
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Guardando…';
+  try {
+    await API.createRecord(CONFIG.ENTITIES.MATRIZ, values, Object.keys(rel).length ? rel : null);
+    toast('Registro guardado correctamente.');
+    document.getElementById('formRiesgo').reset();
+    showOrigin(''); showEval(''); calcIndice();
+    STATE.matriz = []; // invalidar caché
+  } catch(err) {
+    toast('Error al guardar: ' + err.message, true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Guardar registro';
+  }
+});
+document.getElementById('btnReset').onclick = () => {
+  document.getElementById('formRiesgo').reset(); showOrigin(''); showEval(''); calcIndice();
+};
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+const NIVEL_COLORS = {1:'var(--n1)',2:'var(--n2)',3:'var(--n3)',4:'var(--n4)'};
+function nivelDe(idx){ if(!idx)return 0; if(idx>12)return 4; if(idx>9)return 3; if(idx>4)return 2; return 1; }
+
+async function loadMatriz() {
+  if (STATE.matriz.length) return STATE.matriz;
+  const data = await API.records(CONFIG.ENTITIES.MATRIZ);
+  STATE.matriz = data.records || [];
+  return STATE.matriz;
+}
+
+async function renderDashboard() {
+  try {
+    const recs = await loadMatriz();
+    const F = CONFIG.MATRIZ_FIELDS;
+    // helper: lee por nombre de columna (name_value=1) o por id
+    const get = (r, def, nombre) => (r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
+
+    let total=recs.length, conResidual=0, sumInh=0, sumRes=0, bajaron=0;
+    const distInh={1:0,2:0,3:0,4:0}, distRes={1:0,2:0,3:0,4:0};
+    const heat={}; // "p-i" -> count
+    const porProc={};
+
+    recs.forEach(r=>{
+      const idxInh = num(get(r,F.indice_riesgo_inh,'Índice de prioridad riesgo inherente'))
+                  || num(get(r,F.prob_riesgo_inh,'Probabilidad riesgo inherente'))*num(get(r,F.imp_riesgo_inh,'Impacto riesgo inherente'));
+      const idxRes = num(get(r,F.indice_riesgo_res,'Índice de prioridad riesgo residual'));
+      const nInh=nivelDe(idxInh), nRes=nivelDe(idxRes);
+      if(nInh) distInh[nInh]++;
+      if(nRes){ distRes[nRes]++; conResidual++; sumRes+=idxRes; if(idxRes<idxInh) bajaron++; }
+      if(nInh) sumInh+=idxInh;
+      const p=num(get(r,F.prob_riesgo_inh,'Probabilidad riesgo inherente')), i=num(get(r,F.imp_riesgo_inh,'Impacto riesgo inherente'));
+      if(p&&i){ const k=p+'-'+i; heat[k]=(heat[k]||0)+1; }
+      const proc=get(r,F.tipo_proceso,'Tipo de proceso')||'Sin proceso';
+      porProc[proc]=(porProc[proc]||0)+1;
+    });
+
+    const reduccion = sumInh? Math.round((1-(sumRes/Math.max(sumInh,1)))*100):0;
+    document.getElementById('kpis').innerHTML = `
+      ${kpi('Riesgos registrados', total, 'en la matriz')}
+      ${kpi('Reevaluados', conResidual, conResidual?`${Math.round(conResidual/total*100)}% del total`:'aún sin residual')}
+      ${kpi('Han disminuido', bajaron, 'nivel residual menor', 'var(--n1)')}
+      ${kpi('Nivel intolerable', distInh[4]||0, 'requieren acción inmediata', distInh[4]?'var(--n4)':'')}
+    `;
+
+    // Distribución inherente vs residual
+    const nombres={1:'Nivel 1 · Bajo',2:'Nivel 2 · Medio',3:'Nivel 3 · Alto',4:'Nivel 4 · Intolerable'};
+    const maxD=Math.max(1,...Object.values(distInh),...Object.values(distRes));
+    document.getElementById('distNiveles').innerHTML = [1,2,3,4].map(n=>`
+      <div class="bar-row"><div class="lbl">${nombres[n]}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(distInh[n]/maxD*100)||2}%;background:${NIVEL_COLORS[n]}">${distInh[n]||''}</div></div>
+      </div>
+      <div class="bar-row"><div class="lbl" style="opacity:.6;font-size:11px">→ residual</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(distRes[n]/maxD*100)||2}%;background:${NIVEL_COLORS[n]};opacity:.55">${distRes[n]||''}</div></div>
+      </div>`).join('');
+
+    // Por proceso
+    const procEntries=Object.entries(porProc).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    const maxP=Math.max(1,...procEntries.map(e=>e[1]));
+    document.getElementById('porProceso').innerHTML = procEntries.length? procEntries.map(([k,v])=>`
+      <div class="bar-row"><div class="lbl" title="${k}">${k.length>22?k.slice(0,22)+'…':k}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${v/maxP*100}%;background:var(--brand-2)">${v}</div></div>
+      </div>`).join('') : '<p class="hint">Sin datos de proceso aún.</p>';
+
+    // Heatmap P×I
+    let hm='<div class="matrix"><div class="axis"></div>';
+    for(let i=1;i<=4;i++) hm+=`<div class="axis">I${i}</div>`;
+    for(let p=4;p>=1;p--){ hm+=`<div class="axis">P${p}</div>`;
+      for(let i=1;i<=4;i++){ const idx=p*i,n=nivelDe(idx),c=heat[p+'-'+i]||''; 
+        hm+=`<div class="cell" style="background:${NIVEL_COLORS[n]};opacity:${c?1:.25}">${c}</div>`; } }
+    hm+='</div>';
+    document.getElementById('heatmap').innerHTML=hm;
+
+    // estado medidas (placeholder: requiere leer subtabla; se completa al conectar)
+    document.getElementById('estadoMedidas').innerHTML =
+      '<p class="hint">Se calcula leyendo la subtabla de reportes de acción. Disponible al conectar el proxy.</p>';
+
+    setConn(true);
+  } catch(e){ setConn(false, e.message); 
+    document.getElementById('kpis').innerHTML = emptyCard('No se pudo cargar el tablero', e.message); }
+}
+function kpi(k,v,sub,color){ return `<div class="kpi"><div class="k">${k}</div><div class="v" style="${color?`color:${color}`:''}">${v}</div><div class="sub">${sub}</div></div>`; }
+function emptyCard(t,m){ return `<div class="empty" style="grid-column:1/-1"><h3>${t}</h3><p>${m}</p></div>`; }
+
+/* ============================================================
+   REEVALUACIÓN — lista con habilitación según reglas
+   ============================================================ */
+async function renderReeval() {
+  const tb = document.getElementById('tablaReeval');
+  try {
+    const recs = await loadMatriz();
+    const F = CONFIG.MATRIZ_FIELDS;
+    const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
+    if(!recs.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty"><h3>Sin riesgos</h3><p>Registra el primero en la pestaña Registrar.</p></div></td></tr>'; return; }
+    tb.innerHTML = recs.map(r=>{
+      const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
+      const proc=get(r,F.tipo_proceso,'Tipo de proceso')||'—';
+      const idxInh=num(get(r,F.indice_riesgo_inh,'Índice de prioridad riesgo inherente'));
+      const nInh=nivelDe(idxInh);
+      const cert=get(r,F.certificacion_control,'Certificación de Implementación del Control');
+      // condición 1 (cond 2 requiere subtabla; se evalúa al conectar)
+      const procede = cert===CONFIG.REGLAS.residual.certificacionRequerida;
+      const idxRes=num(get(r,F.indice_riesgo_res,'Índice de prioridad riesgo residual'));
+      const nRes=nivelDe(idxRes);
+      return `<tr>
+        <td style="max-width:280px">${desc.length>90?desc.slice(0,90)+'…':desc}</td>
+        <td>${proc}</td>
+        <td>${nInh?`<span class="lvl-badge lvl-${nInh}">Nivel ${nInh}</span>`:'—'}</td>
+        <td>${procede?'<span class="tag tag-proc">Procede</span>':'<span class="tag tag-noproc">No procede</span>'}</td>
+        <td>${nRes?`<span class="lvl-badge lvl-${nRes}">Nivel ${nRes}</span>`:'—'}</td>
+        <td>${procede?'<button class="btn btn-ghost" style="padding:6px 14px;font-size:13px">Reevaluar</button>':''}</td>
+      </tr>`;
+    }).join('');
+    setConn(true);
+  } catch(e){ setConn(false,e.message);
+    tb.innerHTML=`<tr><td colspan="6"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
+}
+
+/* ============================================================
+   CONEXIÓN — indicador de estado
+   ============================================================ */
+function setConn(ok, msg) {
+  const dot=document.getElementById('connDot'), txt=document.getElementById('connText');
+  if(ok){ dot.className='dot on'; txt.textContent='Conectado a QuintaDB · datos en vivo'; }
+  else { dot.className='dot off'; txt.textContent='Sin conexión: '+(msg||'revisa PROXY_URL en config.js'); }
+}
+
+/* ============================================================
+   ARRANQUE
+   ============================================================ */
+(async function init(){
+  initStaticSelects();
+  // intento de conexión + precarga de listas
+  try {
+    await ensureRelOptions();
+    await initCascada();
+    setConn(true);
+    renderDashboard();
+  } catch(e){
+    setConn(false, e.message);
+  }
+})();
+</script>
+</body>
+</html>
