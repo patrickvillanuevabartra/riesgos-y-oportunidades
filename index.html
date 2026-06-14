@@ -104,6 +104,10 @@
   .matrix{display:grid;grid-template-columns:auto repeat(4,1fr);gap:4px;font-size:12px}
   .matrix .cell{aspect-ratio:1.6;border-radius:7px;display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-weight:500;color:#fff}
   .matrix .axis{display:grid;place-items:center;color:var(--mist);font-weight:600}
+  .heat-sub{font-size:12px;color:var(--mist);margin-bottom:10px;font-weight:500}
+  .heat-leyenda{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:14px;font-size:12px;color:var(--slate)}
+  .heat-leyenda span{display:flex;align-items:center;gap:6px}
+  .heat-leyenda i{width:13px;height:13px;border-radius:3px;display:inline-block;flex:none}
 
   /* Tabla reevaluación */
   table{width:100%;border-collapse:collapse;font-size:13px}
@@ -203,7 +207,8 @@
       <div class="panel"><h3>Avance de medidas de respuesta</h3><div id="estadoMedidas"></div></div>
       <div class="panel"><h3>Riesgos por proceso (nivel 1)</h3><div id="porProceso"></div></div>
       <div class="panel"><h3>Riesgos por oficina responsable</h3><div id="porOficina"></div></div>
-      <div class="panel"><h3>Mapa de calor · probabilidad × impacto</h3><div id="heatmap"></div></div>
+      <div class="panel"><h3>Mapa de calor · riesgo inherente</h3><div id="heatmap"></div></div>
+      <div class="panel"><h3>Mapa de calor · riesgo residual</h3><div id="heatmapRes"></div></div>
     </div>
   </section>
 
@@ -337,7 +342,24 @@
     </div>
   </div>
 
-  <!-- Modal de reevaluación (riesgo residual) -->
+  <!-- Modal de edición de riesgo -->
+  <div id="editModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <div class="eyebrow">Editar riesgo</div>
+          <h2 id="editTitulo" style="font-size:18px">Riesgo</h2>
+        </div>
+        <button class="modal-close" onclick="cerrarEdit()">&times;</button>
+      </div>
+      <div class="modal-body"><div id="editBody"></div></div>
+      <div class="actions" style="border-radius:0">
+        <button class="btn btn-ghost" onclick="cerrarEdit()">Cancelar</button>
+        <button class="btn btn-primary" id="editGuardar" onclick="guardarEdit()">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+
   <div id="reevalModal" class="modal-overlay hidden">
     <div class="modal" style="max-width:520px">
       <div class="modal-head">
@@ -699,6 +721,7 @@ async function renderDashboard() {
     let total=recs.length, conResidual=0, sumInh=0, sumRes=0, bajaron=0;
     const distInh={1:0,2:0,3:0,4:0}, distRes={1:0,2:0,3:0,4:0};
     const heat={}; // "p-i" -> count
+    const heatRes={};
     const porProc={};
     const porOfi={};
 
@@ -712,6 +735,8 @@ async function renderDashboard() {
       if(nInh) sumInh+=idxInh;
       const p=num(get(r,F.prob_riesgo_inh,'Probabilidad riesgo inherente')), i=num(get(r,F.imp_riesgo_inh,'Impacto riesgo inherente'));
       if(p&&i){ const k=p+'-'+i; heat[k]=(heat[k]||0)+1; }
+      const pr=num(get(r,F.prob_riesgo_res,'Probabilidad riesgo residual')), ir=num(get(r,F.imp_riesgo_res,'Impacto riesgo residual'));
+      if(pr&&ir){ const k=pr+'-'+ir; heatRes[k]=(heatRes[k]||0)+1; }
       const proc=nivel1De(r);
       porProc[proc]=(porProc[proc]||0)+1;
       const ofi=oficinaDe(r);
@@ -753,22 +778,66 @@ async function renderDashboard() {
         <div class="bar-track"><div class="bar-fill" style="width:${v/maxO*100}%;background:var(--brand)">${v}</div></div>
       </div>`).join('') : '<p class="hint">Sin datos de oficina aún.</p>';
 
-    // Heatmap P×I
-    let hm='<div class="matrix"><div class="axis"></div>';
-    for(let i=1;i<=4;i++) hm+=`<div class="axis">I${i}</div>`;
-    for(let p=4;p>=1;p--){ hm+=`<div class="axis">P${p}</div>`;
-      for(let i=1;i<=4;i++){ const idx=p*i,n=nivelDe(idx),c=heat[p+'-'+i]||''; 
-        hm+=`<div class="cell" style="background:${NIVEL_COLORS[n]};opacity:${c?1:.25}">${c}</div>`; } }
-    hm+='</div>';
-    document.getElementById('heatmap').innerHTML=hm;
+    // Mapas de calor (inherente y residual) con leyenda
+    function construirHeatmap(datos){
+      let hm='<div class="matrix"><div class="axis"></div>';
+      for(let i=1;i<=4;i++) hm+=`<div class="axis">I${i}</div>`;
+      for(let p=4;p>=1;p--){ hm+=`<div class="axis">P${p}</div>`;
+        for(let i=1;i<=4;i++){ const idx=p*i,n=nivelDe(idx),c=datos[p+'-'+i]||'';
+          hm+=`<div class="cell" style="background:${NIVEL_COLORS[n]};opacity:${c?1:.25}">${c}</div>`; } }
+      hm+='</div>';
+      return hm;
+    }
+    const leyenda = `<div class="heat-leyenda">
+      <span><i style="background:var(--n1)"></i> Nivel 1 · Bajo</span>
+      <span><i style="background:var(--n2)"></i> Nivel 2 · Medio</span>
+      <span><i style="background:var(--n3)"></i> Nivel 3 · Alto</span>
+      <span><i style="background:var(--n4)"></i> Nivel 4 · Intolerable</span>
+    </div>`;
+    const totalRes = Object.values(heatRes).reduce((a,b)=>a+b,0);
+    document.getElementById('heatmap').innerHTML =
+      '<p class="heat-sub">Evaluación inherente (inicial)</p>' + construirHeatmap(heat) + leyenda;
+    document.getElementById('heatmapRes').innerHTML =
+      '<p class="heat-sub">Evaluación residual (tras tratamiento)</p>' +
+      (totalRes ? construirHeatmap(heatRes) + leyenda
+                : '<p class="hint" style="padding:20px 0">Aún no hay riesgos reevaluados. Aparecerán aquí conforme registres reevaluaciones.</p>');
 
-    // estado medidas (placeholder: requiere leer subtabla; se completa al conectar)
-    document.getElementById('estadoMedidas').innerHTML =
-      '<p class="hint">Se calcula leyendo la subtabla de reportes de acción. Disponible al conectar el proxy.</p>';
+    // Avance de medidas: se carga de forma diferida leyendo la subtabla de reportes
+    document.getElementById('estadoMedidas').innerHTML = '<p class="hint">Calculando avance de las medidas…</p>';
+    cargarAvanceMedidas();
 
     setConn(true);
   } catch(e){ setConn(false, e.message); 
     document.getElementById('kpis').innerHTML = emptyCard('No se pudo cargar el tablero', e.message); }
+}
+
+// Lee toda la subtabla de reportes y cuenta los estados para el panel de avance.
+async function cargarAvanceMedidas(){
+  try {
+    const d = await API.records(CONFIG.ENTITIES.REPORTES);
+    const RF = CONFIG.REPORTE_FIELDS;
+    const recs = d.records || [];
+    const cont = { 'Pendiente':0, 'En Proceso':0, 'Culminado/Ejecutado':0 };
+    recs.forEach(r=>{
+      const est = (r.values||{})[RF.estado.col] || '';
+      if(cont[est]!==undefined) cont[est]++;
+    });
+    const total = recs.length || 1;
+    const filas = [
+      ['Culminado/Ejecutado', cont['Culminado/Ejecutado'], 'var(--n1)'],
+      ['En Proceso',          cont['En Proceso'],          'var(--n2)'],
+      ['Pendiente',           cont['Pendiente'],           'var(--n3)']
+    ];
+    const maxV = Math.max(1, ...filas.map(f=>f[1]));
+    document.getElementById('estadoMedidas').innerHTML =
+      `<p class="hint" style="margin-bottom:14px">${recs.length} reporte${recs.length!==1?'s':''} de acción en total</p>` +
+      filas.map(([lbl,v,color])=>`
+        <div class="bar-row"><div class="lbl">${lbl}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(v/maxV*100)||2}%;background:${color}">${v||''}</div></div>
+        </div>`).join('');
+  } catch(e){
+    document.getElementById('estadoMedidas').innerHTML = '<p class="hint">No se pudo calcular: '+e.message+'</p>';
+  }
 }
 function kpi(k,v,sub,color){ return `<div class="kpi"><div class="k">${k}</div><div class="v" style="${color?`color:${color}`:''}">${v}</div><div class="sub">${sub}</div></div>`; }
 function emptyCard(t,m){ return `<div class="empty" style="grid-column:1/-1"><h3>${t}</h3><p>${m}</p></div>`; }
@@ -894,6 +963,8 @@ async function renderSeguimiento() {
         }</td>
         <td style="text-align:right;white-space:nowrap">
           <button class="icon-btn" title="Ver detalle del riesgo" onclick="verDetalle('${f.id}')">👁</button>
+          <button class="icon-btn" title="Editar riesgo" onclick="editarRiesgo('${f.id}')">✏️</button>
+          <button class="icon-btn" title="Eliminar riesgo" onclick="eliminarRiesgo('${f.id}')">🗑️</button>
         </td>
       </tr>
       <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="6" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
@@ -1079,6 +1150,85 @@ function verDetalle(riesgoId){
   document.getElementById('modalSeg').classList.remove('hidden');
 }
 window.verDetalle = verDetalle;
+
+// === Eliminar riesgo (con confirmación) ===
+async function eliminarRiesgo(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  const F=CONFIG.MATRIZ_FIELDS;
+  const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
+  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'este riesgo';
+  const corto = desc.length>60?desc.slice(0,60)+'…':desc;
+  if(!confirm('¿Eliminar permanentemente este registro?\n\n"'+corto+'"\n\nEsta acción NO se puede deshacer.')) return;
+  try {
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','DELETE',{});
+    toast('Riesgo eliminado.');
+    STATE.matriz=[]; await loadMatriz(); renderSeguimiento();
+  } catch(e){ toast('Error al eliminar: '+e.message, true); }
+}
+window.eliminarRiesgo = eliminarRiesgo;
+
+// === Editar riesgo (campos principales editables) ===
+function editarRiesgo(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  if(!r) return;
+  EDIT_ACTUAL = riesgoId;
+  const v = r.values||{};
+  const F = CONFIG.MATRIZ_FIELDS;
+  const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+
+  // Construir formulario con los campos de texto/select más usados
+  const opt = (arr,sel)=>'<option value="">Seleccione…</option>'+arr.map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('');
+  document.getElementById('editTitulo').textContent = (cur('Riesgo')||cur('Oportunidad')||'Riesgo').slice(0,70);
+  document.getElementById('editBody').innerHTML = `
+    <div class="grid">
+      <div class="field full"><label>Descripción del riesgo</label><textarea id="ed_riesgo">${cur('Riesgo')}</textarea></div>
+      <div class="field full"><label>Causas</label><textarea id="ed_causas">${cur('Causas')}</textarea></div>
+      <div class="field full"><label>Consecuencias</label><textarea id="ed_consec">${cur('Consecuencias')}</textarea></div>
+      <div class="field"><label>Probabilidad inherente</label><select id="ed_prob">${opt(['1: Muy raro','2: Ocasionalmente','3: Frecuente','4: Muy frecuente'],cur('Probabilidad riesgo inherente'))}</select></div>
+      <div class="field"><label>Impacto inherente</label><select id="ed_imp">${opt(['1: Muy bajo','2: Bajo','3: Moderado','4: Alto'],cur('Impacto riesgo inherente'))}</select></div>
+      <div class="field"><label>¿Existen controles?</label><select id="ed_ctrl">${opt(['Sí','No'],cur('¿Existen controles?'))}</select></div>
+      <div class="field"><label>Respuesta</label><select id="ed_resp">${opt(['Eliminar','Mitigar','Trasladar','Asumir'],cur('Respuesta al riesgo u oportunidad'))}</select></div>
+      <div class="field full"><label>Control establecido</label><textarea id="ed_control">${cur('Control establecido')}</textarea></div>
+      <div class="field full"><label>Medida(s) de respuesta</label><textarea id="ed_medida">${cur('Medida(s) de respuesta')}</textarea></div>
+      <div class="field"><label>Certificación del control</label><select id="ed_cert">${opt(['No Implementado','Implementado sin validar','Certificado/Operativo'],cur('Certificación de Implementación del Control'))}</select></div>
+    </div>`;
+  document.getElementById('editModal').classList.remove('hidden');
+}
+window.editarRiesgo = editarRiesgo;
+function cerrarEdit(){ document.getElementById('editModal').classList.add('hidden'); }
+
+async function guardarEdit(){
+  if(!EDIT_ACTUAL) return;
+  const F=CONFIG.MATRIZ_FIELDS;
+  const g=id=>{ const el=document.getElementById(id); return el?el.value:''; };
+  const btn=document.getElementById('editGuardar');
+  const values={};
+  const set=(def,val)=>{ values[def.id]=val; }; // enviamos aunque sea vacío para permitir borrar
+  set(F.riesgo_desc, g('ed_riesgo'));
+  set(F.causas, g('ed_causas'));
+  set(F.consecuencias, g('ed_consec'));
+  if(g('ed_prob')) set(F.prob_riesgo_inh, g('ed_prob'));
+  if(g('ed_imp'))  set(F.imp_riesgo_inh, g('ed_imp'));
+  if(g('ed_ctrl')) set(F.existen_controles, g('ed_ctrl'));
+  if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
+  set(F.control_establecido, g('ed_control'));
+  set(F.medida_respuesta, g('ed_medida'));
+  if(g('ed_cert')) set(F.certificacion_control, g('ed_cert'));
+
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
+  try{
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+EDIT_ACTUAL+'.json','PUT',
+      { json_values: JSON.stringify(values) });
+    toast('Cambios guardados.');
+    STATE.matriz=[]; await loadMatriz();
+    cerrarEdit(); renderSeguimiento();
+  }catch(err){
+    toast('Error al guardar: '+err.message, true);
+    btn.disabled=false; btn.textContent='Guardar cambios';
+  }
+}
+window.guardarEdit = guardarEdit;
+let EDIT_ACTUAL = null;
 
 function cerrarModal(){ document.getElementById('modalSeg').classList.add('hidden'); }
 document.getElementById('modalCerrar').onclick = cerrarModal;
