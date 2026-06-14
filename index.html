@@ -112,6 +112,9 @@
   tr:hover td{background:var(--paper)}
   .tag{display:inline-block;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600}
   .tag-proc{background:#e8f3ec;color:var(--n1)} .tag-noproc{background:var(--paper);color:var(--mist)}
+  .grupo-row td{background:var(--brand);padding:10px 14px}
+  .grupo-nombre{font-family:'Fraunces',serif;font-weight:600;font-size:14px;color:#fff}
+  .grupo-count{font-size:12px;color:rgba(255,255,255,.7);margin-left:10px}
 
   .empty{text-align:center;padding:60px 20px;color:var(--mist)}
   .empty h3{color:var(--slate);margin-bottom:8px}
@@ -181,6 +184,7 @@
       <div class="panel"><h3>Distribución por nivel · inherente vs. residual</h3><div id="distNiveles"></div></div>
       <div class="panel"><h3>Avance de medidas de respuesta</h3><div id="estadoMedidas"></div></div>
       <div class="panel"><h3>Riesgos por proceso</h3><div id="porProceso"></div></div>
+      <div class="panel"><h3>Riesgos por oficina responsable</h3><div id="porOficina"></div></div>
       <div class="panel"><h3>Mapa de calor · probabilidad × impacto</h3><div id="heatmap"></div></div>
     </div>
   </section>
@@ -666,6 +670,7 @@ async function renderDashboard() {
     const distInh={1:0,2:0,3:0,4:0}, distRes={1:0,2:0,3:0,4:0};
     const heat={}; // "p-i" -> count
     const porProc={};
+    const porOfi={};
 
     recs.forEach(r=>{
       const idxInh = num(get(r,F.indice_riesgo_inh,'Índice de prioridad riesgo inherente'))
@@ -679,6 +684,8 @@ async function renderDashboard() {
       if(p&&i){ const k=p+'-'+i; heat[k]=(heat[k]||0)+1; }
       const proc=procesoDe(r);
       porProc[proc]=(porProc[proc]||0)+1;
+      const ofi=oficinaDe(r);
+      porOfi[ofi]=(porOfi[ofi]||0)+1;
     });
 
     const reduccion = sumInh? Math.round((1-(sumRes/Math.max(sumInh,1)))*100):0;
@@ -707,6 +714,14 @@ async function renderDashboard() {
       <div class="bar-row"><div class="lbl" title="${k}">${k.length>22?k.slice(0,22)+'…':k}</div>
         <div class="bar-track"><div class="bar-fill" style="width:${v/maxP*100}%;background:var(--brand-2)">${v}</div></div>
       </div>`).join('') : '<p class="hint">Sin datos de proceso aún.</p>';
+
+    // Por oficina responsable
+    const ofiEntries=Object.entries(porOfi).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const maxO=Math.max(1,...ofiEntries.map(e=>e[1]));
+    document.getElementById('porOficina').innerHTML = ofiEntries.length? ofiEntries.map(([k,v])=>`
+      <div class="bar-row"><div class="lbl" title="${k}">${k.length>22?k.slice(0,22)+'…':k}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${v/maxO*100}%;background:var(--brand)">${v}</div></div>
+      </div>`).join('') : '<p class="hint">Sin datos de oficina aún.</p>';
 
     // Heatmap P×I
     let hm='<div class="matrix"><div class="axis"></div>';
@@ -755,6 +770,13 @@ function estadoPill(est){
   return `<span class="est-pill ${c}">${est||'—'}</span>`;
 }
 
+// Oficina/dependencia responsable del riesgo (viene directa en el campo 'Responsable').
+function oficinaDe(r){
+  const v=r.values||{};
+  const x=v['Responsable'];
+  return (x && x!=='Responsable') ? x : 'Sin oficina asignada';
+}
+
 async function renderSeguimiento() {
   const tb = document.getElementById('tablaSeguimiento');
   try {
@@ -767,18 +789,32 @@ async function renderSeguimiento() {
     const filas = recs.map(r=>{
       const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
       const proc=procesoDe(r);
+      const oficina=oficinaDe(r);
       const sub=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
-      return {id:r.id, desc, proc, nReportes:sub.length, subIds:sub};
-    }).filter(f => !filtro || f.desc.toLowerCase().includes(filtro) || f.proc.toLowerCase().includes(filtro));
+      return {id:r.id, desc, proc, oficina, nReportes:sub.length, subIds:sub};
+    }).filter(f => !filtro || f.desc.toLowerCase().includes(filtro) || f.proc.toLowerCase().includes(filtro) || f.oficina.toLowerCase().includes(filtro));
 
-    tb.innerHTML = filas.map(f=>`
+    // Agrupar por oficina y ordenar alfabéticamente
+    const grupos = {};
+    filas.forEach(f => { (grupos[f.oficina] = grupos[f.oficina] || []).push(f); });
+    const oficinasOrdenadas = Object.keys(grupos).sort();
+
+    const filaHTML = f => `
       <tr>
         <td style="max-width:300px">${f.desc.length>90?f.desc.slice(0,90)+'…':f.desc}</td>
         <td>${f.proc.length>34?f.proc.slice(0,34)+'…':f.proc}</td>
         <td><strong>${f.nReportes}</strong></td>
         <td id="estado-${f.id}" class="mono" style="font-size:12px;color:var(--mist)">${f.nReportes?'…':'—'}</td>
         <td><button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="abrirReportes('${f.id}')">+ Reporte</button></td>
-      </tr>`).join('') || '<tr><td colspan="5"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
+      </tr>`;
+
+    tb.innerHTML = oficinasOrdenadas.length ? oficinasOrdenadas.map(of => `
+      <tr class="grupo-row"><td colspan="5">
+        <span class="grupo-nombre">${of}</span>
+        <span class="grupo-count">${grupos[of].length} riesgo${grupos[of].length!==1?'s':''}</span>
+      </td></tr>
+      ${grupos[of].map(filaHTML).join('')}
+    `).join('') : '<tr><td colspan="5"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
 
     setConn(true);
   } catch(e){ setConn(false,e.message);
