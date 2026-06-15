@@ -474,11 +474,23 @@ const API = {
     }
     const payload = { path, method, body };
     if (CONFIG.PROXY_TOKEN) payload.token = CONFIG.PROXY_TOKEN;
-    const r = await fetch(CONFIG.PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
-      body: JSON.stringify(payload)
-    });
+    // Timeout de 30s: si el proxy/QuintaDB no responde, abortamos en vez de colgarnos.
+    const ctrl = new AbortController();
+    const t = setTimeout(()=>ctrl.abort(), 30000);
+    let r;
+    try {
+      r = await fetch(CONFIG.PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS
+        body: JSON.stringify(payload),
+        signal: ctrl.signal
+      });
+    } catch(e) {
+      clearTimeout(t);
+      if (e.name === 'AbortError') throw new Error('Sin respuesta del servidor (30s). Revisa tu conexión y recarga para verificar.');
+      throw e;
+    }
+    clearTimeout(t);
     const data = await r.json();
     if (data.error) throw new Error(data.error);
     return data;
@@ -815,8 +827,8 @@ document.getElementById('btnReset').onclick = () => {
 const NIVEL_COLORS = {1:'var(--n1)',2:'var(--n2)',3:'var(--n3)',4:'var(--n4)'};
 function nivelDe(idx){ if(!idx)return 0; if(idx>12)return 4; if(idx>9)return 3; if(idx>4)return 2; return 1; }
 
-async function loadMatriz() {
-  if (STATE.matriz.length) return STATE.matriz;
+async function loadMatriz(forzar) {
+  if (!forzar && STATE.matriz.length) return STATE.matriz;
   const data = await API.records(CONFIG.ENTITIES.MATRIZ);
   STATE.matriz = data.records || [];
   return STATE.matriz;
@@ -1358,7 +1370,7 @@ async function guardarReporte(riesgoId){
       { json_subforms_values: JSON.stringify(subforms) });
     toast('Reporte agregado correctamente.');
     STATE.matriz=[];
-    await loadMatriz();
+    await loadMatriz(true);
     await renderSeguimiento();
     // reabrir el historial del mismo riesgo
     setTimeout(()=>toggleHistorial(riesgoId), 100);
@@ -1430,7 +1442,7 @@ async function guardarEdicionReporte(repId){
     await Promise.race([guardar, timeout]);
     toast('Reporte actualizado.');
     STATE.matriz=[];
-    await loadMatriz();
+    await loadMatriz(true);
     await renderSeguimiento();
     const rid = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
     if(rid) setTimeout(()=>toggleHistorial(rid), 100);
@@ -1450,7 +1462,7 @@ async function eliminarReporte(repId){
     await Promise.race([borrar, timeout]);
     toast('Reporte eliminado.');
     STATE.matriz=[];
-    await loadMatriz();
+    await loadMatriz(true);
     await renderSeguimiento();
     const rid = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
     if(rid) setTimeout(()=>toggleHistorial(rid), 100);
@@ -1520,7 +1532,7 @@ async function eliminarRiesgo(riesgoId){
   try {
     await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','DELETE',{});
     toast('Riesgo eliminado.');
-    STATE.matriz=[]; await loadMatriz(); renderSeguimiento();
+    STATE.matriz=[]; await loadMatriz(true); renderSeguimiento();
   } catch(e){ toast('Error al eliminar: '+e.message, true); }
 }
 window.eliminarRiesgo = eliminarRiesgo;
@@ -1776,7 +1788,7 @@ async function guardarEdit(){
     const resp = await Promise.race([guardar, timeout]);
     console.log('[guardarEdit] Respuesta:', resp);
     toast('Cambios guardados.');
-    STATE.matriz=[]; await loadMatriz();
+    STATE.matriz=[]; await loadMatriz(true);
     cerrarEdit(); renderSeguimiento();
   }catch(err){
     console.error('[guardarEdit] ERROR completo:', err);
@@ -1874,7 +1886,7 @@ async function guardarReeval(){
     await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+REEVAL_ACTUAL+'.json','PUT',
       { json_values: JSON.stringify(values) });
     toast('Reevaluación guardada.');
-    STATE.matriz=[]; await loadMatriz();
+    STATE.matriz=[]; await loadMatriz(true);
     cerrarReeval(); renderReeval();
   }catch(err){
     toast('Error al guardar: '+err.message, true);
