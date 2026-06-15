@@ -1620,26 +1620,24 @@ function showOriginEdit(fuente){
 async function cargarRelEdit(v){
   const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
   try{
-    // Amenaza, Oportunidad relacionada, Parte, Responsable (selección única por nombre)
     const [ams,ops,partes,resp] = await Promise.all([
       loadMaestra('AMENAZAS','Amenaza'),
       loadMaestra('OPORTUNIDADES','Oportunidad'),
       loadMaestra('PARTES'),
       loadMaestra('RESPONSABLES')
     ]);
-    // Estos selects guardan por NOMBRE visible (texto), para coincidir con lo que ya hay en la matriz
-    const fillByLabel=(id,opts,actual)=>{
+    // El value de cada opción es el ID del registro (lo que QuintaDB espera para una relación);
+    // se muestra el nombre. Preseleccionamos por coincidencia de nombre con el valor actual.
+    const fillById=(id,opts,actualNombre)=>{
       const el=document.getElementById(id); if(!el) return;
-      el.innerHTML='<option value="">Seleccione…</option>'+opts.map(o=>`<option value="${o.label}" ${o.label===actual?'selected':''}>${o.label}</option>`).join('');
-      // Si el valor actual no está en la lista, lo añadimos para no perderlo
-      if(actual && !opts.some(o=>o.label===actual)){
-        el.innerHTML += `<option value="${actual}" selected>${actual} (actual)</option>`;
-      }
+      const match = opts.find(o=>o.label===actualNombre);
+      el.innerHTML='<option value="">Seleccione…</option>'+
+        opts.map(o=>`<option value="${o.value}" ${match&&o.value===match.value?'selected':''}>${o.label}</option>`).join('');
     };
-    fillByLabel('ed_amenaza', ams, cur('Amenaza'));
-    fillByLabel('ed_oport_rel', ops, cur('Oportunidad relacionada'));
-    fillByLabel('ed_parte', partes, cur('Parte interesada'));
-    fillByLabel('ed_responsable', resp, cur('Responsable'));
+    fillById('ed_amenaza', ams, cur('Amenaza'));
+    fillById('ed_oport_rel', ops, cur('Oportunidad relacionada'));
+    fillById('ed_parte', partes, cur('Parte interesada'));
+    fillById('ed_responsable', resp, cur('Responsable'));
     // Cascada de procesos con preselección
     await initCascadaEdit(v);
   }catch(e){ toast('No se pudieron cargar algunas listas: '+e.message, true); }
@@ -1690,55 +1688,76 @@ async function guardarEdit(){
   if(!EDIT_ACTUAL) return;
   const F=CONFIG.MATRIZ_FIELDS;
   const g=id=>{ const el=document.getElementById(id); return el?el.value:''; };
-  const limpiar=t=>(t||'').replace(/<br\s*\/?>/gi,'\n'); // convierte <br/> en salto de línea
+  const limpiar=t=>(t||'').replace(/<br\s*\/?>/gi,'\n');
   const btn=document.getElementById('editGuardar');
-  const values={};
-  const set=(def,val)=>{ values[def.id]=val; }; // enviamos aunque sea vacío para permitir borrar
-  // Identificación
-  if(g('ed_fecha'))     set(F.fecha_evaluacion, g('ed_fecha'));
+  const values={};   // campos de texto/select → json_values
+  const rel={};      // relaciones (IDs) → json_rel_values
+  const set=(def,val)=>{ values[def.id]=val; };
+  const setRel=(def,val)=>{ if(val) rel[def.id]=val; };
+
+  // Identificación (texto)
+  if(g('ed_fecha'))  set(F.fecha_evaluacion, g('ed_fecha'));
   const fuenteSel = g('ed_fuente');
-  if(fuenteSel)         set(F.fuente, fuenteSel);
+  if(fuenteSel)      set(F.fuente, fuenteSel);
   set(F.actividad, g('ed_actividad'));
-  // Campos relacionales: solo guardamos los del grupo correspondiente a la fuente
+
+  // Campos relacionales según la fuente (se envían como RELACIÓN con IDs)
   if(fuenteSel==='Contexto'){
-    set(F.amenaza, g('ed_amenaza'));
-    set(F.oportunidad_rel, g('ed_oport_rel'));
+    setRel(F.amenaza, g('ed_amenaza'));
+    setRel(F.oportunidad_rel, g('ed_oport_rel'));
   } else if(fuenteSel==='Partes interesadas'){
-    set(F.parte_interesada, g('ed_parte'));
+    setRel(F.parte_interesada, g('ed_parte'));
   } else if(fuenteSel==='Proceso'){
-    set(F.tipo_proceso, g('ed_tipo'));
-    set(F.proceso_n0, g('ed_n0'));
-    set(F.proceso_n1, g('ed_n1'));
-    set(F.proceso_n2, g('ed_n2'));
+    // Los desplegables de proceso manejan TEXTO; buscamos en el inventario la fila
+    // coincidente y tomamos los IDs de sus rel_values (igual que al crear).
+    const fila = (STATE.inventario||[]).find(r=>{
+      const vv=r.values||{};
+      return vv[INV_COLS.tipo]===g('ed_tipo')
+        && (!g('ed_n0') || vv[INV_COLS.n0]===g('ed_n0'))
+        && (!g('ed_n1') || vv[INV_COLS.n1]===g('ed_n1'))
+        && (!g('ed_n2') || vv[INV_COLS.n2]===g('ed_n2'));
+    });
+    if(fila && fila.rel_values){
+      const RV=fila.rel_values, first=a=>Array.isArray(a)?a[0]:a, IF=CONFIG.INVENTARIO_FIELDS;
+      if(RV[IF.tipo_proceso.id]) rel[F.tipo_proceso.id]=first(RV[IF.tipo_proceso.id]);
+      if(RV[IF.proceso_n0.id])   rel[F.proceso_n0.id]=first(RV[IF.proceso_n0.id]);
+      if(RV[IF.proceso_n1.id])   rel[F.proceso_n1.id]=first(RV[IF.proceso_n1.id]);
+      if(RV[IF.proceso_n2.id])   rel[F.proceso_n2.id]=first(RV[IF.proceso_n2.id]);
+    }
   }
-  // Naturaleza
+
+  // Naturaleza (texto)
   if(g('ed_tipo_ro')) set(F.riesgo_u_oportunidad, g('ed_tipo_ro'));
   set(F.riesgo_desc, limpiar(g('ed_riesgo')));
   set(F.oportunidad_desc, limpiar(g('ed_oport_desc')));
   set(F.causas, limpiar(g('ed_causas')));
   set(F.consecuencias, limpiar(g('ed_consec')));
-  // Evaluación inherente
+  // Evaluación inherente (texto)
   if(g('ed_prob')) set(F.prob_riesgo_inh, g('ed_prob'));
   if(g('ed_imp'))  set(F.imp_riesgo_inh, g('ed_imp'));
-  // Controles
+  // Controles (texto)
   if(g('ed_ctrl')) set(F.existen_controles, g('ed_ctrl'));
   if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
   set(F.control_establecido, limpiar(g('ed_control')));
-  set(F.responsable, g('ed_responsable'));
   set(F.medida_respuesta, limpiar(g('ed_medida')));
   if(g('ed_cert')) set(F.certificacion_control, g('ed_cert'));
+  // Responsable es RELACIÓN (se envía el ID)
+  setRel(F.responsable, g('ed_responsable'));
 
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
   try{
-    // Timeout de seguridad: si en 25s no responde, recuperamos el botón
-    const guardar = API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+EDIT_ACTUAL+'.json','PUT',
-      { json_values: JSON.stringify(values) });
-    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('La operación tardó demasiado. Revisa tu conexión e intenta de nuevo. (Si vuelve a pasar, el riesgo pudo haberse guardado igual; recarga para verificar.)')),25000));
-    await Promise.race([guardar, timeout]);
+    const body = { json_values: JSON.stringify(values) };
+    if(Object.keys(rel).length) body.json_rel_values = JSON.stringify(rel);
+    console.log('[guardarEdit] Enviando:', {id:EDIT_ACTUAL, values, rel});
+    const guardar = API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+EDIT_ACTUAL+'.json','PUT', body);
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('Tardó demasiado (25s). Revisa la consola y recarga para verificar.')),25000));
+    const resp = await Promise.race([guardar, timeout]);
+    console.log('[guardarEdit] Respuesta:', resp);
     toast('Cambios guardados.');
     STATE.matriz=[]; await loadMatriz();
     cerrarEdit(); renderSeguimiento();
   }catch(err){
+    console.error('[guardarEdit] ERROR completo:', err);
     toast('Error al guardar: '+err.message, true);
     btn.disabled=false; btn.textContent='Guardar cambios';
   }
