@@ -124,7 +124,7 @@
   .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:11px;font-size:13px}
   .bar-row .lbl{width:160px;flex:none;color:var(--slate)}
   .bar-track{flex:1;height:22px;background:var(--paper);border-radius:6px;overflow:hidden;position:relative;display:flex;align-items:center}
-  .bar-num-out{margin-left:8px;font-size:12px;font-weight:600;color:var(--slate)}
+  .bar-num-out{margin-left:10px;font-size:12px;font-weight:600;color:var(--slate)}
   .bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:12px;font-weight:600;min-width:24px}
   .matrix{display:grid;grid-template-columns:auto repeat(4,1fr);gap:4px;font-size:12px}
   .matrix .cell{aspect-ratio:1.6;border-radius:7px;display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-weight:500;color:#fff}
@@ -948,11 +948,12 @@ async function cargarAvanceMedidas(){
       `<p class="hint" style="margin-bottom:14px">${recs.length} riesgos según el estado de su última acción</p>` +
       filas.map(([lbl,v,color])=>{
         const pct = v/maxV*100;
-        const dentro = pct > 8; // si la barra es ancha, el número va dentro; si no, al lado
+        const dentro = v>0 && pct > 8; // si la barra es ancha y hay valor, el número va dentro
+        const ancho = v>0 ? Math.max(pct,1) : 0; // valor 0 → sin barra
         return `
         <div class="bar-row"><div class="lbl">${lbl}</div>
           <div class="bar-track">
-            <div class="bar-fill" style="width:${Math.max(pct,1)}%;background:${color}">${dentro?v:''}</div>
+            ${ancho>0?`<div class="bar-fill" style="width:${ancho}%;background:${color}">${dentro?v:''}</div>`:''}
             ${dentro?'':`<span class="bar-num-out">${v}</span>`}
           </div>
         </div>`;
