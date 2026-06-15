@@ -1671,17 +1671,39 @@ async function initCascadaEdit(v){
     if(!n3.value) return;
     fillSelect(pr, opcionesInv(inv,{[C.n2]:n2.value,[C.n3]:n3.value},C.proc)); pr.disabled=false; };
 
-  // Preseleccionar la ruta actual, disparando cada nivel en cadena
+  // Preseleccionar la ruta actual de forma SECUENCIAL y verificada.
+  // En vez de disparar onchange en cadena (frágil), llenamos cada nivel y
+  // asignamos el valor comprobando que exista en las opciones generadas.
   const vTipo=cur('Tipo de proceso'), vN0=cur('Proceso nivel 0'),
         vN1=cur('Procesos nivel 1')||cur('Proceso nivel 1'),
         vN2=cur('Proceso nivel 2'), vN3=cur('Proceso nivel 3'),
         vPr=cur('Procedimiento');
-  if(vTipo){ fTipo.value=vTipo; fTipo.onchange();
-    if(vN0){ n0.value=vN0; n0.onchange();
-      if(vN1){ n1.value=vN1; n1.onchange();
-        if(vN2){ n2.value=vN2; n2.onchange();
-          if(vN3){ n3.value=vN3; n3.onchange();
-            if(vPr){ pr.value=vPr; } } } } } }
+
+  // Asigna el valor a un select solo si existe como opción; devuelve true si lo logró
+  const fijar=(el,valor)=>{
+    if(!valor) return false;
+    const existe=[...el.options].some(o=>o.value===valor);
+    if(existe){ el.value=valor; return true; }
+    console.warn('[cascadaEdit] No se encontró la opción "'+valor+'" en '+el.id+'. Opciones:', [...el.options].map(o=>o.value));
+    return false;
+  };
+
+  if(fijar(fTipo,vTipo)){
+    fillSelect(n0, opcionesInv(inv,{[C.tipo]:vTipo},C.n0)); n0.disabled=false;
+    if(fijar(n0,vN0)){
+      fillSelect(n1, opcionesInv(inv,{[C.tipo]:vTipo,[C.n0]:vN0},C.n1)); n1.disabled=false;
+      if(fijar(n1,vN1)){
+        fillSelect(n2, opcionesInv(inv,{[C.n0]:vN0,[C.n1]:vN1},C.n2)); n2.disabled=false;
+        if(fijar(n2,vN2)){
+          fillSelect(n3, opcionesInv(inv,{[C.n1]:vN1,[C.n2]:vN2},C.n3)); n3.disabled=false;
+          if(fijar(n3,vN3)){
+            fillSelect(pr, opcionesInv(inv,{[C.n2]:vN2,[C.n3]:vN3},C.proc)); pr.disabled=false;
+            fijar(pr,vPr);
+          }
+        }
+      }
+    }
+  }
 }
 
 async function guardarEdit(){
