@@ -536,9 +536,11 @@ const API = {
     });
     const bodyStr = partes.join('&');
     const method = recordId ? 'PUT' : 'POST';
+    // Al actualizar (PUT) la ruta lleva el id del registro.
+    // Al crear (POST) la ruta lleva la entidad (tabla) destino.
     const path = recordId
       ? `/apps/${CONFIG.APP_ID}/dtypes/${recordId}.json`
-      : `/apps/${CONFIG.APP_ID}/dtypes.json`;
+      : `/apps/${CONFIG.APP_ID}/dtypes/entity/${CONFIG.ENTITIES.MATRIZ}.json`;
     return this.call(path, method, bodyStr, 'application/x-www-form-urlencoded');
   }
 };
@@ -930,10 +932,10 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
 
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Guardando…';
   try {
-    // Creamos con saveForm (texto plano) — incluye los campos de texto que SÍ
-    // persisten. Intentamos además las relaciones por compatibilidad, pero la
-    // verdad operativa vive en los campos de texto.
-    await API.createRecord(CONFIG.ENTITIES.MATRIZ, values, Object.keys(rel).length ? rel : null);
+    // Creamos con saveForm (formulario x-www-form-urlencoded). Los campos de
+    // texto (TXT.*) SÍ persisten así. recordId=null → POST (crear).
+    const resp = await API.saveForm(null, values);
+    console.log('[crear] Respuesta:', resp);
     toast('Registro guardado correctamente.');
     document.getElementById('formRiesgo').reset();
     limpiarMultiselects();
@@ -1243,7 +1245,7 @@ const FILTRO_CAMPOS = {
   proceso:      { label:'Proceso (ruta)',       get:r=>rutaProcesoDe(r) },
   nivel:        { label:'Nivel inherente',      get:r=>String(nivelInherenteDe(r).nivel||''), opciones:['1','2','3','4'] },
   procede:      { label:'¿Procede reevaluación?',get:r=>procedeReeval(r).procede?'Sí':'No', opciones:['Sí','No'] },
-  tipo:         { label:'Tipo de proceso',       get:r=>{const x=(r.values||{})['Tipo de proceso'];return (x&&x!=='Tipo de proceso')?x:'';} },
+  tipo:         { label:'Tipo de proceso',       get:r=>{const ruta=rutaProcesoDe(r); return ruta?ruta.split(' › ')[0]:'';} },
   ro:           { label:'¿Riesgo u oportunidad?',get:r=>{const x=(r.values||{})['¿Riesgo u oportunidad?'];return (x&&x!=='¿Riesgo u oportunidad?')?x:'';}, opciones:['Riesgo','Oportunidad'] },
   respuesta:    { label:'Respuesta',             get:r=>{const x=(r.values||{})['Respuesta al riesgo u oportunidad'];return (x&&!x.includes('Respuesta'))?x:'';}, opciones:['Eliminar','Mitigar','Trasladar','Asumir'] },
   certificacion:{ label:'Certificación control', get:r=>{const x=(r.values||{})['Certificación de Implementación del Control'];return (x&&!x.includes('Certificación'))?x:'';}, opciones:['No Implementado','Implementado sin validar','Certificado/Operativo'] }
