@@ -1054,6 +1054,18 @@ function fmtFecha(s){
   return s;
 }
 
+// Convierte una fecha de QuintaDB (varios formatos) a yyyy-mm-dd para <input type="date">
+function fechaParaInput(s){
+  if(!s) return '';
+  s = String(s).trim();
+  let m;
+  if((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)))      return `${m[1]}-${m[2]}-${m[3]}`; // aaaa-mm-dd
+  if((m = s.match(/^(\d{2})-(\d{2})-(\d{4})/)))      return `${m[3]}-${m[2]}-${m[1]}`; // dd-mm-aaaa
+  if((m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/)))    return `${m[3]}-${m[2]}-${m[1]}`; // dd/mm/aaaa
+  if((m = s.match(/^(\d{4})\/(\d{2})\/(\d{2})/)))    return `${m[1]}-${m[2]}-${m[3]}`; // aaaa/mm/dd
+  return '';
+}
+
 // Índice y nivel inherente del riesgo (P×I → nivel 1-4)
 function nivelInherenteDe(r){
   const v=r.values||{};
@@ -1364,12 +1376,7 @@ function editarReporte(repId){
   const item = document.getElementById('repitem-'+repId);
   if(!item) return;
   // Convertir fecha mostrada a formato yyyy-mm-dd para el input date
-  let fechaISO = '';
-  if(d.fecha){
-    const m = String(d.fecha).match(/(\d{4})-(\d{2})-(\d{2})/);
-    if(m) fechaISO = m[0];
-    else { const m2=String(d.fecha).match(/(\d{2})\/(\d{2})\/(\d{4})/); if(m2) fechaISO=`${m2[3]}-${m2[2]}-${m2[1]}`; }
-  }
+  const fechaISO = fechaParaInput(d.fecha);
   const esc=s=>(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   item.innerHTML = `<div class="rep-edit-form">
     <div class="hist-head" style="margin-bottom:10px">✏️ Editando reporte</div>
@@ -1528,9 +1535,8 @@ function editarRiesgo(riesgoId){
   const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
 
   const opt = (arr,sel)=>'<option value="">Seleccione…</option>'+arr.map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('');
-  let fechaISO='';
   const fRaw=cur('Fecha de evaluación');
-  if(fRaw){ const m=String(fRaw).match(/(\d{4})-(\d{2})-(\d{2})/); if(m) fechaISO=m[0]; else{ const m2=String(fRaw).match(/(\d{2})\/(\d{2})\/(\d{4})/); if(m2) fechaISO=`${m2[3]}-${m2[2]}-${m2[1]}`; } }
+  const fechaISO=fechaParaInput(fRaw);
   const tipoRO = cur('Riesgo u oportunidad') || (cur('Riesgo')?'Riesgo':(cur('Oportunidad')?'Oportunidad':''));
   const fuenteAct = cur('Fuente de identificación');
 
