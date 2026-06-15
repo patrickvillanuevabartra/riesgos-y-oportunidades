@@ -86,6 +86,7 @@ const CONFIG = {
   REPORTE_FIELDS: {
     fecha_reporte:  { id: "ddSIRdSSnoiikenSogsuLu", type: "date", col: "Fecha de reporte" },
     accion:         { id: "crsCo9n8jbf500emo4g8kA", type: "text", col: "Acción desarrollada" },
+    pct_completado: { id: "cQW4tdRKLdVioZWOJdQCoW", type: "integer", col: "% completado" },
     evidencia2:     { id: "aIWRX9W7TmW5TbwmoXcszL", type: "url",  col: "Evidencia 2" },
     observacion:    { id: "aQWOHyWRvcSiotbeSqWOen", type: "text", col: "Observación" },
     estado:         { id: "ddGIWLW6PcGikeWO88W6mU", type: "select", col: "Estado medida(s) de respuesta", options: ["Pendiente","En Proceso","Culminado/Ejecutado"] }
