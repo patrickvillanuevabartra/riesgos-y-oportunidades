@@ -561,7 +561,9 @@ document.querySelectorAll('nav button').forEach(b => {
 /* ============================================================
    ESTADO en memoria
    ============================================================ */
-const STATE = { matriz: [], maestras: {}, inventario: [] };
+const STATE = { matriz: [], maestras: {}, inventario: [], relNames: {} };
+// relNames: diccionario global { idDeRegistro : nombreLegible } para traducir
+// los IDs que QuintaDB devuelve en los campos de relación a su texto.
 
 function toast(msg, isErr) {
   const t = document.getElementById('toast');
@@ -640,7 +642,42 @@ async function loadMaestra(entityKey, labelCol) {
   const data = await API.records(entityId);
   const opts = recordsToOptions(data.records || [], labelCol);
   STATE.maestras[cacheKey] = opts;
+  // Alimentar el diccionario global id→nombre para traducir relaciones al leer.
+  opts.forEach(o => { if (o.value && o.label) STATE.relNames[o.value] = o.label; });
   return opts;
+}
+
+// Traduce el valor de un campo de relación a su nombre legible.
+// QuintaDB devuelve la relación de dos formas: por NOMBRE de columna (a veces
+// null) y por field_id (devuelve el ID del registro relacionado). Esta función
+// intenta: 1) el texto por nombre; 2) traducir el ID por field_id vía relNames.
+function leerRelacion(r, nombreCol, fieldId){
+  const v = r.values || {};
+  // 1) Texto directo por nombre de columna
+  const porNombre = v[nombreCol];
+  if (porNombre && porNombre !== nombreCol && !/^[a-zA-Z0-9_\-]{22}$/.test(porNombre)) {
+    return porNombre;
+  }
+  // 2) ID por field_id → traducir con el diccionario
+  const idRel = v[fieldId];
+  if (idRel) {
+    const id = Array.isArray(idRel) ? idRel[0] : idRel;
+    if (STATE.relNames[id]) return STATE.relNames[id];
+    return id; // último recurso: mostrar el ID si aún no se cargó la maestra
+  }
+  return '';
+}
+
+// Precarga todas las maestras de proceso para poder traducir sus IDs.
+async function precargarMaestrasProceso(){
+  try {
+    await Promise.all([
+      loadMaestra('TIPO_PROCESO'), loadMaestra('NIVEL0'),
+      loadMaestra('NIVEL1'), loadMaestra('NIVEL2'), loadMaestra('NIVEL3'),
+      loadMaestra('RESPONSABLES'), loadMaestra('AMENAZAS','Amenaza'),
+      loadMaestra('OPORTUNIDADES','Oportunidad'), loadMaestra('PARTES')
+    ]);
+  } catch(e){ /* si falla, leerRelacion mostrará IDs como respaldo */ }
 }
 
 // Carga inicial de selects estáticos (con opciones fijas del config)
@@ -870,6 +907,7 @@ async function loadMatriz(forzar) {
 async function renderDashboard() {
   try {
     const recs = await loadMatriz();
+    await precargarMaestrasProceso(); // garantizar diccionario id→nombre
     const F = CONFIG.MATRIZ_FIELDS;
     // helper: lee por nombre de columna (name_value=1) o por id
     const get = (r, def, nombre) => (r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
@@ -1040,29 +1078,26 @@ function procesoDe(r) {
 
 // Ruta COMPLETA del proceso: Tipo › Nivel 0 › Nivel 1 › Nivel 2 › Nivel 3
 // (solo los niveles que tengan dato). Devuelve '' si no hay ninguno.
+// Usa leerRelacion(): si el nombre viene vacío, traduce el ID de relación.
 function rutaProcesoDe(r){
-  const v = r.values || {};
-  const limpio = (col) => { const x=v[col]; return (x && x!==col) ? x : ''; };
-  const nivel1 = limpio('Procesos nivel 1') || limpio('Proceso nivel 1'); // singular o plural
+  const F = CONFIG.MATRIZ_FIELDS;
   const partes = [
-    limpio('Tipo de proceso'),
-    limpio('Proceso nivel 0'),
-    nivel1,
-    limpio('Proceso nivel 2'),
-    limpio('Proceso nivel 3')
+    leerRelacion(r, 'Tipo de proceso',  F.tipo_proceso.id),
+    leerRelacion(r, 'Proceso nivel 0',  F.proceso_n0.id),
+    leerRelacion(r, 'Procesos nivel 1', F.proceso_n1.id) || leerRelacion(r, 'Proceso nivel 1', F.proceso_n1.id),
+    leerRelacion(r, 'Proceso nivel 2',  F.proceso_n2.id),
+    leerRelacion(r, 'Proceso nivel 3',  '')
   ].filter(Boolean);
   return partes.join(' › ');
 }
 
-// Proceso de NIVEL 1 (para agrupar en el dashboard). Prueba ambas grafías
-// porque la matriz y el inventario pueden nombrarlo distinto (singular/plural).
+// Proceso de NIVEL 1 (para agrupar en el dashboard). Traduce IDs de relación.
 function nivel1De(r){
-  const v=r.values||{};
-  const cand=['Procesos nivel 1','Proceso nivel 1'];
-  for(const c of cand){ if(v[c] && v[c]!==c) return v[c]; }
-  // si no hay nivel 1, cae al nivel 0 o tipo
-  return (v['Proceso nivel 0']&&v['Proceso nivel 0']!=='Proceso nivel 0'?v['Proceso nivel 0']:null)
-      || (v['Tipo de proceso']&&v['Tipo de proceso']!=='Tipo de proceso'?v['Tipo de proceso']:null)
+  const F = CONFIG.MATRIZ_FIELDS;
+  return leerRelacion(r, 'Procesos nivel 1', F.proceso_n1.id)
+      || leerRelacion(r, 'Proceso nivel 1', F.proceso_n1.id)
+      || leerRelacion(r, 'Proceso nivel 0', F.proceso_n0.id)
+      || leerRelacion(r, 'Tipo de proceso', F.tipo_proceso.id)
       || 'Sin proceso';
 }
 
@@ -1084,9 +1119,9 @@ function procedeReeval(r){
 
 // Oficina/dependencia responsable del riesgo (viene directa en el campo 'Responsable').
 function oficinaDe(r){
-  const v=r.values||{};
-  const x=v['Responsable'];
-  return (x && x!=='Responsable') ? x : 'Sin oficina asignada';
+  const F = CONFIG.MATRIZ_FIELDS;
+  const x = leerRelacion(r, 'Responsable', F.responsable.id);
+  return x ? x : 'Sin oficina asignada';
 }
 
 // Formatea una fecha a dd/mm/aaaa (acepta '2026-06-13', '13-06-2026', etc.)
@@ -1186,6 +1221,7 @@ async function renderSeguimiento() {
   const tb = document.getElementById('tablaSeguimiento');
   try {
     const recs = await loadMatriz();
+    await precargarMaestrasProceso(); // garantizar diccionario id→nombre
     const F = CONFIG.MATRIZ_FIELDS;
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
     if(!recs.length){ tb.innerHTML='<tr><td colspan="8"><div class="empty"><h3>Sin riesgos</h3></div></td></tr>'; return; }
@@ -1536,6 +1572,7 @@ function verDetalle(riesgoId){
   ];
   const limpio = (col)=>{
     if(col==='__proceso__') return rutaProcesoDe(r);
+    if(col==='Responsable') return oficinaDe(r)==='Sin oficina asignada' ? '' : oficinaDe(r);
     const val = v[col];
     if(!val || val===col) return '';
     return val;
@@ -1583,12 +1620,16 @@ function editarRiesgo(riesgoId){
   const fRaw=cur('Fecha de evaluación');
   const fechaISO=fechaParaInput(fRaw);
   const tipoRO = cur('Riesgo u oportunidad') || (cur('Riesgo')?'Riesgo':(cur('Oportunidad')?'Oportunidad':''));
-  // Fuente: si viene vacía pero hay datos de un grupo, la inferimos para mostrar la cascada/campos
-  let fuenteAct = cur('Fuente de identificación');
+  // Fuente: leer con el nombre de columna REAL. Si viene vacía, inferir según
+  // qué relaciones tienen ID (los nombres por columna a veces vienen vacíos).
+  let fuenteAct = cur('Fuente de identificación del riesgo u oportunidad') || cur('Fuente de identificación');
   if(!fuenteAct){
-    const tieneProceso = cur('Tipo de proceso')||cur('Proceso nivel 0')||cur('Procesos nivel 1')||cur('Proceso nivel 1')||cur('Proceso nivel 2');
-    const tieneParte = cur('Parte interesada');
-    const tieneContexto = cur('Amenaza')||cur('Oportunidad relacionada');
+    const tieneProceso = leerRelacion(r,'Tipo de proceso',F.tipo_proceso.id)
+      || leerRelacion(r,'Proceso nivel 0',F.proceso_n0.id)
+      || leerRelacion(r,'Procesos nivel 1',F.proceso_n1.id)
+      || leerRelacion(r,'Proceso nivel 2',F.proceso_n2.id);
+    const tieneParte = leerRelacion(r,'Parte interesada',F.parte_interesada.id);
+    const tieneContexto = leerRelacion(r,'Amenaza',F.amenaza.id)||leerRelacion(r,'Oportunidad relacionada',F.oportunidad_rel.id);
     if(tieneProceso) fuenteAct='Proceso';
     else if(tieneParte) fuenteAct='Partes interesadas';
     else if(tieneContexto) fuenteAct='Contexto';
@@ -1663,7 +1704,9 @@ function showOriginEdit(fuente){
 
 // Carga las listas dinámicas del modal de edición y preselecciona los valores actuales
 async function cargarRelEdit(v){
-  const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+  // r: registro completo, para poder traducir IDs de relación a nombres.
+  const r = STATE.matriz.find(x=>(x.values||{})===v) || { values: v };
+  const F = CONFIG.MATRIZ_FIELDS;
   try{
     const [ams,ops,partes,resp] = await Promise.all([
       loadMaestra('AMENAZAS','Amenaza'),
@@ -1671,18 +1714,18 @@ async function cargarRelEdit(v){
       loadMaestra('PARTES'),
       loadMaestra('RESPONSABLES')
     ]);
-    // El value de cada opción es el ID del registro (lo que QuintaDB espera para una relación);
-    // se muestra el nombre. Preseleccionamos por coincidencia de nombre con el valor actual.
+    // El value de cada opción es el ID del registro; se muestra el nombre.
+    // Preseleccionamos por coincidencia de nombre con el valor actual (traducido).
     const fillById=(id,opts,actualNombre)=>{
       const el=document.getElementById(id); if(!el) return;
       const match = opts.find(o=>o.label===actualNombre);
       el.innerHTML='<option value="">Seleccione…</option>'+
         opts.map(o=>`<option value="${o.value}" ${match&&o.value===match.value?'selected':''}>${o.label}</option>`).join('');
     };
-    fillById('ed_amenaza', ams, cur('Amenaza'));
-    fillById('ed_oport_rel', ops, cur('Oportunidad relacionada'));
-    fillById('ed_parte', partes, cur('Parte interesada'));
-    fillById('ed_responsable', resp, cur('Responsable'));
+    fillById('ed_amenaza', ams, leerRelacion(r,'Amenaza',F.amenaza.id));
+    fillById('ed_oport_rel', ops, leerRelacion(r,'Oportunidad relacionada',F.oportunidad_rel.id));
+    fillById('ed_parte', partes, leerRelacion(r,'Parte interesada',F.parte_interesada.id));
+    fillById('ed_responsable', resp, leerRelacion(r,'Responsable',F.responsable.id));
     // Cascada de procesos con preselección
     await initCascadaEdit(v);
   }catch(e){ toast('No se pudieron cargar algunas listas: '+e.message, true); }
@@ -1690,7 +1733,8 @@ async function cargarRelEdit(v){
 
 // Cascada de procesos para edición, preseleccionando valores actuales
 async function initCascadaEdit(v){
-  const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+  const r = STATE.matriz.find(x=>(x.values||{})===v) || { values: v };
+  const F = CONFIG.MATRIZ_FIELDS;
   const inv = await loadInventario();
   const C = INV_COLS;
   const fTipo=document.getElementById('ed_tipo'), n0=document.getElementById('ed_n0'),
@@ -1719,10 +1763,12 @@ async function initCascadaEdit(v){
   // Preseleccionar la ruta actual de forma SECUENCIAL y verificada.
   // En vez de disparar onchange en cadena (frágil), llenamos cada nivel y
   // asignamos el valor comprobando que exista en las opciones generadas.
-  const vTipo=cur('Tipo de proceso'), vN0=cur('Proceso nivel 0'),
-        vN1=cur('Procesos nivel 1')||cur('Proceso nivel 1'),
-        vN2=cur('Proceso nivel 2'), vN3=cur('Proceso nivel 3'),
-        vPr=cur('Procedimiento');
+  const vTipo=leerRelacion(r,'Tipo de proceso',F.tipo_proceso.id),
+        vN0=leerRelacion(r,'Proceso nivel 0',F.proceso_n0.id),
+        vN1=leerRelacion(r,'Procesos nivel 1',F.proceso_n1.id)||leerRelacion(r,'Proceso nivel 1',F.proceso_n1.id),
+        vN2=leerRelacion(r,'Proceso nivel 2',F.proceso_n2.id),
+        vN3=leerRelacion(r,'Proceso nivel 3',''),
+        vPr=(v['Procedimiento'] && v['Procedimiento']!=='Procedimiento')?v['Procedimiento']:'';
 
   // Asigna el valor a un select solo si existe como opción; devuelve true si lo logró
   const fijar=(el,valor)=>{
@@ -1850,6 +1896,7 @@ async function renderReeval() {
   const tb = document.getElementById('tablaReeval');
   try {
     const recs = await loadMatriz();
+    await precargarMaestrasProceso(); // garantizar diccionario id→nombre
     const F = CONFIG.MATRIZ_FIELDS;
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
     if(!recs.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty"><h3>Sin riesgos</h3><p>Registra el primero en la pestaña Registrar.</p></div></td></tr>'; return; }
@@ -1949,6 +1996,7 @@ function setConn(ok, msg) {
   try {
     await ensureRelOptions();
     await initCascada();
+    await precargarMaestrasProceso(); // diccionario id→nombre para traducir relaciones
     setConn(true);
     renderDashboard();
   } catch(e){
