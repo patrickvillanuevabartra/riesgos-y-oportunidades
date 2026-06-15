@@ -468,11 +468,14 @@
    CLIENTE DEL PROXY — todas las llamadas pasan por Apps Script
    ============================================================ */
 const API = {
-  async call(path, method = 'GET', body = {}) {
+  async call(path, method = 'GET', body = {}, contentType) {
     if (!CONFIG.PROXY_URL || CONFIG.PROXY_URL.startsWith('PEGA')) {
       throw new Error('Configura PROXY_URL en config.js');
     }
     const payload = { path, method, body };
+    // Si se indica contentType (ej. formulario), se lo pasamos al proxy para que
+    // reenvíe a QuintaDB como x-www-form-urlencoded (necesario para guardar relaciones).
+    if (contentType) payload.contentType = contentType;
     if (CONFIG.PROXY_TOKEN) payload.token = CONFIG.PROXY_TOKEN;
     // Timeout de 30s: si el proxy/QuintaDB no responde, abortamos en vez de colgarnos.
     const ctrl = new AbortController();
@@ -507,6 +510,36 @@ const API = {
     // JSON serializado para que QuintaDB lo interprete correctamente.
     if (rel_values) body.json_rel_values = JSON.stringify(rel_values);
     return this.call(`/apps/${CONFIG.APP_ID}/dtypes/entity/${entityId}.json`, 'POST', body);
+  },
+
+  // ── MÉTODO GANADOR (formulario) ──────────────────────────────────────────
+  // Guarda/actualiza un registro enviando los campos como formulario
+  // (values[fieldId]=valor). Este es el ÚNICO método que QuintaDB respeta para
+  // ACTUALIZAR campos de relación vía PUT. Sirve igual para texto y relaciones.
+  //   recordId : id del registro a actualizar (PUT) o null para crear (POST)
+  //   campos   : objeto { fieldId: valor }  — valor puede ser string o array de IDs
+  saveForm(recordId, campos) {
+    const partes = [];
+    Object.keys(campos).forEach(fid => {
+      let val = campos[fid];
+      if (val === null || val === undefined) return;
+      if (Array.isArray(val)) {
+        // Relación múltiple: se repite el campo con sufijo [] por cada ID.
+        val.forEach(item => {
+          if (item !== null && item !== undefined && item !== '') {
+            partes.push('values[' + encodeURIComponent(fid) + '][]=' + encodeURIComponent(item));
+          }
+        });
+      } else {
+        partes.push('values[' + encodeURIComponent(fid) + ']=' + encodeURIComponent(val));
+      }
+    });
+    const bodyStr = partes.join('&');
+    const method = recordId ? 'PUT' : 'POST';
+    const path = recordId
+      ? `/apps/${CONFIG.APP_ID}/dtypes/${recordId}.json`
+      : `/apps/${CONFIG.APP_ID}/dtypes.json`;
+    return this.call(path, method, bodyStr, 'application/x-www-form-urlencoded');
   }
 };
 
@@ -1780,10 +1813,12 @@ async function guardarEdit(){
 
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
   try{
-    const body = { json_values: JSON.stringify(values) };
-    if(Object.keys(rel).length) body.json_rel_values = JSON.stringify(rel);
-    console.log('[guardarEdit] Enviando:', {id:EDIT_ACTUAL, values, rel});
-    const guardar = API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+EDIT_ACTUAL+'.json','PUT', body);
+    // Combinamos texto + relaciones en un solo objeto de campos. El método de
+    // formulario (saveForm) los envía como values[id]=valor, que es lo que
+    // QuintaDB respeta para guardar relaciones al actualizar (PUT).
+    const campos = Object.assign({}, values, rel);
+    console.log('[guardarEdit] Enviando (formulario):', {id:EDIT_ACTUAL, campos});
+    const guardar = API.saveForm(EDIT_ACTUAL, campos);
     const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('Tardó demasiado (25s). Revisa la consola y recarga para verificar.')),25000));
     const resp = await Promise.race([guardar, timeout]);
     console.log('[guardarEdit] Respuesta:', resp);
