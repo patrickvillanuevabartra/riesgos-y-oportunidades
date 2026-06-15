@@ -565,6 +565,48 @@ const STATE = { matriz: [], maestras: {}, inventario: [], relNames: {} };
 // relNames: diccionario global { idDeRegistro : nombreLegible } para traducir
 // los IDs que QuintaDB devuelve en los campos de relación a su texto.
 
+// ── Campos de TEXTO que reemplazan las relaciones ─────────────────────
+// QuintaDB no escribe campos de relación por API; usamos campos de texto
+// donde guardamos los IDs (separados por | para el proceso). Al leer,
+// reconstruimos el nombre vigente desde el inventario/maestras (relNames),
+// de modo que si renombras en QuintaDB, la app lo refleja automáticamente.
+const TXT = {
+  ruta_proceso: 'a4DCopxfLcQlDGuSktBCkU', // "Ruta de proceso"   (string)
+  responsable:  'dcKJbSW79mWRTCWQyIirKz', // "Responsable texto" (string)
+  origen:       'c3W6zDWPvcVOkdW4lcLuTi'  // "Origen texto"      (string)
+};
+
+// Traduce un ID a su nombre vigente usando el diccionario relNames.
+// Si el ID ya no existe (registro eliminado del inventario), avisa.
+function nombreDeId(id){
+  if(!id) return '';
+  if(STATE.relNames[id]) return STATE.relNames[id];
+  // Parece un ID de QuintaDB (22 chars) pero no está en el diccionario → eliminado
+  if(/^[a-zA-Z0-9_\-]{22}$/.test(id)) return '(eliminado)';
+  return id; // no es un ID; devolver tal cual
+}
+
+// Lee la ruta de proceso desde el campo de texto (IDs separados por |) y
+// reconstruye el nombre vigente de cada nivel. Devuelve '' si no hay nada.
+function rutaProcesoTxt(r){
+  const raw = (r.values||{})[TXT.ruta_proceso];
+  if(!raw || raw === 'Ruta de proceso') return '';
+  return String(raw).split('|').map(s=>s.trim()).filter(Boolean)
+    .map(nombreDeId).filter(Boolean).join(' › ');
+}
+// Lee el responsable desde el campo de texto (un ID) y devuelve su nombre vigente.
+function responsableTxt(r){
+  const raw = (r.values||{})[TXT.responsable];
+  if(!raw || raw === 'Responsable texto') return '';
+  return nombreDeId(String(raw).trim());
+}
+// Lee el origen (amenaza/oportunidad/parte) desde el campo de texto.
+function origenTxt(r){
+  const raw = (r.values||{})[TXT.origen];
+  if(!raw || raw === 'Origen texto') return '';
+  return nombreDeId(String(raw).trim());
+}
+
 function toast(msg, isErr) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.className = 'toast show' + (isErr ? ' err' : '');
@@ -865,8 +907,32 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   }
   putRel(F.responsable, v('f_responsable')); // responsable es relación
 
+  // ── Guardar también como TEXTO (IDs) en los campos nuevos ──────────────
+  // Proceso: tomar los IDs resueltos en 'rel' y unirlos por | en orden de nivel.
+  if (fuente === 'Proceso') {
+    const idsProc = [
+      rel[F.tipo_proceso.id], rel[F.proceso_n0.id],
+      rel[F.proceso_n1.id], rel[F.proceso_n2.id]
+    ].filter(Boolean);
+    if (idsProc.length) values[TXT.ruta_proceso] = idsProc.join('|');
+  }
+  // Responsable: guardar el ID elegido como texto.
+  if (v('f_responsable')) values[TXT.responsable] = v('f_responsable');
+  // Origen (Contexto: primera amenaza/oportunidad; Partes: la parte) como texto.
+  if (fuente === 'Contexto') {
+    const ams = getMultiselect('f_amenaza');
+    const ops = getMultiselect('f_oportunidad_rel');
+    const primer = (ams[0] || ops[0] || '');
+    if (primer) values[TXT.origen] = primer;
+  } else if (fuente === 'Partes interesadas') {
+    if (v('f_parte')) values[TXT.origen] = v('f_parte');
+  }
+
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Guardando…';
   try {
+    // Creamos con saveForm (texto plano) — incluye los campos de texto que SÍ
+    // persisten. Intentamos además las relaciones por compatibilidad, pero la
+    // verdad operativa vive en los campos de texto.
     await API.createRecord(CONFIG.ENTITIES.MATRIZ, values, Object.keys(rel).length ? rel : null);
     toast('Registro guardado correctamente.');
     document.getElementById('formRiesgo').reset();
@@ -1080,6 +1146,10 @@ function procesoDe(r) {
 // (solo los niveles que tengan dato). Devuelve '' si no hay ninguno.
 // Usa leerRelacion(): si el nombre viene vacío, traduce el ID de relación.
 function rutaProcesoDe(r){
+  // 1) Preferir el campo de texto nuevo (IDs → nombres vigentes).
+  const txt = rutaProcesoTxt(r);
+  if(txt) return txt;
+  // 2) Respaldo: relaciones viejas (para riesgos antiguos).
   const F = CONFIG.MATRIZ_FIELDS;
   const partes = [
     leerRelacion(r, 'Tipo de proceso',  F.tipo_proceso.id),
@@ -1093,6 +1163,12 @@ function rutaProcesoDe(r){
 
 // Proceso de NIVEL 1 (para agrupar en el dashboard). Traduce IDs de relación.
 function nivel1De(r){
+  // Si hay ruta de texto, usar el nivel más específico de esa ruta.
+  const txt = rutaProcesoTxt(r);
+  if(txt){
+    const partes = txt.split(' › ').filter(p=>p && p!=='(eliminado)');
+    if(partes.length) return partes[partes.length-1];
+  }
   const F = CONFIG.MATRIZ_FIELDS;
   return leerRelacion(r, 'Procesos nivel 1', F.proceso_n1.id)
       || leerRelacion(r, 'Proceso nivel 1', F.proceso_n1.id)
@@ -1119,6 +1195,11 @@ function procedeReeval(r){
 
 // Oficina/dependencia responsable del riesgo (viene directa en el campo 'Responsable').
 function oficinaDe(r){
+  // 1) Preferir el campo de texto nuevo (ID → nombre vigente).
+  const txt = responsableTxt(r);
+  if(txt && txt !== '(eliminado)') return txt;
+  if(txt === '(eliminado)') return '(responsable eliminado)';
+  // 2) Respaldo: relación vieja.
   const F = CONFIG.MATRIZ_FIELDS;
   const x = leerRelacion(r, 'Responsable', F.responsable.id);
   return x ? x : 'Sin oficina asignada';
@@ -1904,11 +1985,29 @@ async function guardarEdit(){
   // Responsable es RELACIÓN (se envía el ID)
   setRel(F.responsable, g('ed_responsable'));
 
+  // ── Guardar también como TEXTO (IDs) en los campos nuevos ──────────────
+  // Proceso: usar los IDs resueltos en 'rel' (vienen del inventario), unidos por |.
+  if(fuenteSel==='Proceso'){
+    const idsProc = [
+      rel[F.tipo_proceso.id], rel[F.proceso_n0.id],
+      rel[F.proceso_n1.id], rel[F.proceso_n2.id]
+    ].filter(Boolean);
+    values[TXT.ruta_proceso] = idsProc.length ? idsProc.join('|') : '';
+  }
+  // Responsable como texto (ID).
+  values[TXT.responsable] = g('ed_responsable') || '';
+  // Origen como texto (ID) según la fuente.
+  if(fuenteSel==='Contexto'){
+    values[TXT.origen] = g('ed_amenaza') || g('ed_oport_rel') || '';
+  } else if(fuenteSel==='Partes interesadas'){
+    values[TXT.origen] = g('ed_parte') || '';
+  }
+
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
   try{
-    // Combinamos texto + relaciones en un solo objeto de campos. El método de
-    // formulario (saveForm) los envía como values[id]=valor, que es lo que
-    // QuintaDB respeta para guardar relaciones al actualizar (PUT).
+    // Combinamos texto + relaciones en un solo objeto de campos. Los campos de
+    // texto (TXT.*) son los que SÍ persisten en QuintaDB; las relaciones se
+    // intentan por compatibilidad pero la verdad operativa vive en el texto.
     const campos = Object.assign({}, values, rel);
     console.log('[guardarEdit] Enviando (formulario):', {id:EDIT_ACTUAL, campos});
     const guardar = API.saveForm(EDIT_ACTUAL, campos);
