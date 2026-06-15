@@ -13,7 +13,7 @@
 
   :root{
     --ink:#11161d; --slate:#3a4754; --mist:#6b7785; --line:#e2e6ea;
-    --paper:#f7f8fa; --card:#ffffff; --brand:#1f3a5f; --brand-2:#2c5e8f;
+    --paper:#f7f8fa; --card:#ffffff; --brand:#1f5641; --brand-2:#2e7d5b;
     --n1:#3a8c5f; --n2:#c9a227; --n3:#d97706; --n4:#c0392b; /* niveles 1-4 */
     --ok:#3a8c5f; --warn:#d97706; --shadow:0 1px 2px rgba(16,22,29,.04),0 4px 16px rgba(16,22,29,.06);
   }
@@ -127,6 +127,11 @@
   .matrix{display:grid;grid-template-columns:auto repeat(4,1fr);gap:4px;font-size:12px}
   .matrix .cell{aspect-ratio:1.6;border-radius:7px;display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-weight:500;color:#fff}
   .matrix .axis{display:grid;place-items:center;color:var(--mist);font-weight:600}
+  /* Ejes etiquetados del mapa de calor */
+  .heat-grid{display:flex;align-items:stretch;gap:8px}
+  .heat-ylabel{writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--brand-2);text-transform:uppercase;padding:4px 0}
+  .heat-grid .matrix{flex:1}
+  .heat-xlabel{text-align:center;font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--brand-2);text-transform:uppercase;margin-top:6px;padding-left:30px}
   .heat-sub{font-size:12px;color:var(--mist);margin-bottom:10px;font-weight:500}
   .heat-leyenda{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:14px;font-size:12px;color:var(--slate)}
   .heat-leyenda span{display:flex;align-items:center;gap:6px}
@@ -200,7 +205,7 @@
   <div class="bar">
     <div class="logo">
       <div class="logo-mark">R</div>
-      <div><b>Matriz de Riesgos y Oportunidades</b><span>Sistema de Gestión · ISO 31000</span></div>
+      <div><b>Matriz de Riesgos y Oportunidades</b><span>Sistema de Gestión · ISO 21000</span></div>
     </div>
     <nav>
       <button data-view="dashboard" class="active">Tablero</button>
@@ -226,12 +231,12 @@
     </div>
     <div class="kpis" id="kpis"></div>
     <div class="dash-grid">
+      <div class="panel"><h3>Mapa de calor · riesgo inherente</h3><div id="heatmap"></div></div>
+      <div class="panel"><h3>Mapa de calor · riesgo residual</h3><div id="heatmapRes"></div></div>
       <div class="panel"><h3>Distribución por nivel · inherente vs. residual</h3><div id="distNiveles"></div></div>
       <div class="panel"><h3>Avance de medidas de respuesta</h3><div id="estadoMedidas"></div></div>
       <div class="panel"><h3>Riesgos por proceso (nivel 1)</h3><div id="porProceso"></div></div>
       <div class="panel"><h3>Riesgos por oficina responsable</h3><div id="porOficina"></div></div>
-      <div class="panel"><h3>Mapa de calor · riesgo inherente</h3><div id="heatmap"></div></div>
-      <div class="panel"><h3>Mapa de calor · riesgo residual</h3><div id="heatmapRes"></div></div>
     </div>
   </section>
 
@@ -869,12 +874,12 @@ async function renderDashboard() {
 
     // Mapas de calor (inherente y residual) con leyenda
     function construirHeatmap(datos){
-      let hm='<div class="matrix"><div class="axis"></div>';
+      let hm='<div class="heat-grid"><div class="heat-ylabel">Probabilidad →</div><div class="matrix"><div class="axis"></div>';
       for(let i=1;i<=4;i++) hm+=`<div class="axis">I${i}</div>`;
       for(let p=4;p>=1;p--){ hm+=`<div class="axis">P${p}</div>`;
         for(let i=1;i<=4;i++){ const idx=p*i,n=nivelDe(idx),c=datos[p+'-'+i]||'';
           hm+=`<div class="cell" style="background:${NIVEL_COLORS[n]};opacity:${c?1:.25}">${c}</div>`; } }
-      hm+='</div>';
+      hm+='</div></div><div class="heat-xlabel">Impacto →</div>';
       return hm;
     }
     const leyenda = `<div class="heat-leyenda">
