@@ -100,7 +100,7 @@
   .calc{flex:1;min-width:150px;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
   .calc .k{font-size:12px;color:var(--mist);font-weight:500}
   .calc .v{font-family:'IBM Plex Sans',sans-serif;font-size:26px;font-weight:600;margin-top:3px}
-  .lvl-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;color:#fff;margin-top:4px}
+  .lvl-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;color:#fff;margin-top:4px;white-space:nowrap}
   .lvl-1{background:var(--n1)} .lvl-2{background:var(--n2)} .lvl-3{background:var(--n3)} .lvl-4{background:var(--n4)}
 
   /* Botones */
@@ -378,7 +378,7 @@
     </div>
 
     <div class="card"><div style="padding:6px 4px"><table>
-      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>% avance</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
+      <thead><tr><th>Riesgo</th><th>Proceso</th><th style="white-space:nowrap">Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>% avance</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
       <tbody id="tablaSeguimiento"><tr><td colspan="8" class="empty"><h3>Cargando…</h3></td></tr></tbody>
     </table></div></div>
   </section>
