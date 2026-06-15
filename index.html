@@ -537,11 +537,18 @@ const API = {
     const bodyStr = partes.join('&');
     const method = recordId ? 'PUT' : 'POST';
     // Al actualizar (PUT) la ruta lleva el id del registro.
-    // Al crear (POST) la ruta lleva la entidad (tabla) destino.
-    const path = recordId
-      ? `/apps/${CONFIG.APP_ID}/dtypes/${recordId}.json`
-      : `/apps/${CONFIG.APP_ID}/dtypes/entity/${CONFIG.ENTITIES.MATRIZ}.json`;
-    return this.call(path, method, bodyStr, 'application/x-www-form-urlencoded');
+    // Al crear (POST) replicamos EXACTO el método de Homologación (que sí crea):
+    //   ruta /dtypes.json + entity_id en el body como campo de formulario.
+    let bodyFinal = bodyStr;
+    let path;
+    if (recordId) {
+      path = `/apps/${CONFIG.APP_ID}/dtypes/${recordId}.json`;
+    } else {
+      path = `/apps/${CONFIG.APP_ID}/dtypes.json`;
+      bodyFinal = 'entity_id=' + encodeURIComponent(CONFIG.ENTITIES.MATRIZ) +
+                  (bodyStr ? '&' + bodyStr : '');
+    }
+    return this.call(path, method, bodyFinal, 'application/x-www-form-urlencoded');
   }
 };
 
