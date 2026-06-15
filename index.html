@@ -184,6 +184,12 @@
   .avance-track{flex:1;height:8px;background:var(--paper);border-radius:4px;overflow:hidden;min-width:50px}
   .avance-fill{height:100%;border-radius:4px;transition:width .3s}
   .avance-num{font-size:12px;font-weight:600;color:var(--slate);min-width:34px;text-align:right}
+  .rep-item .icon-btn{font-size:13px;padding:2px 5px;opacity:.6}
+  .rep-item .icon-btn:hover{opacity:1}
+  .rep-edit-form{padding:4px 2px}
+  .edit-sec{margin-bottom:18px}
+  .edit-sec-tit{font-weight:600;font-size:14px;color:var(--brand-2);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+  .edit-sec .hint{font-weight:400;font-size:12px}
   .rep-evid{margin-top:8px;display:flex;gap:14px;flex-wrap:wrap}
   .rep-evid a{font-size:12px;color:var(--brand-2);text-decoration:none;font-weight:500}
   .rep-evid a:hover{text-decoration:underline}
@@ -1243,10 +1249,23 @@ async function renderHistorialHTML(subIds){
     const evHtml = (ev1||ev2) ? `<div class="rep-evid">${
       ev1 ? `<a href="${ev1}" target="_blank" rel="noopener">📎 Evidencia 1</a>` : ''
     }${ev2 ? `<a href="${ev2}" target="_blank" rel="noopener">🔗 Evidencia 2</a>` : ''}</div>` : '';
-    return `<div class="rep-item">
+    // Guardamos los valores actuales para precargar el formulario de edición
+    REPORTE_CACHE[rec.id] = {
+      fecha: val(rec,RF.fecha_reporte.col),
+      estado: est,
+      pct: pct,
+      accion: val(rec,RF.accion.col),
+      obs: val(rec,RF.observacion.col),
+      evid: ev2
+    };
+    return `<div class="rep-item" id="repitem-${rec.id}">
       <div class="top">
         <span class="fecha">${fmtFecha(val(rec,RF.fecha_reporte.col))}</span>
-        <span style="display:flex;gap:8px;align-items:center">${pct!==''?`<span class="rep-pct">${pct}% completado</span>`:''}${estadoPill(est)}</span>
+        <span style="display:flex;gap:8px;align-items:center">
+          ${pct!==''?`<span class="rep-pct">${pct}% completado</span>`:''}${estadoPill(est)}
+          <button class="icon-btn rep-edit" title="Editar reporte" onclick="editarReporte('${rec.id}')">✏️</button>
+          <button class="icon-btn rep-del" title="Eliminar reporte" onclick="eliminarReporte('${rec.id}')">🗑️</button>
+        </span>
       </div>
       <div class="acc">${val(rec,RF.accion.col)||'(sin descripción de acción)'}</div>
       ${val(rec,RF.observacion.col)?`<div class="obs">Obs: ${val(rec,RF.observacion.col)}</div>`:''}
@@ -1254,6 +1273,8 @@ async function renderHistorialHTML(subIds){
     </div>`;
   }).join('') || '<p class="hint">No se pudieron leer los reportes.</p>';
 }
+// Caché de valores de reportes (para precargar el formulario de edición)
+const REPORTE_CACHE = {};
 
 // === Clic en el nombre del riesgo → despliega/oculta historial + formulario añadir ===
 async function toggleHistorial(riesgoId){
@@ -1336,6 +1357,103 @@ async function guardarReporte(riesgoId){
 }
 window.guardarReporte = guardarReporte;
 
+// === Editar un reporte de avance (registro propio en la entidad REPORTES) ===
+function editarReporte(repId){
+  const RF=CONFIG.REPORTE_FIELDS;
+  const d = REPORTE_CACHE[repId] || {};
+  const item = document.getElementById('repitem-'+repId);
+  if(!item) return;
+  // Convertir fecha mostrada a formato yyyy-mm-dd para el input date
+  let fechaISO = '';
+  if(d.fecha){
+    const m = String(d.fecha).match(/(\d{4})-(\d{2})-(\d{2})/);
+    if(m) fechaISO = m[0];
+    else { const m2=String(d.fecha).match(/(\d{2})\/(\d{2})\/(\d{4})/); if(m2) fechaISO=`${m2[3]}-${m2[2]}-${m2[1]}`; }
+  }
+  const esc=s=>(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  item.innerHTML = `<div class="rep-edit-form">
+    <div class="hist-head" style="margin-bottom:10px">✏️ Editando reporte</div>
+    <div class="grid">
+      <div class="field"><label>Fecha de reporte</label><input type="date" id="er_fecha_${repId}" value="${fechaISO}"></div>
+      <div class="field"><label>Estado</label><select id="er_estado_${repId}">
+        <option value="">Seleccione…</option>
+        ${['Pendiente','En Proceso','Culminado/Ejecutado'].map(o=>`<option ${d.estado===o?'selected':''}>${o}</option>`).join('')}
+      </select></div>
+      <div class="field"><label>% completado</label><div class="pct-input"><input type="number" min="0" max="100" step="1" id="er_pct_${repId}" value="${d.pct!==''&&d.pct!=null?d.pct:''}" placeholder="0"><span>%</span></div></div>
+      <div class="field full"><label>Acción desarrollada</label><textarea id="er_accion_${repId}">${esc(d.accion)}</textarea></div>
+      <div class="field full"><label>Observación</label><textarea id="er_obs_${repId}">${esc(d.obs)}</textarea></div>
+      <div class="field full"><label>Evidencia (enlace)</label><input id="er_evid_${repId}" value="${esc(d.evid)}" placeholder="https://…"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button class="btn" onclick="cancelarEdicionReporte()">Cancelar</button>
+      <button class="btn btn-primary" id="erbtn-${repId}" onclick="guardarEdicionReporte('${repId}')">Guardar cambios</button>
+    </div>
+  </div>`;
+}
+window.editarReporte = editarReporte;
+
+function cancelarEdicionReporte(){
+  // Recarga el historial del riesgo actualmente abierto
+  if(SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id) toggleHistorial(SEG_RIESGO_ACTUAL.id);
+}
+window.cancelarEdicionReporte = cancelarEdicionReporte;
+
+async function guardarEdicionReporte(repId){
+  const RF=CONFIG.REPORTE_FIELDS;
+  const g=id=>{ const el=document.getElementById(id+'_'+repId); return el?el.value:''; };
+  const btn=document.getElementById('erbtn-'+repId);
+  const values={};
+  // Enviamos todos los campos (vacío permite borrar)
+  values[RF.fecha_reporte.id] = g('er_fecha');
+  values[RF.estado.id]        = g('er_estado');
+  values[RF.accion.id]        = g('er_accion');
+  values[RF.observacion.id]   = g('er_obs');
+  values[RF.evidencia2.id]    = g('er_evid');
+  const pctVal=g('er_pct');
+  if(pctVal!=='' && pctVal!=null){
+    values[RF.pct_completado.id]=Math.max(0,Math.min(100,parseInt(pctVal)||0));
+  } else {
+    values[RF.pct_completado.id]='';
+  }
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
+  try{
+    const guardar = API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+repId+'.json','PUT',
+      { json_values: JSON.stringify(values) });
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('Tardó demasiado. Recarga para verificar si se guardó.')),25000));
+    await Promise.race([guardar, timeout]);
+    toast('Reporte actualizado.');
+    STATE.matriz=[];
+    await loadMatriz();
+    await renderSeguimiento();
+    const rid = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
+    if(rid) setTimeout(()=>toggleHistorial(rid), 100);
+  }catch(err){
+    toast('Error al actualizar el reporte: '+err.message, true);
+    btn.disabled=false; btn.textContent='Guardar cambios';
+  }
+}
+window.guardarEdicionReporte = guardarEdicionReporte;
+
+// === Eliminar un reporte de avance ===
+async function eliminarReporte(repId){
+  if(!confirm('¿Eliminar este reporte de avance? Esta acción no se puede deshacer.')) return;
+  try{
+    const borrar = API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+repId+'.json','DELETE',{});
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('Tardó demasiado. Recarga para verificar.')),25000));
+    await Promise.race([borrar, timeout]);
+    toast('Reporte eliminado.');
+    STATE.matriz=[];
+    await loadMatriz();
+    await renderSeguimiento();
+    const rid = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
+    if(rid) setTimeout(()=>toggleHistorial(rid), 100);
+  }catch(err){
+    toast('Error al eliminar el reporte: '+err.message, true);
+  }
+}
+window.eliminarReporte = eliminarReporte;
+
+
 // === Ícono de ojo → modal con el detalle completo del riesgo ===
 function verDetalle(riesgoId){
   const r = STATE.matriz.find(x=>x.id===riesgoId);
@@ -1409,49 +1527,192 @@ function editarRiesgo(riesgoId){
   const F = CONFIG.MATRIZ_FIELDS;
   const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
 
-  // Construir formulario con los campos de texto/select más usados
   const opt = (arr,sel)=>'<option value="">Seleccione…</option>'+arr.map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('');
+  let fechaISO='';
+  const fRaw=cur('Fecha de evaluación');
+  if(fRaw){ const m=String(fRaw).match(/(\d{4})-(\d{2})-(\d{2})/); if(m) fechaISO=m[0]; else{ const m2=String(fRaw).match(/(\d{2})\/(\d{2})\/(\d{4})/); if(m2) fechaISO=`${m2[3]}-${m2[2]}-${m2[1]}`; } }
+  const tipoRO = cur('Riesgo u oportunidad') || (cur('Riesgo')?'Riesgo':(cur('Oportunidad')?'Oportunidad':''));
+  const fuenteAct = cur('Fuente de identificación');
+
   document.getElementById('editTitulo').textContent = (cur('Riesgo')||cur('Oportunidad')||'Riesgo').slice(0,70);
   document.getElementById('editBody').innerHTML = `
+    <div class="edit-sec"><div class="edit-sec-tit">1 · Identificación</div>
     <div class="grid">
+      <div class="field"><label>Fecha de evaluación</label><input type="date" id="ed_fecha" value="${fechaISO}"></div>
+      <div class="field"><label>Fuente de identificación</label><select id="ed_fuente">${opt(['Contexto','Partes interesadas','Proceso'],fuenteAct)}</select></div>
+      <div class="field full"><label>Actividad específica</label><input id="ed_actividad" value="${(cur('Actividad específica')||'').replace(/"/g,'&quot;')}"></div>
+
+      <div class="field origin-ed contexto-ed hidden"><label>Amenaza(s)</label><select id="ed_amenaza"></select></div>
+      <div class="field origin-ed contexto-ed hidden"><label>Oportunidad(es) relacionada(s)</label><select id="ed_oport_rel"></select></div>
+
+      <div class="field origin-ed partes-ed hidden"><label>Parte interesada</label><select id="ed_parte"></select></div>
+
+      <div class="field origin-ed proceso-ed hidden"><label>Tipo de proceso</label><select id="ed_tipo"></select></div>
+      <div class="field origin-ed proceso-ed hidden"><label>Proceso nivel 0</label><select id="ed_n0" disabled></select></div>
+      <div class="field origin-ed proceso-ed hidden"><label>Proceso nivel 1</label><select id="ed_n1" disabled></select></div>
+      <div class="field origin-ed proceso-ed hidden"><label>Proceso nivel 2</label><select id="ed_n2" disabled></select></div>
+      <div class="field origin-ed proceso-ed hidden"><label>Proceso nivel 3</label><select id="ed_n3" disabled></select></div>
+    </div></div>
+
+    <div class="edit-sec"><div class="edit-sec-tit">2 · Naturaleza y descripción</div>
+    <div class="grid">
+      <div class="field"><label>¿Riesgo u oportunidad?</label><select id="ed_tipo_ro">${opt(['Riesgo','Oportunidad'],tipoRO)}</select></div>
+      <div class="field"></div>
       <div class="field full"><label>Descripción del riesgo</label><textarea id="ed_riesgo">${cur('Riesgo')}</textarea></div>
+      <div class="field full"><label>Descripción de la oportunidad</label><textarea id="ed_oport_desc">${cur('Oportunidad')}</textarea></div>
       <div class="field full"><label>Causas</label><textarea id="ed_causas">${cur('Causas')}</textarea></div>
       <div class="field full"><label>Consecuencias</label><textarea id="ed_consec">${cur('Consecuencias')}</textarea></div>
+    </div></div>
+
+    <div class="edit-sec"><div class="edit-sec-tit">3 · Evaluación inherente</div>
+    <div class="grid">
       <div class="field"><label>Probabilidad inherente</label><select id="ed_prob">${opt(['1: Muy raro','2: Ocasionalmente','3: Frecuente','4: Muy frecuente'],cur('Probabilidad riesgo inherente'))}</select></div>
       <div class="field"><label>Impacto inherente</label><select id="ed_imp">${opt(['1: Muy bajo','2: Bajo','3: Moderado','4: Alto'],cur('Impacto riesgo inherente'))}</select></div>
+    </div></div>
+
+    <div class="edit-sec"><div class="edit-sec-tit">4 · Controles y tratamiento</div>
+    <div class="grid">
       <div class="field"><label>¿Existen controles?</label><select id="ed_ctrl">${opt(['Sí','No'],cur('¿Existen controles?'))}</select></div>
       <div class="field"><label>Respuesta</label><select id="ed_resp">${opt(['Eliminar','Mitigar','Trasladar','Asumir'],cur('Respuesta al riesgo u oportunidad'))}</select></div>
       <div class="field full"><label>Control establecido</label><textarea id="ed_control">${cur('Control establecido')}</textarea></div>
+      <div class="field full"><label>Responsable (oficina)</label><select id="ed_responsable"></select></div>
       <div class="field full"><label>Medida(s) de respuesta</label><textarea id="ed_medida">${cur('Medida(s) de respuesta')}</textarea></div>
       <div class="field"><label>Certificación del control</label><select id="ed_cert">${opt(['No Implementado','Implementado sin validar','Certificado/Operativo'],cur('Certificación de Implementación del Control'))}</select></div>
-    </div>`;
+    </div></div>`;
+
   document.getElementById('editModal').classList.remove('hidden');
+
+  // Mostrar el grupo correcto según la fuente, y enganchar el cambio
+  showOriginEdit(fuenteAct);
+  document.getElementById('ed_fuente').onchange = e => showOriginEdit(e.target.value);
+
+  // Cargar desplegables dinámicos y preseleccionar valores actuales
+  cargarRelEdit(v);
 }
 window.editarRiesgo = editarRiesgo;
 function cerrarEdit(){ document.getElementById('editModal').classList.add('hidden'); }
+
+// Muestra/oculta los grupos de campos según la fuente (versión edición)
+function showOriginEdit(fuente){
+  document.querySelectorAll('.origin-ed').forEach(e=>e.classList.add('hidden'));
+  const map={'Contexto':'contexto-ed','Partes interesadas':'partes-ed','Proceso':'proceso-ed'};
+  if(map[fuente]) document.querySelectorAll('.origin-ed.'+map[fuente]).forEach(e=>e.classList.remove('hidden'));
+}
+
+// Carga las listas dinámicas del modal de edición y preselecciona los valores actuales
+async function cargarRelEdit(v){
+  const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+  try{
+    // Amenaza, Oportunidad relacionada, Parte, Responsable (selección única por nombre)
+    const [ams,ops,partes,resp] = await Promise.all([
+      loadMaestra('AMENAZAS','Amenaza'),
+      loadMaestra('OPORTUNIDADES','Oportunidad'),
+      loadMaestra('PARTES'),
+      loadMaestra('RESPONSABLES')
+    ]);
+    // Estos selects guardan por NOMBRE visible (texto), para coincidir con lo que ya hay en la matriz
+    const fillByLabel=(id,opts,actual)=>{
+      const el=document.getElementById(id); if(!el) return;
+      el.innerHTML='<option value="">Seleccione…</option>'+opts.map(o=>`<option value="${o.label}" ${o.label===actual?'selected':''}>${o.label}</option>`).join('');
+      // Si el valor actual no está en la lista, lo añadimos para no perderlo
+      if(actual && !opts.some(o=>o.label===actual)){
+        el.innerHTML += `<option value="${actual}" selected>${actual} (actual)</option>`;
+      }
+    };
+    fillByLabel('ed_amenaza', ams, cur('Amenaza'));
+    fillByLabel('ed_oport_rel', ops, cur('Oportunidad relacionada'));
+    fillByLabel('ed_parte', partes, cur('Parte interesada'));
+    fillByLabel('ed_responsable', resp, cur('Responsable'));
+    // Cascada de procesos con preselección
+    await initCascadaEdit(v);
+  }catch(e){ toast('No se pudieron cargar algunas listas: '+e.message, true); }
+}
+
+// Cascada de procesos para edición, preseleccionando valores actuales
+async function initCascadaEdit(v){
+  const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+  const inv = await loadInventario();
+  const C = INV_COLS;
+  const fTipo=document.getElementById('ed_tipo'), n0=document.getElementById('ed_n0'),
+        n1=document.getElementById('ed_n1'), n2=document.getElementById('ed_n2'),
+        n3=document.getElementById('ed_n3');
+  if(!fTipo) return;
+  const reset=(el)=>{ el.innerHTML='<option value="">Seleccione…</option>'; el.disabled=true; };
+
+  fillSelect(fTipo, opcionesInv(inv,{},C.tipo));
+  fTipo.onchange=()=>{ [n0,n1,n2,n3].forEach(reset);
+    if(!fTipo.value) return;
+    fillSelect(n0, opcionesInv(inv,{[C.tipo]:fTipo.value},C.n0)); n0.disabled=false; };
+  n0.onchange=()=>{ [n1,n2,n3].forEach(reset);
+    if(!n0.value) return;
+    fillSelect(n1, opcionesInv(inv,{[C.tipo]:fTipo.value,[C.n0]:n0.value},C.n1)); n1.disabled=false; };
+  n1.onchange=()=>{ [n2,n3].forEach(reset);
+    if(!n1.value) return;
+    fillSelect(n2, opcionesInv(inv,{[C.n0]:n0.value,[C.n1]:n1.value},C.n2)); n2.disabled=false; };
+  n2.onchange=()=>{ [n3].forEach(reset);
+    if(!n2.value) return;
+    fillSelect(n3, opcionesInv(inv,{[C.n1]:n1.value,[C.n2]:n2.value},C.n3)); n3.disabled=false; };
+
+  // Preseleccionar la ruta actual, disparando cada nivel en cadena
+  const vTipo=cur('Tipo de proceso'), vN0=cur('Proceso nivel 0'),
+        vN1=cur('Procesos nivel 1')||cur('Proceso nivel 1'),
+        vN2=cur('Proceso nivel 2'), vN3=cur('Proceso nivel 3');
+  if(vTipo){ fTipo.value=vTipo; fTipo.onchange();
+    if(vN0){ n0.value=vN0; n0.onchange();
+      if(vN1){ n1.value=vN1; n1.onchange();
+        if(vN2){ n2.value=vN2; n2.onchange();
+          if(vN3){ n3.value=vN3; } } } } }
+}
 
 async function guardarEdit(){
   if(!EDIT_ACTUAL) return;
   const F=CONFIG.MATRIZ_FIELDS;
   const g=id=>{ const el=document.getElementById(id); return el?el.value:''; };
+  const limpiar=t=>(t||'').replace(/<br\s*\/?>/gi,'\n'); // convierte <br/> en salto de línea
   const btn=document.getElementById('editGuardar');
   const values={};
   const set=(def,val)=>{ values[def.id]=val; }; // enviamos aunque sea vacío para permitir borrar
-  set(F.riesgo_desc, g('ed_riesgo'));
-  set(F.causas, g('ed_causas'));
-  set(F.consecuencias, g('ed_consec'));
+  // Identificación
+  if(g('ed_fecha'))     set(F.fecha_evaluacion, g('ed_fecha'));
+  const fuenteSel = g('ed_fuente');
+  if(fuenteSel)         set(F.fuente, fuenteSel);
+  set(F.actividad, g('ed_actividad'));
+  // Campos relacionales: solo guardamos los del grupo correspondiente a la fuente
+  if(fuenteSel==='Contexto'){
+    set(F.amenaza, g('ed_amenaza'));
+    set(F.oportunidad_rel, g('ed_oport_rel'));
+  } else if(fuenteSel==='Partes interesadas'){
+    set(F.parte_interesada, g('ed_parte'));
+  } else if(fuenteSel==='Proceso'){
+    set(F.tipo_proceso, g('ed_tipo'));
+    set(F.proceso_n0, g('ed_n0'));
+    set(F.proceso_n1, g('ed_n1'));
+    set(F.proceso_n2, g('ed_n2'));
+  }
+  // Naturaleza
+  if(g('ed_tipo_ro')) set(F.riesgo_u_oportunidad, g('ed_tipo_ro'));
+  set(F.riesgo_desc, limpiar(g('ed_riesgo')));
+  set(F.oportunidad_desc, limpiar(g('ed_oport_desc')));
+  set(F.causas, limpiar(g('ed_causas')));
+  set(F.consecuencias, limpiar(g('ed_consec')));
+  // Evaluación inherente
   if(g('ed_prob')) set(F.prob_riesgo_inh, g('ed_prob'));
   if(g('ed_imp'))  set(F.imp_riesgo_inh, g('ed_imp'));
+  // Controles
   if(g('ed_ctrl')) set(F.existen_controles, g('ed_ctrl'));
   if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
-  set(F.control_establecido, g('ed_control'));
-  set(F.medida_respuesta, g('ed_medida'));
+  set(F.control_establecido, limpiar(g('ed_control')));
+  set(F.responsable, g('ed_responsable'));
+  set(F.medida_respuesta, limpiar(g('ed_medida')));
   if(g('ed_cert')) set(F.certificacion_control, g('ed_cert'));
 
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
   try{
-    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+EDIT_ACTUAL+'.json','PUT',
+    // Timeout de seguridad: si en 25s no responde, recuperamos el botón
+    const guardar = API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+EDIT_ACTUAL+'.json','PUT',
       { json_values: JSON.stringify(values) });
+    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('La operación tardó demasiado. Revisa tu conexión e intenta de nuevo. (Si vuelve a pasar, el riesgo pudo haberse guardado igual; recarga para verificar.)')),25000));
+    await Promise.race([guardar, timeout]);
     toast('Cambios guardados.');
     STATE.matriz=[]; await loadMatriz();
     cerrarEdit(); renderSeguimiento();
