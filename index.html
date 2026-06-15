@@ -1540,7 +1540,6 @@ function editarRiesgo(riesgoId){
     <div class="grid">
       <div class="field"><label>Fecha de evaluación</label><input type="date" id="ed_fecha" value="${fechaISO}"></div>
       <div class="field"><label>Fuente de identificación</label><select id="ed_fuente">${opt(['Contexto','Partes interesadas','Proceso'],fuenteAct)}</select></div>
-      <div class="field full"><label>Actividad específica</label><input id="ed_actividad" value="${(cur('Actividad específica')||'').replace(/"/g,'&quot;')}"></div>
 
       <div class="field origin-ed contexto-ed hidden"><label>Amenaza(s)</label><select id="ed_amenaza"></select></div>
       <div class="field origin-ed contexto-ed hidden"><label>Oportunidad(es) relacionada(s)</label><select id="ed_oport_rel"></select></div>
@@ -1552,6 +1551,9 @@ function editarRiesgo(riesgoId){
       <div class="field origin-ed proceso-ed hidden"><label>Proceso nivel 1</label><select id="ed_n1" disabled></select></div>
       <div class="field origin-ed proceso-ed hidden"><label>Proceso nivel 2</label><select id="ed_n2" disabled></select></div>
       <div class="field origin-ed proceso-ed hidden"><label>Proceso nivel 3</label><select id="ed_n3" disabled></select></div>
+      <div class="field origin-ed proceso-ed hidden"><label>Procedimiento</label><select id="ed_proc" disabled></select></div>
+
+      <div class="field full"><label>Actividad específica</label><input id="ed_actividad" value="${(cur('Actividad específica')||'').replace(/"/g,'&quot;')}"></div>
     </div></div>
 
     <div class="edit-sec"><div class="edit-sec-tit">2 · Naturaleza y descripción</div>
@@ -1635,33 +1637,38 @@ async function initCascadaEdit(v){
   const C = INV_COLS;
   const fTipo=document.getElementById('ed_tipo'), n0=document.getElementById('ed_n0'),
         n1=document.getElementById('ed_n1'), n2=document.getElementById('ed_n2'),
-        n3=document.getElementById('ed_n3');
+        n3=document.getElementById('ed_n3'), pr=document.getElementById('ed_proc');
   if(!fTipo) return;
   const reset=(el)=>{ el.innerHTML='<option value="">Seleccione…</option>'; el.disabled=true; };
 
   fillSelect(fTipo, opcionesInv(inv,{},C.tipo));
-  fTipo.onchange=()=>{ [n0,n1,n2,n3].forEach(reset);
+  fTipo.onchange=()=>{ [n0,n1,n2,n3,pr].forEach(reset);
     if(!fTipo.value) return;
     fillSelect(n0, opcionesInv(inv,{[C.tipo]:fTipo.value},C.n0)); n0.disabled=false; };
-  n0.onchange=()=>{ [n1,n2,n3].forEach(reset);
+  n0.onchange=()=>{ [n1,n2,n3,pr].forEach(reset);
     if(!n0.value) return;
     fillSelect(n1, opcionesInv(inv,{[C.tipo]:fTipo.value,[C.n0]:n0.value},C.n1)); n1.disabled=false; };
-  n1.onchange=()=>{ [n2,n3].forEach(reset);
+  n1.onchange=()=>{ [n2,n3,pr].forEach(reset);
     if(!n1.value) return;
     fillSelect(n2, opcionesInv(inv,{[C.n0]:n0.value,[C.n1]:n1.value},C.n2)); n2.disabled=false; };
-  n2.onchange=()=>{ [n3].forEach(reset);
+  n2.onchange=()=>{ [n3,pr].forEach(reset);
     if(!n2.value) return;
     fillSelect(n3, opcionesInv(inv,{[C.n1]:n1.value,[C.n2]:n2.value},C.n3)); n3.disabled=false; };
+  n3.onchange=()=>{ reset(pr);
+    if(!n3.value) return;
+    fillSelect(pr, opcionesInv(inv,{[C.n2]:n2.value,[C.n3]:n3.value},C.proc)); pr.disabled=false; };
 
   // Preseleccionar la ruta actual, disparando cada nivel en cadena
   const vTipo=cur('Tipo de proceso'), vN0=cur('Proceso nivel 0'),
         vN1=cur('Procesos nivel 1')||cur('Proceso nivel 1'),
-        vN2=cur('Proceso nivel 2'), vN3=cur('Proceso nivel 3');
+        vN2=cur('Proceso nivel 2'), vN3=cur('Proceso nivel 3'),
+        vPr=cur('Procedimiento');
   if(vTipo){ fTipo.value=vTipo; fTipo.onchange();
     if(vN0){ n0.value=vN0; n0.onchange();
       if(vN1){ n1.value=vN1; n1.onchange();
         if(vN2){ n2.value=vN2; n2.onchange();
-          if(vN3){ n3.value=vN3; } } } } }
+          if(vN3){ n3.value=vN3; n3.onchange();
+            if(vPr){ pr.value=vPr; } } } } } }
 }
 
 async function guardarEdit(){
