@@ -8,8 +8,8 @@
 <style>
   /* ===== Identidad visual: "Centro de control de riesgos" =====
      Paleta sobria institucional con acentos semafóricos para niveles de riesgo.
-     Display: Fraunces (serif con carácter) · Body/UI: Inter · Data: IBM Plex Mono */
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+     Display y Body/UI: IBM Plex Sans (sin serifas) · Data: IBM Plex Mono */
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
   :root{
     --ink:#11161d; --slate:#3a4754; --mist:#6b7785; --line:#e2e6ea;
@@ -18,16 +18,17 @@
     --ok:#3a8c5f; --warn:#d97706; --shadow:0 1px 2px rgba(16,22,29,.04),0 4px 16px rgba(16,22,29,.06);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Inter',system-ui,sans-serif;color:var(--ink);background:var(--paper);line-height:1.5;-webkit-font-smoothing:antialiased}
-  h1,h2,h3{font-family:'Fraunces',Georgia,serif;font-weight:600;letter-spacing:-.01em;line-height:1.15}
+  html{font-size:17px}
+  body{font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);background:var(--paper);line-height:1.55;-webkit-font-smoothing:antialiased;zoom:1.08}
+  h1,h2,h3{font-family:'IBM Plex Sans',system-ui,sans-serif;font-weight:700;letter-spacing:-.01em;line-height:1.2}
   .mono{font-family:'IBM Plex Mono',monospace}
 
   /* Topbar */
   header{background:var(--brand);color:#fff;padding:0;position:sticky;top:0;z-index:50;box-shadow:var(--shadow)}
   .bar{max-width:1280px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:20px}
   .logo{display:flex;align-items:center;gap:11px}
-  .logo-mark{width:30px;height:30px;border:2px solid #fff;border-radius:7px;display:grid;place-items:center;font-family:'Fraunces',serif;font-weight:600;font-size:16px}
-  .logo b{font-family:'Fraunces',serif;font-weight:600;font-size:18px;letter-spacing:-.01em}
+  .logo-mark{width:30px;height:30px;border:2px solid #fff;border-radius:7px;display:grid;place-items:center;font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:16px}
+  .logo b{font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:18px;letter-spacing:-.01em}
   .logo span{display:block;font-size:11px;opacity:.7;font-weight:400;letter-spacing:.02em}
   nav{margin-left:auto;display:flex;gap:2px}
   nav button{background:transparent;border:0;color:#fff;opacity:.72;font-family:inherit;font-size:14px;font-weight:500;padding:9px 16px;border-radius:8px;cursor:pointer;transition:.15s}
@@ -53,7 +54,7 @@
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
   .section{padding:22px 24px;border-bottom:1px solid var(--line)}
   .section:last-child{border-bottom:0}
-  .section-title{display:flex;align-items:center;gap:10px;font-family:'Fraunces',serif;font-weight:600;font-size:17px;margin-bottom:4px}
+  .section-title{display:flex;align-items:center;gap:10px;font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:17px;margin-bottom:4px}
   .section-num{font-family:'IBM Plex Mono',monospace;font-size:12px;color:#fff;background:var(--brand-2);width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex:none}
   .section-desc{font-size:13px;color:var(--mist);margin-bottom:18px}
 
@@ -74,7 +75,7 @@
   /* Filtros avanzados */
   .filtros-card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px}
   .filtros-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px}
-  .filtros-head>span{font-family:'Fraunces',serif;font-weight:600;font-size:15px}
+  .filtros-head>span{font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:15px}
   .filtros-head>div{display:flex;align-items:center;gap:10px}
   .filtros-logica{font-size:13px;color:var(--slate);display:flex;align-items:center;gap:6px}
   .filtros-logica select{padding:5px 8px;font-size:13px;width:auto}
@@ -98,7 +99,7 @@
   .calc-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:4px}
   .calc{flex:1;min-width:150px;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
   .calc .k{font-size:12px;color:var(--mist);font-weight:500}
-  .calc .v{font-family:'Fraunces',serif;font-size:26px;font-weight:600;margin-top:3px}
+  .calc .v{font-family:'IBM Plex Sans',sans-serif;font-size:26px;font-weight:600;margin-top:3px}
   .lvl-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;color:#fff;margin-top:4px}
   .lvl-1{background:var(--n1)} .lvl-2{background:var(--n2)} .lvl-3{background:var(--n3)} .lvl-4{background:var(--n4)}
 
@@ -115,14 +116,15 @@
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow)}
   .kpi .k{font-size:12px;color:var(--mist);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
-  .kpi .v{font-family:'Fraunces',serif;font-size:34px;font-weight:600;margin-top:6px}
+  .kpi .v{font-family:'IBM Plex Sans',sans-serif;font-size:34px;font-weight:600;margin-top:6px}
   .kpi .sub{font-size:12px;color:var(--mist);margin-top:2px}
   .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
   .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:20px 22px}
   .panel h3{font-size:16px;margin-bottom:16px}
   .bar-row{display:flex;align-items:center;gap:12px;margin-bottom:11px;font-size:13px}
   .bar-row .lbl{width:160px;flex:none;color:var(--slate)}
-  .bar-track{flex:1;height:22px;background:var(--paper);border-radius:6px;overflow:hidden}
+  .bar-track{flex:1;height:22px;background:var(--paper);border-radius:6px;overflow:hidden;position:relative;display:flex;align-items:center}
+  .bar-num-out{margin-left:8px;font-size:12px;font-weight:600;color:var(--slate)}
   .bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding:0 8px;color:#fff;font-size:12px;font-weight:600;min-width:24px}
   .matrix{display:grid;grid-template-columns:auto repeat(4,1fr);gap:4px;font-size:12px}
   .matrix .cell{aspect-ratio:1.6;border-radius:7px;display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-weight:500;color:#fff}
@@ -145,7 +147,7 @@
   .tag{display:inline-block;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600}
   .tag-proc{background:#e8f3ec;color:var(--n1)} .tag-noproc{background:var(--paper);color:var(--mist)}
   .grupo-row td{background:var(--brand);padding:10px 14px}
-  .grupo-nombre{font-family:'Fraunces',serif;font-weight:600;font-size:14px;color:#fff}
+  .grupo-nombre{font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:14px;color:#fff}
   .grupo-count{font-size:12px;color:rgba(255,255,255,.7);margin-left:10px}
 
   .empty{text-align:center;padding:60px 20px;color:var(--mist)}
@@ -164,7 +166,7 @@
   .modal-overlay.hidden{display:none}
   .modal{background:var(--card);border-radius:16px;width:100%;max-width:640px;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
   .modal-head{display:flex;align-items:flex-start;justify-content:space-between;padding:22px 24px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card);z-index:1}
-  .modal-head h2{font-family:'Fraunces',serif}
+  .modal-head h2{font-family:'IBM Plex Sans',sans-serif}
   .modal-close{background:none;border:0;font-size:28px;line-height:1;color:var(--mist);cursor:pointer;padding:0 4px}
   .modal-close:hover{color:var(--ink)}
   .modal-body{padding:22px 24px}
@@ -173,6 +175,15 @@
   .rep-item .fecha{font-size:12px;color:var(--mist);font-family:'IBM Plex Mono',monospace}
   .rep-item .acc{font-size:14px;color:var(--ink)}
   .rep-item .obs{font-size:13px;color:var(--mist);margin-top:4px}
+  /* % completado en reportes y seguimiento */
+  .rep-pct{font-size:11px;font-weight:600;padding:3px 9px;border-radius:6px;background:#e8f0f3;color:var(--brand-2)}
+  .pct-input{display:flex;align-items:center;gap:6px}
+  .pct-input input{width:90px}
+  .pct-input span{font-size:14px;color:var(--mist);font-weight:600}
+  .avance-wrap{display:flex;align-items:center;gap:8px}
+  .avance-track{flex:1;height:8px;background:var(--paper);border-radius:4px;overflow:hidden;min-width:50px}
+  .avance-fill{height:100%;border-radius:4px;transition:width .3s}
+  .avance-num{font-size:12px;font-weight:600;color:var(--slate);min-width:34px;text-align:right}
   .rep-evid{margin-top:8px;display:flex;gap:14px;flex-wrap:wrap}
   .rep-evid a{font-size:12px;color:var(--brand-2);text-decoration:none;font-weight:500}
   .rep-evid a:hover{text-decoration:underline}
@@ -185,7 +196,7 @@
   .icon-btn:hover{border-color:var(--brand-2);background:var(--paper)}
   /* Panel de historial (acordeón bajo el riesgo) */
   .hist-panel{padding:18px 20px}
-  .hist-head{font-family:'Fraunces',serif;font-weight:600;font-size:15px;margin-bottom:14px}
+  .hist-head{font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:15px;margin-bottom:14px}
   .add-rep{margin-top:16px;border-top:1px solid var(--line);padding-top:8px}
   .add-rep summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--brand);padding:8px 0}
   .add-rep summary:hover{color:var(--brand-2)}
@@ -367,8 +378,8 @@
     </div>
 
     <div class="card"><div style="padding:6px 4px"><table>
-      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
-      <tbody id="tablaSeguimiento"><tr><td colspan="7" class="empty"><h3>Cargando…</h3></td></tr></tbody>
+      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>% avance</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
+      <tbody id="tablaSeguimiento"><tr><td colspan="8" class="empty"><h3>Cargando…</h3></td></tr></tbody>
     </table></div></div>
   </section>
 
@@ -935,10 +946,17 @@ async function cargarAvanceMedidas(){
     const maxV = Math.max(1, ...filas.map(f=>f[1]));
     document.getElementById('estadoMedidas').innerHTML =
       `<p class="hint" style="margin-bottom:14px">${recs.length} riesgos según el estado de su última acción</p>` +
-      filas.map(([lbl,v,color])=>`
+      filas.map(([lbl,v,color])=>{
+        const pct = v/maxV*100;
+        const dentro = pct > 8; // si la barra es ancha, el número va dentro; si no, al lado
+        return `
         <div class="bar-row"><div class="lbl">${lbl}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${(v/maxV*100)||2}%;background:${color}">${v||''}</div></div>
-        </div>`).join('');
+          <div class="bar-track">
+            <div class="bar-fill" style="width:${Math.max(pct,1)}%;background:${color}">${dentro?v:''}</div>
+            ${dentro?'':`<span class="bar-num-out">${v}</span>`}
+          </div>
+        </div>`;
+      }).join('');
   } catch(e){
     document.getElementById('estadoMedidas').innerHTML = '<p class="hint">No se pudo calcular: '+e.message+'</p>';
   }
@@ -1106,7 +1124,7 @@ async function renderSeguimiento() {
     const recs = await loadMatriz();
     const F = CONFIG.MATRIZ_FIELDS;
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
-    if(!recs.length){ tb.innerHTML='<tr><td colspan="7"><div class="empty"><h3>Sin riesgos</h3></div></td></tr>'; return; }
+    if(!recs.length){ tb.innerHTML='<tr><td colspan="8"><div class="empty"><h3>Sin riesgos</h3></div></td></tr>'; return; }
 
     const filtro = (document.getElementById('segBuscar').value||'').toLowerCase();
     const filas = recs.filter(pasaFiltros).map(r=>{
@@ -1136,6 +1154,7 @@ async function renderSeguimiento() {
         <td>${nivelBadge(f.nivel)}</td>
         <td><strong>${f.nReportes}</strong></td>
         <td id="estado-${f.id}" style="font-size:12px">${f.nReportes?'<span class="hint">…</span>':estadoPill('Pendiente')}</td>
+        <td id="avance-${f.id}" style="min-width:110px">${f.nReportes?'<span class="hint">…</span>':'<span class="hint">—</span>'}</td>
         <td title="${(f.procedeTexto||'').replace(/"/g,'&quot;')}">${
           f.procede
             ? '<span class="tag tag-proc">✓ Procede</span>'
@@ -1147,22 +1166,22 @@ async function renderSeguimiento() {
           <button class="icon-btn" title="Eliminar riesgo" onclick="eliminarRiesgo('${f.id}')">🗑️</button>
         </td>
       </tr>
-      <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="7" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
+      <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="8" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
 
     tb.innerHTML = oficinasOrdenadas.length ? oficinasOrdenadas.map(of => `
-      <tr class="grupo-row"><td colspan="7">
+      <tr class="grupo-row"><td colspan="8">
         <span class="grupo-nombre">${of}</span>
         <span class="grupo-count">${grupos[of].length} riesgo${grupos[of].length!==1?'s':''}</span>
       </td></tr>
       ${grupos[of].map(filaHTML).join('')}
-    `).join('') : '<tr><td colspan="7"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
+    `).join('') : '<tr><td colspan="8"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
 
     setConn(true);
 
     // Cargar "último estado" de forma diferida (solo riesgos con reportes)
     cargarUltimosEstados(filas.filter(f=>f.subIds.length));
   } catch(e){ setConn(false,e.message);
-    tb.innerHTML=`<tr><td colspan="7"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
+    tb.innerHTML=`<tr><td colspan="8"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
 }
 
 // Lee el último reporte de cada riesgo con reportes y muestra su estado en la columna.
@@ -1172,14 +1191,37 @@ async function cargarUltimosEstados(filasConReportes) {
     try {
       const ultimoId = f.subIds[f.subIds.length - 1]; // el último vinculado
       const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+ultimoId+'.json','GET',{name_value:1});
-      const est = (d.record && d.record.values) ? (d.record.values[RF.estado.col]||'') : '';
+      const v = (d.record && d.record.values) ? d.record.values : {};
+      const est = v[RF.estado.col] || '';
       const cel = document.getElementById('estado-'+f.id);
       if (cel) cel.innerHTML = est ? estadoPill(est) : '—';
+      // % avance = % completado del último reporte
+      const pctRaw = v[RF.pct_completado.col];
+      const cav = document.getElementById('avance-'+f.id);
+      if (cav) {
+        if (pctRaw !== '' && pctRaw != null) {
+          const pct = Math.max(0, Math.min(100, parseInt(pctRaw)||0));
+          cav.innerHTML = barraAvance(pct);
+        } else {
+          cav.innerHTML = '<span class="hint">—</span>';
+        }
+      }
     } catch(_) {
       const cel = document.getElementById('estado-'+f.id);
       if (cel) cel.textContent = '—';
+      const cav = document.getElementById('avance-'+f.id);
+      if (cav) cav.innerHTML = '<span class="hint">—</span>';
     }
   }
+}
+
+// Barra de avance compacta con porcentaje
+function barraAvance(pct){
+  const color = pct>=100?'var(--n1)':pct>=50?'var(--n2)':'var(--n3)';
+  return `<div class="avance-wrap">
+    <div class="avance-track"><div class="avance-fill" style="width:${pct}%;background:${color}"></div></div>
+    <span class="avance-num">${pct}%</span>
+  </div>`;
 }
 
 // Abre el modal y carga el historial de reportes de ese riesgo
@@ -1196,11 +1238,15 @@ async function renderHistorialHTML(subIds){
     const est=val(rec,RF.estado.col);
     const ev1=val(rec,'Evidencia 1');
     const ev2=val(rec,RF.evidencia2.col);
+    const pct=val(rec,RF.pct_completado.col);
     const evHtml = (ev1||ev2) ? `<div class="rep-evid">${
       ev1 ? `<a href="${ev1}" target="_blank" rel="noopener">📎 Evidencia 1</a>` : ''
     }${ev2 ? `<a href="${ev2}" target="_blank" rel="noopener">🔗 Evidencia 2</a>` : ''}</div>` : '';
     return `<div class="rep-item">
-      <div class="top"><span class="fecha">${fmtFecha(val(rec,RF.fecha_reporte.col))}</span>${estadoPill(est)}</div>
+      <div class="top">
+        <span class="fecha">${fmtFecha(val(rec,RF.fecha_reporte.col))}</span>
+        <span style="display:flex;gap:8px;align-items:center">${pct!==''?`<span class="rep-pct">${pct}% completado</span>`:''}${estadoPill(est)}</span>
+      </div>
       <div class="acc">${val(rec,RF.accion.col)||'(sin descripción de acción)'}</div>
       ${val(rec,RF.observacion.col)?`<div class="obs">Obs: ${val(rec,RF.observacion.col)}</div>`:''}
       ${evHtml}
@@ -1231,6 +1277,7 @@ async function toggleHistorial(riesgoId){
       <div class="grid" style="margin-top:14px">
         <div class="field"><label>Fecha de reporte</label><input type="date" id="add_fecha_${riesgoId}"></div>
         <div class="field"><label>Estado</label><select id="add_estado_${riesgoId}"><option value="">Seleccione…</option><option>Pendiente</option><option>En Proceso</option><option>Culminado/Ejecutado</option></select></div>
+        <div class="field"><label>% completado</label><div class="pct-input"><input type="number" min="0" max="100" step="1" id="add_pct_${riesgoId}" placeholder="0"><span>%</span></div></div>
         <div class="field full"><label>Acción desarrollada</label><textarea id="add_accion_${riesgoId}"></textarea></div>
         <div class="field full"><label>Observación</label><textarea id="add_obs_${riesgoId}"></textarea></div>
         <div class="field full"><label>Evidencia (enlace)</label><input id="add_evid_${riesgoId}" placeholder="https://…"></div>
@@ -1261,6 +1308,11 @@ async function guardarReporte(riesgoId){
   if(g('add_obs'))    repVals[RF.observacion.id]=g('add_obs');
   if(g('add_evid'))   repVals[RF.evidencia2.id]=g('add_evid');
   if(g('add_estado')) repVals[RF.estado.id]=g('add_estado');
+  const pctVal=g('add_pct');
+  if(pctVal!=='' && pctVal!=null){
+    const pn=Math.max(0,Math.min(100,parseInt(pctVal)||0));
+    repVals[RF.pct_completado.id]=pn;
+  }
 
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
   try{
