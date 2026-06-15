@@ -1538,7 +1538,16 @@ function editarRiesgo(riesgoId){
   const fRaw=cur('Fecha de evaluación');
   const fechaISO=fechaParaInput(fRaw);
   const tipoRO = cur('Riesgo u oportunidad') || (cur('Riesgo')?'Riesgo':(cur('Oportunidad')?'Oportunidad':''));
-  const fuenteAct = cur('Fuente de identificación');
+  // Fuente: si viene vacía pero hay datos de un grupo, la inferimos para mostrar la cascada/campos
+  let fuenteAct = cur('Fuente de identificación');
+  if(!fuenteAct){
+    const tieneProceso = cur('Tipo de proceso')||cur('Proceso nivel 0')||cur('Procesos nivel 1')||cur('Proceso nivel 1')||cur('Proceso nivel 2');
+    const tieneParte = cur('Parte interesada');
+    const tieneContexto = cur('Amenaza')||cur('Oportunidad relacionada');
+    if(tieneProceso) fuenteAct='Proceso';
+    else if(tieneParte) fuenteAct='Partes interesadas';
+    else if(tieneContexto) fuenteAct='Contexto';
+  }
 
   document.getElementById('editTitulo').textContent = (cur('Riesgo')||cur('Oportunidad')||'Riesgo').slice(0,70);
   document.getElementById('editBody').innerHTML = `
