@@ -50,7 +50,7 @@ const CONFIG = {
     riesgo_u_oportunidad:    { id: "ajW5fNsv5cSOkUcb_dRZOw", type: "select", options: ["Riesgo","Oportunidad"] },
     actividad:               { id: "bHWPVcM1HdRikFWPpcHSom", type: "string" },
     riesgo_desc:             { id: "aEW7vppbrdS4oXv0VcLSoh", type: "text" },
-    oportunidad_desc:        { id: "c6W5CsWQ5kFykQWRWxaSoV", type: "text" },
+    oportunidad_desc:        { id: "c6W5CsWQ5kFykQWRWxaSoV", type: "text", col: "Oportunidad - text" },
     causas:                  { id: "dcHXqRWOrcK4kbW4NcUHKS", type: "text" },
     consecuencias:           { id: "cOWOTHWObcMyzZrmotrJ9W", type: "text" },
 
@@ -86,7 +86,7 @@ const CONFIG = {
     proceso_txt:             { id: "dcJchdUCjkfOkhW6VcUCoS", type: "string", col: "Proceso" },
     responsable_txt:         { id: "ayFSodvNDcMOorwCocW7jx", type: "string", col: "Responsable - string" },
     amenaza_txt:             { id: "cMWRZdJLjcPzT8WQpdNmox", type: "string", col: "Amenaza - string" },
-    oportunidad_txt:         { id: "cgBSoSWODdRPRcJdazW7eO", type: "string", col: "Oportunidad - text" },
+    oportunidad_txt:         { id: "cgBSoSWODdRPRcJdazW7eO", type: "string", col: "Oportunidad relacionada" },
     parte_txt:               { id: "cpWRGkWRfhAi8sW45VjHzi", type: "string", col: "Parte interesada " }
   },
 
