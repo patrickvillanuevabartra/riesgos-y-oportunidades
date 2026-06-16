@@ -79,7 +79,15 @@ const CONFIG = {
     prob_riesgo_res:         { id: "c_WQRdVLbcLioxBxtcK8kH", type: "select", options: ["1: Muy raro","2: Ocasionalmente","3: Frecuente","4: Muy frecuente"] },
     imp_riesgo_res:          { id: "aXeSoBWRvcHOkwhw3dLfK9", type: "select", options: ["1: Muy bajo","2: Bajo","3: Moderado","4: Alto"] },
     indice_riesgo_res:       { id: "bEW5rLwrnehyo4x8kEWQT5", type: "formula", readOnly: true },
-    nivel_riesgo_res:        { id: "c4WPpcNSncW5LrW40KtSk5", type: "formula", readOnly: true }
+    nivel_riesgo_res:        { id: "c4WPpcNSncW5LrW40KtSk5", type: "formula", readOnly: true },
+
+    // --- CAMPOS DE TEXTO (reemplazan a las relaciones para poder guardar/editar
+    //     desde el aplicativo). Guardan el NOMBRE, no el ID. ---
+    proceso_txt:             { id: "dcJchdUCjkfOkhW6VcUCoS", type: "string", col: "Proceso" },
+    responsable_txt:         { id: "ayFSodvNDcMOorwCocW7jx", type: "string", col: "Responsable" },
+    amenaza_txt:             { id: "cMWRZdJLjcPzT8WQpdNmox", type: "string", col: "Amenaza" },
+    oportunidad_txt:         { id: "cgBSoSWODdRPRcJdazW7eO", type: "string", col: "Oportuinad relacionada" },
+    parte_txt:               { id: "cpWRGkWRfhAi8sW45VjHzi", type: "string", col: "Parte interesada " }
   },
 
   // ---- Campos de la SUBTABLA Reporte de acciones (IDs reales verificados) ----
