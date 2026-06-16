@@ -1695,7 +1695,7 @@ function editarRiesgo(riesgoId){
   const opt = (arr,sel)=>'<option value="">Seleccione…</option>'+arr.map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('');
   const fRaw=cur('Fecha de evaluación');
   const fechaISO=fechaParaInput(fRaw);
-  const tipoRO = cur('Riesgo u oportunidad') || (cur('Riesgo')?'Riesgo':(cur('Oportunidad - text')?'Oportunidad':''));
+  const tipoRO = cur('¿Riesgo u oportunidad?') || (cur('Riesgo')?'Riesgo':(cur('Oportunidad - text')?'Oportunidad':''));
   // Fuente: leer con el nombre de columna REAL. Si viene vacía, inferir según
   // qué relaciones tienen ID (los nombres por columna a veces vienen vacíos).
   let fuenteAct = cur('Fuente de identificación del riesgo u oportunidad') || cur('Fuente de identificación');
