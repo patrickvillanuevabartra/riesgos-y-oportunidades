@@ -1296,7 +1296,7 @@ async function renderSeguimiento() {
 
     const filtro = (document.getElementById('segBuscar').value||'').toLowerCase();
     const filas = recs.filter(pasaFiltros).map(r=>{
-      const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
+      const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad - text')||'(sin descripción)';
       const proc=rutaProcesoDe(r) || '—';
       const oficina=oficinaDe(r);
       const sub=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
@@ -1672,7 +1672,7 @@ async function eliminarRiesgo(riesgoId){
   const r = STATE.matriz.find(x=>x.id===riesgoId);
   const F=CONFIG.MATRIZ_FIELDS;
   const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
-  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'este riesgo';
+  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad - text')||'este riesgo';
   const corto = desc.length>60?desc.slice(0,60)+'…':desc;
   if(!confirm('¿Eliminar permanentemente este registro?\n\n"'+corto+'"\n\nEsta acción NO se puede deshacer.')) return;
   try {
@@ -1695,7 +1695,7 @@ function editarRiesgo(riesgoId){
   const opt = (arr,sel)=>'<option value="">Seleccione…</option>'+arr.map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('');
   const fRaw=cur('Fecha de evaluación');
   const fechaISO=fechaParaInput(fRaw);
-  const tipoRO = cur('Riesgo u oportunidad') || (cur('Riesgo')?'Riesgo':(cur('Oportunidad')?'Oportunidad':''));
+  const tipoRO = cur('Riesgo u oportunidad') || (cur('Riesgo')?'Riesgo':(cur('Oportunidad - text')?'Oportunidad':''));
   // Fuente: leer con el nombre de columna REAL. Si viene vacía, inferir según
   // qué relaciones tienen ID (los nombres por columna a veces vienen vacíos).
   let fuenteAct = cur('Fuente de identificación del riesgo u oportunidad') || cur('Fuente de identificación');
@@ -1705,17 +1705,17 @@ function editarRiesgo(riesgoId){
       || leerRelacion(r,'Proceso nivel 0',F.proceso_n0.id)
       || leerRelacion(r,'Procesos nivel 1',F.proceso_n1.id)
       || leerRelacion(r,'Proceso nivel 2',F.proceso_n2.id);
-    const tieneParte = (v[F.parte_txt.id] && v[F.parte_txt.id]!=='Parte interesada ')
+    const tieneParte = leerTexto(r, F.parte_txt, true)
       || leerRelacion(r,'Parte interesada',F.parte_interesada.id);
-    const tieneContexto = (v[F.amenaza_txt.id] && v[F.amenaza_txt.id]!=='Amenaza')
-      || (v[F.oportunidad_txt.id] && v[F.oportunidad_txt.id]!=='Oportuinad relacionada')
+    const tieneContexto = leerTexto(r, F.amenaza_txt, true)
+      || leerTexto(r, F.oportunidad_txt, true)
       || leerRelacion(r,'Amenaza',F.amenaza.id)||leerRelacion(r,'Oportunidad relacionada',F.oportunidad_rel.id);
     if(tieneProceso) fuenteAct='Proceso';
     else if(tieneParte) fuenteAct='Partes interesadas';
     else if(tieneContexto) fuenteAct='Contexto';
   }
 
-  document.getElementById('editTitulo').textContent = (cur('Riesgo')||cur('Oportunidad')||'Riesgo').slice(0,70);
+  document.getElementById('editTitulo').textContent = (cur('Riesgo')||cur('Oportunidad - text')||'Riesgo').slice(0,70);
   document.getElementById('editBody').innerHTML = `
     <div class="edit-sec"><div class="edit-sec-tit">1 · Identificación</div>
     <div class="grid">
@@ -1743,7 +1743,7 @@ function editarRiesgo(riesgoId){
       <div class="field"><label>¿Riesgo u oportunidad?</label><select id="ed_tipo_ro">${opt(['Riesgo','Oportunidad'],tipoRO)}</select></div>
       <div class="field"></div>
       <div class="field full"><label>Descripción del riesgo</label><textarea id="ed_riesgo">${cur('Riesgo')}</textarea></div>
-      <div class="field full"><label>Descripción de la oportunidad</label><textarea id="ed_oport_desc">${cur('Oportunidad')}</textarea></div>
+      <div class="field full"><label>Descripción de la oportunidad</label><textarea id="ed_oport_desc">${cur('Oportunidad - text')}</textarea></div>
       <div class="field full"><label>Causas</label><textarea id="ed_causas">${cur('Causas')}</textarea></div>
       <div class="field full"><label>Consecuencias</label><textarea id="ed_consec">${cur('Consecuencias')}</textarea></div>
     </div></div>
@@ -1999,7 +1999,7 @@ async function renderReeval() {
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
     if(!recs.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty"><h3>Sin riesgos</h3><p>Registra el primero en la pestaña Registrar.</p></div></td></tr>'; return; }
     tb.innerHTML = recs.map(r=>{
-      const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
+      const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad - text')||'(sin descripción)';
       const proc=rutaProcesoDe(r) || '—';
       const idxInh=num(get(r,F.indice_riesgo_inh,'Índice de prioridad riesgo inherente'));
       const nInh=nivelDe(idxInh);
@@ -2029,7 +2029,7 @@ function abrirReeval(riesgoId){
   REEVAL_ACTUAL = riesgoId;
   const F=CONFIG.MATRIZ_FIELDS;
   const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
-  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
+  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad - text')||'(sin descripción)';
   const esRiesgo = (get(r,F.riesgo_u_oportunidad,'¿Riesgo u oportunidad?')||'Riesgo')!=='Oportunidad';
 
   document.getElementById('reevalTitulo').textContent = desc.length>70?desc.slice(0,70)+'…':desc;
