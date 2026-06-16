@@ -362,8 +362,15 @@
       <h1>Seguimiento</h1>
       <p>Registra el avance de las medidas de respuesta. Cada riesgo muestra cuántos reportes tiene; abre uno para ver su historial y añadir nuevos reportes.</p>
     </div>
-    <div class="conn" style="margin-bottom:12px">
-      <input id="segBuscar" placeholder="Buscar riesgo por descripción o proceso…" style="border:0;background:transparent;flex:1;padding:0" oninput="renderSeguimiento()">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <div class="conn" style="margin-bottom:0;flex:1;min-width:220px">
+        <input id="segBuscar" placeholder="Buscar por descripción o proceso…" style="border:0;background:transparent;flex:1;padding:0" oninput="renderSeguimiento()">
+      </div>
+      <div style="display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px">
+        <button class="seg-tab-btn active" data-segtipo="todos" onclick="setSegTipo('todos')" style="border:0;background:var(--brand);color:#fff;font-family:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer">Todos</button>
+        <button class="seg-tab-btn" data-segtipo="riesgos" onclick="setSegTipo('riesgos')" style="border:0;background:transparent;color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer">Riesgos</button>
+        <button class="seg-tab-btn" data-segtipo="oportunidades" onclick="setSegTipo('oportunidades')" style="border:0;background:transparent;color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer">Oportunidades</button>
+      </div>
     </div>
 
     <!-- Filtros avanzados -->
@@ -915,6 +922,7 @@ async function renderDashboard() {
     const get = (r, def, nombre) => (r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
 
     let total=recs.length, conResidual=0, sumInh=0, sumRes=0, bajaron=0;
+    let numRiesgos=0, numOportunidades=0; // conteo separado
     const distInh={1:0,2:0,3:0,4:0}, distRes={1:0,2:0,3:0,4:0};
     const heat={}; // "p-i" -> count
     const heatRes={};
@@ -922,17 +930,23 @@ async function renderDashboard() {
     const porOfi={};
 
     recs.forEach(r=>{
-      const idxInh = num(get(r,F.indice_riesgo_inh,'Índice de prioridad riesgo inherente'))
-                  || num(get(r,F.prob_riesgo_inh,'Probabilidad riesgo inherente'))*num(get(r,F.imp_riesgo_inh,'Impacto riesgo inherente'));
-      const idxRes = num(get(r,F.indice_riesgo_res,'Índice de prioridad riesgo residual'));
-      const nInh=nivelDe(idxInh), nRes=nivelDe(idxRes);
-      if(nInh) distInh[nInh]++;
-      if(nRes){ distRes[nRes]++; conResidual++; sumRes+=idxRes; if(idxRes<idxInh) bajaron++; }
-      if(nInh) sumInh+=idxInh;
-      const p=num(get(r,F.prob_riesgo_inh,'Probabilidad riesgo inherente')), i=num(get(r,F.imp_riesgo_inh,'Impacto riesgo inherente'));
-      if(p&&i){ const k=p+'-'+i; heat[k]=(heat[k]||0)+1; }
-      const pr=num(get(r,F.prob_riesgo_res,'Probabilidad riesgo residual')), ir=num(get(r,F.imp_riesgo_res,'Impacto riesgo residual'));
-      if(pr&&ir){ const k=pr+'-'+ir; heatRes[k]=(heatRes[k]||0)+1; }
+      const esOp = esOportunidad(r);
+      if(esOp) numOportunidades++; else numRiesgos++;
+      // Los gráficos de nivel/mapa de calor de RIESGO solo consideran riesgos.
+      if(!esOp){
+        const idxInh = num(get(r,F.indice_riesgo_inh,'Índice de prioridad riesgo inherente'))
+                    || num(get(r,F.prob_riesgo_inh,'Probabilidad riesgo inherente'))*num(get(r,F.imp_riesgo_inh,'Impacto riesgo inherente'));
+        const idxRes = num(get(r,F.indice_riesgo_res,'Índice de prioridad riesgo residual'));
+        const nInh=nivelDe(idxInh), nRes=nivelDe(idxRes);
+        if(nInh) distInh[nInh]++;
+        if(nRes){ distRes[nRes]++; conResidual++; sumRes+=idxRes; if(idxRes<idxInh) bajaron++; }
+        if(nInh) sumInh+=idxInh;
+        const p=num(get(r,F.prob_riesgo_inh,'Probabilidad riesgo inherente')), i=num(get(r,F.imp_riesgo_inh,'Impacto riesgo inherente'));
+        if(p&&i){ const k=p+'-'+i; heat[k]=(heat[k]||0)+1; }
+        const pr=num(get(r,F.prob_riesgo_res,'Probabilidad riesgo residual')), ir=num(get(r,F.imp_riesgo_res,'Impacto riesgo residual'));
+        if(pr&&ir){ const k=pr+'-'+ir; heatRes[k]=(heatRes[k]||0)+1; }
+      }
+      // Proceso y oficina cuentan todos (riesgos y oportunidades).
       const proc=nivel1De(r);
       porProc[proc]=(porProc[proc]||0)+1;
       const ofi=oficinaDe(r);
@@ -941,10 +955,10 @@ async function renderDashboard() {
 
     const reduccion = sumInh? Math.round((1-(sumRes/Math.max(sumInh,1)))*100):0;
     document.getElementById('kpis').innerHTML = `
-      ${kpi('Riesgos registrados', total, 'en la matriz')}
-      ${kpi('Reevaluados', conResidual, conResidual?`${Math.round(conResidual/total*100)}% del total`:'aún sin residual')}
-      ${kpi('Han disminuido', bajaron, 'nivel residual menor', 'var(--n1)')}
-      ${kpi('Nivel intolerable', distInh[4]||0, 'requieren acción inmediata', distInh[4]?'var(--n4)':'')}
+      ${kpi('Riesgos registrados', numRiesgos, 'identificados en la matriz')}
+      ${kpi('Oportunidades registradas', numOportunidades, 'identificadas en la matriz', 'var(--n1)')}
+      ${kpi('Riesgos reevaluados', conResidual, conResidual?`${numRiesgos?Math.round(conResidual/numRiesgos*100):0}% de los riesgos`:'aún sin residual')}
+      ${kpi('Riesgos intolerables', distInh[4]||0, 'requieren acción inmediata', distInh[4]?'var(--n4)':'')}
     `;
 
     // Distribución inherente vs residual
@@ -1061,6 +1075,18 @@ function emptyCard(t,m){ return `<div class="empty" style="grid-column:1/-1"><h3
    ============================================================ */
 const SUBFORM_FIELD_ID = CONFIG.MATRIZ_FIELDS.reporte_acciones.id; // bfyfu...
 let SEG_RIESGO_ACTUAL = null; // {id, subIds:[]}
+let SEG_TIPO = 'todos'; // 'todos' | 'riesgos' | 'oportunidades'
+function setSegTipo(t){
+  SEG_TIPO = t;
+  // Resaltar el botón activo
+  document.querySelectorAll('.seg-tab-btn').forEach(b=>{
+    const on = b.dataset.segtipo===t;
+    b.style.background = on ? 'var(--brand)' : 'transparent';
+    b.style.color = on ? '#fff' : 'var(--slate)';
+  });
+  renderSeguimiento();
+}
+window.setSegTipo = setSegTipo;
 
 // Devuelve el proceso MÁS ESPECÍFICO que tenga el riesgo (n2 → n1 → n0 → tipo).
 // Lee por nombre de columna; ignora valores que sean el propio nombre del campo.
@@ -1223,6 +1249,36 @@ function nivelInherenteDe(r){
   return { idx, nivel: nivelDe(idx) };
 }
 
+// ¿El registro es una OPORTUNIDAD? (según el campo "¿Riesgo u oportunidad?")
+function esOportunidad(r){
+  const v=r.values||{};
+  const t = v['¿Riesgo u oportunidad?'];
+  return (t && t!=='¿Riesgo u oportunidad?') ? (String(t).trim()==='Oportunidad') : false;
+}
+
+// Nivel de una OPORTUNIDAD. Su impacto va de 1-3 y la probabilidad de 1-4,
+// así que el índice va de 1 a 12. Se mapea a 4 niveles proporcionalmente:
+//   1-3 Bajo · 4-6 Medio · 7-9 Alto · 10-12 Muy alto.
+function nivelOportDe(idx){ if(!idx)return 0; if(idx>=10)return 4; if(idx>=7)return 3; if(idx>=4)return 2; return 1; }
+
+// Índice y nivel inherente de una OPORTUNIDAD (P×I, con impacto 1-3).
+function nivelOportInherenteDe(r){
+  const v=r.values||{};
+  const n=x=>{const m=String(x||'').match(/^(\d+)/);return m?+m[1]:0;};
+  let idx = n(v['Índice de prioridad oportunidad inherente']);
+  if(!idx) idx = n(v['Probabilidad oportunidad inherente'])*n(v['Impacto oportunidad inherente']);
+  return { idx, nivel: nivelOportDe(idx) };
+}
+
+// Descripción del registro, sea riesgo u oportunidad (con la columna correcta).
+function descripcionDe(r){
+  const v=r.values||{};
+  const ri = v['Riesgo']; if(ri && ri!=='Riesgo') var dR=ri;
+  const op = v['Oportunidad - text']; if(op && op!=='Oportunidad - text') var dO=op;
+  if(esOportunidad(r)) return dO || dR || '(sin descripción)';
+  return dR || dO || '(sin descripción)';
+}
+
 /* ===== FILTROS AVANZADOS ===== */
 // Campos disponibles para filtrar y cómo obtener su valor de cada riesgo.
 const FILTRO_CAMPOS = {
@@ -1296,15 +1352,20 @@ async function renderSeguimiento() {
 
     const filtro = (document.getElementById('segBuscar').value||'').toLowerCase();
     const filas = recs.filter(pasaFiltros).map(r=>{
-      const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad - text')||'(sin descripción)';
+      const op = esOportunidad(r);
+      const desc = descripcionDe(r);
       const proc=rutaProcesoDe(r) || '—';
       const oficina=oficinaDe(r);
       const sub=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
       const pr=procedeReeval(r);
-      const ni=nivelInherenteDe(r);
+      // Nivel según tipo: riesgo usa su escala (1-4 impacto), oportunidad la suya (1-3 impacto).
+      const ni = op ? nivelOportInherenteDe(r) : nivelInherenteDe(r);
       const desact=segmentoDesactualizado(r);
-      return {id:r.id, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact};
-    }).filter(f => !filtro || f.desc.toLowerCase().includes(filtro) || f.proc.toLowerCase().includes(filtro) || f.oficina.toLowerCase().includes(filtro));
+      return {id:r.id, op, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact};
+    })
+    // Filtro por el selector Todos/Riesgos/Oportunidades
+    .filter(f => SEG_TIPO==='todos' || (SEG_TIPO==='oportunidades'?f.op:!f.op))
+    .filter(f => !filtro || f.desc.toLowerCase().includes(filtro) || f.proc.toLowerCase().includes(filtro) || f.oficina.toLowerCase().includes(filtro));
 
     // Agrupar por oficina; dentro de cada grupo ordenar por nivel inherente (mayor arriba)
     const grupos = {};
@@ -1313,11 +1374,15 @@ async function renderSeguimiento() {
     const oficinasOrdenadas = Object.keys(grupos).sort();
 
     const nivelBadge = n => n ? `<span class="lvl-badge lvl-${n}">Nivel ${n}</span>` : '<span class="hint" style="font-size:12px">—</span>';
+    // Etiqueta visual de tipo (solo se muestra en la vista "Todos" para distinguir)
+    const tipoTag = f => (SEG_TIPO==='todos')
+      ? (f.op ? '<span class="tag tag-proc" style="margin-right:6px">Oportunidad</span>' : '<span class="tag tag-noproc" style="margin-right:6px">Riesgo</span>')
+      : '';
 
     const filaHTML = f => `
       <tr>
         <td style="max-width:280px">
-          <a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>80?f.desc.slice(0,80)+'…':f.desc}</a>
+          ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>80?f.desc.slice(0,80)+'…':f.desc}</a>
         </td>
         <td title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>36?f.proc.slice(0,36)+'…':f.proc}${f.desact?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
         <td>${nivelBadge(f.nivel)}</td>
@@ -1330,17 +1395,18 @@ async function renderSeguimiento() {
             : '<span class="tag tag-noproc">No procede</span>'
         }</td>
         <td style="text-align:right;white-space:nowrap">
-          <button class="icon-btn" title="Ver detalle del riesgo" onclick="verDetalle('${f.id}')">👁</button>
-          <button class="icon-btn" title="Editar riesgo" onclick="editarRiesgo('${f.id}')">✏️</button>
-          <button class="icon-btn" title="Eliminar riesgo" onclick="eliminarRiesgo('${f.id}')">🗑️</button>
+          <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
+          <button class="icon-btn" title="Editar" onclick="editarRiesgo('${f.id}')">✏️</button>
+          <button class="icon-btn" title="Eliminar" onclick="eliminarRiesgo('${f.id}')">🗑️</button>
         </td>
       </tr>
       <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="8" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
 
+    const palabra = SEG_TIPO==='oportunidades' ? 'oportunidad' : (SEG_TIPO==='riesgos' ? 'riesgo' : 'registro');
     tb.innerHTML = oficinasOrdenadas.length ? oficinasOrdenadas.map(of => `
       <tr class="grupo-row"><td colspan="8">
         <span class="grupo-nombre">${of}</span>
-        <span class="grupo-count">${grupos[of].length} riesgo${grupos[of].length!==1?'s':''}</span>
+        <span class="grupo-count">${grupos[of].length} ${palabra}${grupos[of].length!==1?'s':''}</span>
       </td></tr>
       ${grupos[of].map(filaHTML).join('')}
     `).join('') : '<tr><td colspan="8"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
@@ -1999,17 +2065,29 @@ async function renderReeval() {
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
     if(!recs.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty"><h3>Sin riesgos</h3><p>Registra el primero en la pestaña Registrar.</p></div></td></tr>'; return; }
     tb.innerHTML = recs.map(r=>{
-      const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad - text')||'(sin descripción)';
+      const op = esOportunidad(r);
+      const desc = descripcionDe(r);
       const proc=rutaProcesoDe(r) || '—';
-      const idxInh=num(get(r,F.indice_riesgo_inh,'Índice de prioridad riesgo inherente'));
-      const nInh=nivelDe(idxInh);
+      // Nivel inherente según tipo
+      const niInh = op ? nivelOportInherenteDe(r) : nivelInherenteDe(r);
+      const nInh = niInh.nivel;
       const cert=get(r,F.certificacion_control,'Certificación de Implementación del Control');
       // Usa el campo oficial de QuintaDB que ya evalúa las 2 condiciones
       const procede = procedeReeval(r).procede;
-      const idxRes=num(get(r,F.indice_riesgo_res,'Índice de prioridad riesgo residual'));
-      const nRes=nivelDe(idxRes);
+      // Nivel residual según tipo
+      let nRes;
+      if(op){
+        const v=r.values||{};
+        let idxR=num(v['Índice de prioridad oportunidad residual']);
+        if(!idxR) idxR=num(v['Probabilidad oportunidad residual'])*num(v['Impacto oportunidad residual']);
+        nRes=nivelOportDe(idxR);
+      } else {
+        const idxRes=num(get(r,F.indice_riesgo_res,'Índice de prioridad riesgo residual'));
+        nRes=nivelDe(idxRes);
+      }
+      const tag = op ? '<span class="tag tag-proc" style="margin-right:6px">Oport.</span>' : '<span class="tag tag-noproc" style="margin-right:6px">Riesgo</span>';
       return `<tr>
-        <td style="max-width:280px" title="${(desc||'').replace(/"/g,'&quot;')}">${desc.length>90?desc.slice(0,90)+'…':desc}</td>
+        <td style="max-width:280px" title="${(desc||'').replace(/"/g,'&quot;')}">${tag}${desc.length>80?desc.slice(0,80)+'…':desc}</td>
         <td title="${(proc||'').replace(/"/g,'&quot;')}">${proc.length>34?proc.slice(0,34)+'…':proc}</td>
         <td>${nInh?`<span class="lvl-badge lvl-${nInh}">Nivel ${nInh}</span>`:'—'}</td>
         <td>${procede?'<span class="tag tag-proc">Procede</span>':'<span class="tag tag-noproc">No procede</span>'}</td>
