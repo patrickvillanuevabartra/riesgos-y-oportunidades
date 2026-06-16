@@ -1794,57 +1794,31 @@ async function initCascadaEdit(v){
     if(!n3.value) return;
     fillSelect(pr, opcionesInv(inv,{[C.n2]:n2.value,[C.n3]:n3.value},C.proc)); pr.disabled=false; };
 
-  // ── Preselección robusta: en vez de traducir IDs a texto y comparar (frágil),
-  // buscamos en el INVENTARIO la fila cuyos rel_values coinciden con los IDs del
-  // riesgo, y tomamos de ESA fila los textos exactos de cada nivel. Esos textos
-  // sí coinciden con las opciones de la cascada porque vienen de la misma fuente.
+  // ── Preselección desde la RUTA DE TEXTO nueva (campo "Proceso").
+  // La ruta viene como "Tipo › N0 › N1 › N2 › N3 › Proc". Tomamos cada segmento
+  // e intentamos seleccionarlo en su nivel. Si un segmento no existe como opción
+  // (p.ej. "Proceso nivel 1" de un registro viejo vacío), simplemente paramos ahí
+  // y dejamos que el usuario complete — sin mostrar errores.
   const v2 = r.values || {};
-  const idTipo = v2[F.tipo_proceso.id];
-  const idN0   = v2[F.proceso_n0.id];
-  const idN1   = v2[F.proceso_n1.id];
-  const idN2   = v2[F.proceso_n2.id];
-  const first = a => Array.isArray(a) ? a[0] : a;
-  const IF = CONFIG.INVENTARIO_FIELDS;
-  // Buscar la fila del inventario que mejor coincide por IDs de relación.
-  let filaInv = null, mejorCoincidencias = -1;
-  inv.forEach(row => {
-    const RV = row.rel_values || {};
-    let c = 0, contra = false;
-    const cmp = (idRiesgo, idInv) => {
-      if (!idRiesgo) return;
-      if (first(idInv) === idRiesgo) c++; else if (idInv) contra = true;
-    };
-    cmp(idTipo, RV[IF.tipo_proceso.id]);
-    cmp(idN0,   RV[IF.proceso_n0.id]);
-    cmp(idN1,   RV[IF.proceso_n1.id]);
-    cmp(idN2,   RV[IF.proceso_n2.id]);
-    if (!contra && c > mejorCoincidencias) { mejorCoincidencias = c; filaInv = row; }
-  });
-
-  // Textos de cada nivel tomados de la fila del inventario (exactos para la cascada).
-  let vTipo='', vN0='', vN1='', vN2='', vN3='', vPr='';
-  if (filaInv) {
-    const fv = filaInv.values || {};
-    vTipo = fv[C.tipo] || '';
-    vN0   = fv[C.n0]   || '';
-    vN1   = fv[C.n1]   || '';
-    vN2   = fv[C.n2]   || '';
-    vN3   = fv[C.n3]   || '';
-    vPr   = fv[C.proc] || '';
-  } else {
-    // Respaldo: usar la traducción por nombre/diccionario (como antes).
-    vTipo=leerRelacion(r,'Tipo de proceso',F.tipo_proceso.id);
-    vN0=leerRelacion(r,'Proceso nivel 0',F.proceso_n0.id);
-    vN1=leerRelacion(r,'Procesos nivel 1',F.proceso_n1.id)||leerRelacion(r,'Proceso nivel 1',F.proceso_n1.id);
-    vN2=leerRelacion(r,'Proceso nivel 2',F.proceso_n2.id);
+  const rutaTxt = v2[F.proceso_txt.id];
+  let segs = [];
+  if (rutaTxt && rutaTxt !== 'Proceso') {
+    segs = rutaTxt.split('›').map(s=>s.trim()).filter(Boolean);
   }
+  // Filtrar segmentos que sean solo el nombre genérico del campo (registros viejos)
+  const generico = /^(Tipo de proceso|Proceso nivel [0-3]|Procesos nivel 1|Procedimiento)$/i;
+  const vTipo = segs[0] && !generico.test(segs[0]) ? segs[0] : '';
+  const vN0   = segs[1] && !generico.test(segs[1]) ? segs[1] : '';
+  const vN1   = segs[2] && !generico.test(segs[2]) ? segs[2] : '';
+  const vN2   = segs[3] && !generico.test(segs[3]) ? segs[3] : '';
+  const vN3   = segs[4] && !generico.test(segs[4]) ? segs[4] : '';
+  const vPr   = segs[5] && !generico.test(segs[5]) ? segs[5] : '';
 
-  // Asigna el valor a un select solo si existe como opción; devuelve true si lo logró
+  // Asigna el valor a un select solo si existe como opción (sin avisos de error).
   const fijar=(el,valor)=>{
     if(!valor) return false;
     const existe=[...el.options].some(o=>o.value===valor);
     if(existe){ el.value=valor; return true; }
-    console.warn('[cascadaEdit] No se encontró la opción "'+valor+'" en '+el.id+'. Opciones:', [...el.options].map(o=>o.value));
     return false;
   };
 
@@ -1898,6 +1872,7 @@ async function guardarEdit(){
     // Ruta del proceso como texto: "Tipo › N0 › N1 › N2 › N3 › Proc"
     const ruta = [g('ed_tipo'),g('ed_n0'),g('ed_n1'),g('ed_n2'),g('ed_n3'),g('ed_proc')]
       .filter(Boolean).join(' › ');
+    console.log('[guardarEdit] Ruta de proceso construida:', JSON.stringify(ruta), '| valores cascada:', {tipo:g('ed_tipo'),n0:g('ed_n0'),n1:g('ed_n1'),n2:g('ed_n2')});
     if(ruta) set(F.proceso_txt, ruta);
   }
 
