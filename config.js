@@ -84,9 +84,9 @@ const CONFIG = {
     // --- CAMPOS DE TEXTO (reemplazan a las relaciones para poder guardar/editar
     //     desde el aplicativo). Guardan el NOMBRE, no el ID. ---
     proceso_txt:             { id: "dcJchdUCjkfOkhW6VcUCoS", type: "string", col: "Proceso" },
-    responsable_txt:         { id: "ayFSodvNDcMOorwCocW7jx", type: "string", col: "Responsable" },
-    amenaza_txt:             { id: "cMWRZdJLjcPzT8WQpdNmox", type: "string", col: "Amenaza" },
-    oportunidad_txt:         { id: "cgBSoSWODdRPRcJdazW7eO", type: "string", col: "Oportuinad relacionada" },
+    responsable_txt:         { id: "ayFSodvNDcMOorwCocW7jx", type: "string", col: "Responsable - string" },
+    amenaza_txt:             { id: "cMWRZdJLjcPzT8WQpdNmox", type: "string", col: "Amenaza - string" },
+    oportunidad_txt:         { id: "cgBSoSWODdRPRcJdazW7eO", type: "string", col: "Oportunidad - text" },
     parte_txt:               { id: "cpWRGkWRfhAi8sW45VjHzi", type: "string", col: "Parte interesada " }
   },
 
