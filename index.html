@@ -518,7 +518,8 @@ const API = {
   // ACTUALIZAR campos de relación vía PUT. Sirve igual para texto y relaciones.
   //   recordId : id del registro a actualizar (PUT) o null para crear (POST)
   //   campos   : objeto { fieldId: valor }  — valor puede ser string o array de IDs
-  saveForm(recordId, campos) {
+  //   entityId : (solo al crear) ID de la tabla donde crear el registro
+  saveForm(recordId, campos, entityId) {
     const partes = [];
     Object.keys(campos).forEach(fid => {
       let val = campos[fid];
@@ -536,9 +537,12 @@ const API = {
     });
     const bodyStr = partes.join('&');
     const method = recordId ? 'PUT' : 'POST';
+    // Al ACTUALIZAR: /dtypes/{recordId}.json
+    // Al CREAR: hay que indicar la TABLA → /dtypes/entity/{entityId}.json
+    const ent = entityId || CONFIG.ENTITIES.MATRIZ;
     const path = recordId
       ? `/apps/${CONFIG.APP_ID}/dtypes/${recordId}.json`
-      : `/apps/${CONFIG.APP_ID}/dtypes.json`;
+      : `/apps/${CONFIG.APP_ID}/dtypes/entity/${ent}.json`;
     return this.call(path, method, bodyStr, 'application/x-www-form-urlencoded');
   }
 };
@@ -865,7 +869,7 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
 
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Guardando…';
   try {
-    await API.saveForm(null, campos); // null = crear nuevo registro (POST)
+    await API.saveForm(null, campos, CONFIG.ENTITIES.MATRIZ); // null = crear nuevo registro (POST)
     toast('Registro guardado correctamente.');
     document.getElementById('formRiesgo').reset();
     limpiarMultiselects();
@@ -1076,13 +1080,31 @@ function procesoDe(r) {
 
 // Ruta COMPLETA del proceso: Tipo › Nivel 0 › Nivel 1 › Nivel 2 › Nivel 3
 // (solo los niveles que tengan dato). Devuelve '' si no hay ninguno.
+// Lee un campo de texto nuevo de forma robusta. Devuelve '' si está vacío o si
+// QuintaDB devolvió el nombre del campo (señal de vacío). Para campos cuyo nombre
+// NO colisiona con una relación, también intenta leer por nombre de columna.
+function leerTexto(r, def, leerPorNombre){
+  const v = r.values || {};
+  const porId = v[def.id];
+  if (porId && porId !== def.col && !/^[a-zA-Z0-9_\-]{22}$/.test(String(porId))) return porId;
+  if (leerPorNombre && def.col){
+    const porNombre = v[def.col];
+    if (porNombre && porNombre !== def.col && !/^[a-zA-Z0-9_\-]{22}$/.test(String(porNombre))) return porNombre;
+  }
+  return '';
+}
+
 // Usa leerRelacion(): si el nombre viene vacío, traduce el ID de relación.
 function rutaProcesoDe(r){
   const F = CONFIG.MATRIZ_FIELDS;
   const v = r.values || {};
-  // 1) Preferir el campo de texto nuevo (Proceso) leído por su ID.
-  const txt = v[F.proceso_txt.id];
-  if (txt && txt !== 'Proceso') return txt;
+  // 1) Preferir el campo de texto nuevo (Proceso). QuintaDB con name_value:1 puede
+  //    devolverlo bajo el ID del campo O bajo el nombre de columna "Proceso".
+  //    Tomamos el primero que tenga un valor real (no el nombre del campo).
+  const porId = v[F.proceso_txt.id];
+  const porNombre = v['Proceso'];
+  const cand = [porId, porNombre].find(x => x && x !== 'Proceso' && String(x).length > 1);
+  if (cand) return cand;
   // 2) Respaldo: armar la ruta traduciendo las relaciones (registros antiguos).
   const partes = [
     leerRelacion(r, 'Tipo de proceso',  F.tipo_proceso.id),
@@ -1130,10 +1152,10 @@ function procedeReeval(r){
 // Oficina/dependencia responsable del riesgo.
 function oficinaDe(r){
   const F = CONFIG.MATRIZ_FIELDS;
-  const v = r.values || {};
-  // 1) Preferir el campo de texto nuevo (Responsable) por su ID.
-  const txt = v[F.responsable_txt.id];
-  if (txt && txt !== 'Responsable') return txt;
+  // 1) Campo de texto nuevo (Responsable). Su nombre colisiona con la relación,
+  //    así que solo leemos por ID (no por nombre).
+  const txt = leerTexto(r, F.responsable_txt, false);
+  if (txt) return txt;
   // 2) Respaldo: traducir la relación (registros antiguos).
   const x = leerRelacion(r, 'Responsable', F.responsable.id);
   return x ? x : 'Sin oficina asignada';
@@ -1592,9 +1614,9 @@ function verDetalle(riesgoId){
   const limpio = (col)=>{
     if(col==='__proceso__') return rutaProcesoDe(r);
     if(col==='Responsable') return oficinaDe(r)==='Sin oficina asignada' ? '' : oficinaDe(r);
-    if(col==='__amenaza__'){ const t=v[F2.amenaza_txt.id]; return (t && t!=='Amenaza')?t:''; }
-    if(col==='__oportunidad__'){ const t=v[F2.oportunidad_txt.id]; return (t && t!=='Oportuinad relacionada')?t:''; }
-    if(col==='__parte__'){ const t=v[F2.parte_txt.id]; return (t && t!=='Parte interesada ')?t:''; }
+    if(col==='__amenaza__'){ return leerTexto(r, F2.amenaza_txt, false); }
+    if(col==='__oportunidad__'){ return leerTexto(r, F2.oportunidad_txt, false); }
+    if(col==='__parte__'){ return leerTexto(r, F2.parte_txt, true); }
     const val = v[col];
     if(!val || val===col) return '';
     return val;
@@ -1800,10 +1822,11 @@ async function initCascadaEdit(v){
   // (p.ej. "Proceso nivel 1" de un registro viejo vacío), simplemente paramos ahí
   // y dejamos que el usuario complete — sin mostrar errores.
   const v2 = r.values || {};
-  const rutaTxt = v2[F.proceso_txt.id];
+  const rutaTxt = v2[F.proceso_txt.id] || v2['Proceso'] || '';
   let segs = [];
   if (rutaTxt && rutaTxt !== 'Proceso') {
-    segs = rutaTxt.split('›').map(s=>s.trim()).filter(Boolean);
+    // Aceptar separadores › o > (con o sin espacios)
+    segs = String(rutaTxt).split(/\s*[›>]\s*/).map(s=>s.trim()).filter(Boolean);
   }
   // Filtrar segmentos que sean solo el nombre genérico del campo (registros viejos)
   const generico = /^(Tipo de proceso|Proceso nivel [0-3]|Procesos nivel 1|Procedimiento)$/i;
