@@ -1757,8 +1757,8 @@ function showOriginEdit(fuente){
 
 // Carga las listas dinámicas del modal de edición y preselecciona los valores actuales
 async function cargarRelEdit(v){
-  // r: registro completo, para poder traducir IDs de relación a nombres.
-  const r = STATE.matriz.find(x=>(x.values||{})===v) || { values: v };
+  // v son los .values del riesgo. Usamos EDIT_ACTUAL para hallar el registro.
+  const r = STATE.matriz.find(x=>x.id===EDIT_ACTUAL) || { values: v };
   const F = CONFIG.MATRIZ_FIELDS;
   try{
     const [ams,ops,partes,resp] = await Promise.all([
@@ -1789,7 +1789,8 @@ async function cargarRelEdit(v){
 
 // Cascada de procesos para edición, preseleccionando valores actuales
 async function initCascadaEdit(v){
-  const r = STATE.matriz.find(x=>(x.values||{})===v) || { values: v };
+  // v son los .values del riesgo. Usamos EDIT_ACTUAL para hallar el registro.
+  const r = STATE.matriz.find(x=>x.id===EDIT_ACTUAL) || { values: v };
   const F = CONFIG.MATRIZ_FIELDS;
   const inv = await loadInventario();
   const C = INV_COLS;
@@ -1822,9 +1823,14 @@ async function initCascadaEdit(v){
   // (p.ej. "Proceso nivel 1" de un registro viejo vacío), simplemente paramos ahí
   // y dejamos que el usuario complete — sin mostrar errores.
   const v2 = r.values || {};
-  const rutaTxt = v2[F.proceso_txt.id] || v2['Proceso'] || '';
+  // Leer la ruta del proceso: QuintaDB puede devolverla bajo el ID del campo o
+  // bajo el nombre "Proceso". Tomamos el primero que sea un valor REAL (no el
+  // nombre del campo "Proceso", que significa vacío).
+  const candA = v2[F.proceso_txt.id];
+  const candB = v2['Proceso'];
+  const rutaTxt = [candA, candB].find(x => x && x !== 'Proceso' && String(x).length > 3) || '';
   let segs = [];
-  if (rutaTxt && rutaTxt !== 'Proceso') {
+  if (rutaTxt) {
     // Aceptar separadores › o > (con o sin espacios)
     segs = String(rutaTxt).split(/\s*[›>]\s*/).map(s=>s.trim()).filter(Boolean);
   }
