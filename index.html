@@ -391,7 +391,7 @@
     </div>
 
     <div class="card"><div style="padding:6px 4px"><table>
-      <thead><tr><th>Riesgo</th><th>Proceso</th><th style="white-space:nowrap">Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>% avance</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
+      <thead><tr><th id="thSegPrimera">Riesgo</th><th>Proceso</th><th style="white-space:nowrap">Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>% avance</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
       <tbody id="tablaSeguimiento"><tr><td colspan="8" class="empty"><h3>Cargando…</h3></td></tr></tbody>
     </table></div></div>
   </section>
@@ -828,7 +828,7 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   const F = CONFIG.MATRIZ_FIELDS;
   const v = id => document.getElementById(id).value;
   // Texto visible (nombre) de un select, no su value/ID:
-  const vtxt = id => { const el=document.getElementById(id); return (el && el.selectedOptions && el.selectedOptions[0]) ? el.selectedOptions[0].text.trim() : ''; };
+  const vtxt = id => { const el=document.getElementById(id); if(!(el && el.selectedOptions && el.selectedOptions[0])) return ''; const o=el.selectedOptions[0]; return (o.value==='') ? '' : o.text.trim(); };
   const tipo = v('f_tipo_ro');
 
   // campos: todo va como texto a campos de texto (incluye los nuevos de proceso,
@@ -1111,7 +1111,7 @@ function procesoDe(r) {
 // NO colisiona con una relación, también intenta leer por nombre de columna.
 function leerTexto(r, def, leerPorNombre){
   const v = r.values || {};
-  const esBasura = x => (!x || x === def.col || /^[a-zA-Z0-9_\-]{22}$/.test(String(x)));
+  const esBasura = x => (!x || x === def.col || x === 'Seleccione…' || x === 'Seleccione' || /^[a-zA-Z0-9_\-]{22}$/.test(String(x)));
   // Si se permite leer por nombre, el valor REAL viene bajo el nombre de columna.
   // En estos campos el ID trae el nombre del campo de relación (basura), así que
   // leemos SOLO por nombre y no caemos al ID.
@@ -1348,7 +1348,10 @@ async function renderSeguimiento() {
     await precargarMaestrasProceso(); // garantizar diccionario id→nombre
     const F = CONFIG.MATRIZ_FIELDS;
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
-    if(!recs.length){ tb.innerHTML='<tr><td colspan="8"><div class="empty"><h3>Sin riesgos</h3></div></td></tr>'; return; }
+    // Encabezado de la primera columna según el tipo seleccionado
+    const thP = document.getElementById('thSegPrimera');
+    if(thP) thP.textContent = SEG_TIPO==='oportunidades' ? 'Oportunidad' : (SEG_TIPO==='riesgos' ? 'Riesgo' : 'Riesgo / Oportunidad');
+    if(!recs.length){ tb.innerHTML='<tr><td colspan="8"><div class="empty"><h3>Sin registros</h3></div></td></tr>'; return; }
 
     const filtro = (document.getElementById('segBuscar').value||'').toLowerCase();
     const filas = recs.filter(pasaFiltros).map(r=>{
@@ -1975,7 +1978,7 @@ async function guardarEdit(){
   const F=CONFIG.MATRIZ_FIELDS;
   const g=id=>{ const el=document.getElementById(id); return el?el.value:''; };
   // Texto visible (nombre) de un select:
-  const gtxt=id=>{ const el=document.getElementById(id); return (el && el.selectedOptions && el.selectedOptions[0]) ? el.selectedOptions[0].text.trim() : ''; };
+  const gtxt=id=>{ const el=document.getElementById(id); if(!(el && el.selectedOptions && el.selectedOptions[0])) return ''; const o=el.selectedOptions[0]; return (o.value==='') ? '' : o.text.trim(); };
   const limpiar=t=>(t||'').replace(/<br\s*\/?>/gi,'\n');
   const btn=document.getElementById('editGuardar');
   const campos={};   // TODO va como texto (incluye proceso/responsable/etc.)
