@@ -1085,13 +1085,17 @@ function procesoDe(r) {
 // NO colisiona con una relación, también intenta leer por nombre de columna.
 function leerTexto(r, def, leerPorNombre){
   const v = r.values || {};
-  const porId = v[def.id];
-  if (porId && porId !== def.col && !/^[a-zA-Z0-9_\-]{22}$/.test(String(porId))) return porId;
+  const esBasura = x => (!x || x === def.col || /^[a-zA-Z0-9_\-]{22}$/.test(String(x)));
+  // Si se permite leer por nombre, el valor REAL viene bajo el nombre de columna.
+  // En estos campos el ID trae el nombre del campo de relación (basura), así que
+  // leemos SOLO por nombre y no caemos al ID.
   if (leerPorNombre && def.col){
     const porNombre = v[def.col];
-    if (porNombre && porNombre !== def.col && !/^[a-zA-Z0-9_\-]{22}$/.test(String(porNombre))) return porNombre;
+    return esBasura(porNombre) ? '' : porNombre;
   }
-  return '';
+  // Sin leerPorNombre: leer por ID (descartando basura).
+  const porId = v[def.id];
+  return esBasura(porId) ? '' : porId;
 }
 
 // Comprueba si la ruta de proceso guardada (texto) está desactualizada respecto
@@ -1179,9 +1183,9 @@ function procedeReeval(r){
 // Oficina/dependencia responsable del riesgo.
 function oficinaDe(r){
   const F = CONFIG.MATRIZ_FIELDS;
-  // 1) Campo de texto nuevo (Responsable). Su nombre colisiona con la relación,
-  //    así que solo leemos por ID (no por nombre).
-  const txt = leerTexto(r, F.responsable_txt, false);
+  // 1) Campo de texto nuevo (Responsable - string). El nombre de columna ya NO
+  //    colisiona con la relación, así que leemos por ID o por nombre.
+  const txt = leerTexto(r, F.responsable_txt, true);
   if (txt) return txt;
   // 2) Respaldo: traducir la relación (registros antiguos).
   const x = leerRelacion(r, 'Responsable', F.responsable.id);
@@ -1642,8 +1646,8 @@ function verDetalle(riesgoId){
   const limpio = (col)=>{
     if(col==='__proceso__') return rutaProcesoDe(r);
     if(col==='Responsable') return oficinaDe(r)==='Sin oficina asignada' ? '' : oficinaDe(r);
-    if(col==='__amenaza__'){ return leerTexto(r, F2.amenaza_txt, false); }
-    if(col==='__oportunidad__'){ return leerTexto(r, F2.oportunidad_txt, false); }
+    if(col==='__amenaza__'){ return leerTexto(r, F2.amenaza_txt, true); }
+    if(col==='__oportunidad__'){ return leerTexto(r, F2.oportunidad_txt, true); }
     if(col==='__parte__'){ return leerTexto(r, F2.parte_txt, true); }
     const val = v[col];
     if(!val || val===col) return '';
@@ -1806,10 +1810,9 @@ async function cargarRelEdit(v){
         opts.map(o=>`<option value="${o.value}" ${match&&o.value===match.value?'selected':''}>${o.label}</option>`).join('');
     };
     // Preferir el campo de texto nuevo; si no, traducir la relación.
-    // OJO: el valor por ID puede venir como el NOMBRE del campo (señal de vacío),
-    // p.ej. "Responsable", "Amenaza". Lo descartamos con leerTexto (que ya filtra
-    // ese caso y los IDs de 22 chars) antes de caer al respaldo por relación.
-    const txtO = (def, fallback) => { const t = leerTexto(r, def, false); return t || fallback; };
+    // Los nombres de columna ya NO colisionan ("Responsable - string", etc.),
+    // así que leemos por ID o por nombre con leerTexto(...,true).
+    const txtO = (def, fallback) => { const t = leerTexto(r, def, true); return t || fallback; };
     fillById('ed_amenaza', ams, txtO(F.amenaza_txt, leerRelacion(r,'Amenaza',F.amenaza.id)));
     fillById('ed_oport_rel', ops, txtO(F.oportunidad_txt, leerRelacion(r,'Oportunidad relacionada',F.oportunidad_rel.id)));
     fillById('ed_parte', partes, txtO(F.parte_txt, leerRelacion(r,'Parte interesada',F.parte_interesada.id)));
