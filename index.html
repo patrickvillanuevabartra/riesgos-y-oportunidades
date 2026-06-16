@@ -226,6 +226,7 @@
     </div>
     <nav>
       <button data-view="dashboard" class="active">Tablero</button>
+      <button data-view="registrar">Registrar</button>
       <button data-view="seguimiento">Seguimiento</button>
       <button data-view="reevaluar">Reevaluación</button>
     </nav>
@@ -731,6 +732,15 @@ function getMultiselect(containerId){
   const cont=document.getElementById(containerId);
   return cont ? [...cont.querySelectorAll('input:checked')].map(c=>c.value) : [];
 }
+// Devuelve los NOMBRES (texto) de las opciones marcadas en un multiselect.
+function getMultiselectLabels(containerId){
+  const cont=document.getElementById(containerId);
+  if(!cont) return [];
+  return [...cont.querySelectorAll('input:checked')].map(c=>{
+    const lbl=c.closest('.ms-item');
+    return lbl ? lbl.textContent.trim() : c.value;
+  });
+}
 
 /* ============================================================
    CASCADA de procesos (Tipo → N0 → N1 → N2 → N3 → Proc)
@@ -806,12 +816,14 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   const btn = document.getElementById('btnGuardar');
   const F = CONFIG.MATRIZ_FIELDS;
   const v = id => document.getElementById(id).value;
+  // Texto visible (nombre) de un select, no su value/ID:
+  const vtxt = id => { const el=document.getElementById(id); return (el && el.selectedOptions && el.selectedOptions[0]) ? el.selectedOptions[0].text.trim() : ''; };
   const tipo = v('f_tipo_ro');
 
-  const values = {};
-  const rel = {};
-  const put = (def, val) => { if (val) values[def.id] = val; };
-  const putRel = (def, val) => { if (val) rel[def.id] = val; };
+  // campos: todo va como texto a campos de texto (incluye los nuevos de proceso,
+  // responsable, amenaza, oportunidad, parte). Así QuintaDB sí lo guarda.
+  const campos = {};
+  const put = (def, val) => { if (val) campos[def.id] = val; };
 
   put(F.fecha_evaluacion, v('f_fecha'));
   put(F.fuente, v('f_fuente'));
@@ -824,35 +836,21 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   put(F.control_establecido, v('f_control'));
   put(F.medida_respuesta, v('f_medida'));
 
-  // Origen según fuente
+  // Origen según fuente → se guarda el NOMBRE en el campo de texto correspondiente
   const fuente = v('f_fuente');
   if (fuente === 'Contexto') {
-    const ams = getMultiselect('f_amenaza');
-    const ops = getMultiselect('f_oportunidad_rel');
-    if (ams.length) rel[F.amenaza.id] = ams;            // array de IDs (multi)
-    if (ops.length) rel[F.oportunidad_rel.id] = ops;    // array de IDs (multi)
+    // Amenaza y Oportunidad: multi-selección → unir los nombres marcados
+    const amsNoms = getMultiselectLabels('f_amenaza');
+    const opsNoms = getMultiselectLabels('f_oportunidad_rel');
+    if (amsNoms.length) campos[F.amenaza_txt.id] = amsNoms.join('; ');
+    if (opsNoms.length) campos[F.oportunidad_txt.id] = opsNoms.join('; ');
   }
-  if (fuente === 'Partes interesadas') putRel(F.parte_interesada, v('f_parte'));
+  if (fuente === 'Partes interesadas') put(F.parte_txt, vtxt('f_parte'));
   if (fuente === 'Proceso') {
-    // Los desplegables de proceso manejan TEXTO; la matriz espera el ID del
-    // registro relacionado. Buscamos en el inventario la fila que coincide con
-    // la selección y tomamos los IDs de sus rel_values.
-    const fila = (STATE.inventario || []).find(r => {
-      const vv = r.values || {};
-      return vv[INV_COLS.tipo] === v('f_tipo')
-          && (!v('f_n0') || vv[INV_COLS.n0] === v('f_n0'))
-          && (!v('f_n1') || vv[INV_COLS.n1] === v('f_n1'))
-          && (!v('f_n2') || vv[INV_COLS.n2] === v('f_n2'));
-    });
-    if (fila && fila.rel_values) {
-      const RV = fila.rel_values;
-      const first = a => Array.isArray(a) ? a[0] : a;
-      // Mapear cada nivel al field_id de la MATRIZ con el ID del registro maestro.
-      if (RV[CONFIG.INVENTARIO_FIELDS.tipo_proceso.id]) rel[F.tipo_proceso.id] = first(RV[CONFIG.INVENTARIO_FIELDS.tipo_proceso.id]);
-      if (RV[CONFIG.INVENTARIO_FIELDS.proceso_n0.id])   rel[F.proceso_n0.id]   = first(RV[CONFIG.INVENTARIO_FIELDS.proceso_n0.id]);
-      if (RV[CONFIG.INVENTARIO_FIELDS.proceso_n1.id])   rel[F.proceso_n1.id]   = first(RV[CONFIG.INVENTARIO_FIELDS.proceso_n1.id]);
-      if (RV[CONFIG.INVENTARIO_FIELDS.proceso_n2.id])   rel[F.proceso_n2.id]   = first(RV[CONFIG.INVENTARIO_FIELDS.proceso_n2.id]);
-    }
+    // Construir la ruta del proceso como texto: "Tipo › N0 › N1 › N2 › N3 › Proc"
+    const ruta = [v('f_tipo'), v('f_n0'), v('f_n1'), v('f_n2'), v('f_n3'), v('f_proc')]
+      .filter(Boolean).join(' › ');
+    if (ruta) campos[F.proceso_txt.id] = ruta;
   }
   // Naturaleza
   if (tipo === 'Riesgo') {
@@ -862,11 +860,12 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
     put(F.oportunidad_desc, v('f_oport_desc'));
     put(F.prob_oport_inh, v('f_prob_o_inh')); put(F.imp_oport_inh, v('f_imp_o_inh'));
   }
-  putRel(F.responsable, v('f_responsable')); // responsable es relación
+  // Responsable → nombre de la oficina en campo de texto
+  put(F.responsable_txt, vtxt('f_responsable'));
 
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Guardando…';
   try {
-    await API.createRecord(CONFIG.ENTITIES.MATRIZ, values, Object.keys(rel).length ? rel : null);
+    await API.saveForm(null, campos); // null = crear nuevo registro (POST)
     toast('Registro guardado correctamente.');
     document.getElementById('formRiesgo').reset();
     limpiarMultiselects();
@@ -1080,6 +1079,11 @@ function procesoDe(r) {
 // Usa leerRelacion(): si el nombre viene vacío, traduce el ID de relación.
 function rutaProcesoDe(r){
   const F = CONFIG.MATRIZ_FIELDS;
+  const v = r.values || {};
+  // 1) Preferir el campo de texto nuevo (Proceso) leído por su ID.
+  const txt = v[F.proceso_txt.id];
+  if (txt && txt !== 'Proceso') return txt;
+  // 2) Respaldo: armar la ruta traduciendo las relaciones (registros antiguos).
   const partes = [
     leerRelacion(r, 'Tipo de proceso',  F.tipo_proceso.id),
     leerRelacion(r, 'Proceso nivel 0',  F.proceso_n0.id),
@@ -1090,9 +1094,16 @@ function rutaProcesoDe(r){
   return partes.join(' › ');
 }
 
-// Proceso de NIVEL 1 (para agrupar en el dashboard). Traduce IDs de relación.
+// Proceso de NIVEL 1 (para agrupar en el dashboard).
 function nivel1De(r){
   const F = CONFIG.MATRIZ_FIELDS;
+  const v = r.values || {};
+  // Si hay texto de proceso, tomar el segmento más específico de la ruta.
+  const txt = v[F.proceso_txt.id];
+  if (txt && txt !== 'Proceso') {
+    const segs = txt.split('›').map(s=>s.trim()).filter(Boolean);
+    return segs.length>=2 ? segs[Math.min(2,segs.length-1)] : segs[0] || 'Sin proceso';
+  }
   return leerRelacion(r, 'Procesos nivel 1', F.proceso_n1.id)
       || leerRelacion(r, 'Proceso nivel 1', F.proceso_n1.id)
       || leerRelacion(r, 'Proceso nivel 0', F.proceso_n0.id)
@@ -1116,9 +1127,14 @@ function procedeReeval(r){
   return { procede, texto: (t && t!==CAMPO_PROCEDE) ? t : '' };
 }
 
-// Oficina/dependencia responsable del riesgo (viene directa en el campo 'Responsable').
+// Oficina/dependencia responsable del riesgo.
 function oficinaDe(r){
   const F = CONFIG.MATRIZ_FIELDS;
+  const v = r.values || {};
+  // 1) Preferir el campo de texto nuevo (Responsable) por su ID.
+  const txt = v[F.responsable_txt.id];
+  if (txt && txt !== 'Responsable') return txt;
+  // 2) Respaldo: traducir la relación (registros antiguos).
   const x = leerRelacion(r, 'Responsable', F.responsable.id);
   return x ? x : 'Sin oficina asignada';
 }
@@ -1261,6 +1277,8 @@ async function renderSeguimiento() {
         }</td>
         <td style="text-align:right;white-space:nowrap">
           <button class="icon-btn" title="Ver detalle del riesgo" onclick="verDetalle('${f.id}')">👁</button>
+          <button class="icon-btn" title="Editar riesgo" onclick="editarRiesgo('${f.id}')">✏️</button>
+          <button class="icon-btn" title="Eliminar riesgo" onclick="eliminarRiesgo('${f.id}')">🗑️</button>
         </td>
       </tr>
       <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="8" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
@@ -1554,6 +1572,9 @@ function verDetalle(riesgoId){
     ['Causas','Causas'],
     ['Consecuencias','Consecuencias'],
     ['Ruta del proceso','__proceso__'],
+    ['Amenaza(s)','__amenaza__'],
+    ['Oportunidad(es) relacionada(s)','__oportunidad__'],
+    ['Parte interesada','__parte__'],
     ['Actividad específica','Actividad específica'],
     ['Probabilidad inherente','Probabilidad riesgo inherente'],
     ['Impacto inherente','Impacto riesgo inherente'],
@@ -1567,9 +1588,13 @@ function verDetalle(riesgoId){
     ['Certificación del control','Certificación de Implementación del Control'],
     ['Nivel residual','Nivel de riesgo residual'],
   ];
+  const F2 = CONFIG.MATRIZ_FIELDS;
   const limpio = (col)=>{
     if(col==='__proceso__') return rutaProcesoDe(r);
     if(col==='Responsable') return oficinaDe(r)==='Sin oficina asignada' ? '' : oficinaDe(r);
+    if(col==='__amenaza__'){ const t=v[F2.amenaza_txt.id]; return (t && t!=='Amenaza')?t:''; }
+    if(col==='__oportunidad__'){ const t=v[F2.oportunidad_txt.id]; return (t && t!=='Oportuinad relacionada')?t:''; }
+    if(col==='__parte__'){ const t=v[F2.parte_txt.id]; return (t && t!=='Parte interesada ')?t:''; }
     const val = v[col];
     if(!val || val===col) return '';
     return val;
@@ -1621,12 +1646,16 @@ function editarRiesgo(riesgoId){
   // qué relaciones tienen ID (los nombres por columna a veces vienen vacíos).
   let fuenteAct = cur('Fuente de identificación del riesgo u oportunidad') || cur('Fuente de identificación');
   if(!fuenteAct){
-    const tieneProceso = leerRelacion(r,'Tipo de proceso',F.tipo_proceso.id)
+    const tieneProceso = (v[F.proceso_txt.id] && v[F.proceso_txt.id]!=='Proceso')
+      || leerRelacion(r,'Tipo de proceso',F.tipo_proceso.id)
       || leerRelacion(r,'Proceso nivel 0',F.proceso_n0.id)
       || leerRelacion(r,'Procesos nivel 1',F.proceso_n1.id)
       || leerRelacion(r,'Proceso nivel 2',F.proceso_n2.id);
-    const tieneParte = leerRelacion(r,'Parte interesada',F.parte_interesada.id);
-    const tieneContexto = leerRelacion(r,'Amenaza',F.amenaza.id)||leerRelacion(r,'Oportunidad relacionada',F.oportunidad_rel.id);
+    const tieneParte = (v[F.parte_txt.id] && v[F.parte_txt.id]!=='Parte interesada ')
+      || leerRelacion(r,'Parte interesada',F.parte_interesada.id);
+    const tieneContexto = (v[F.amenaza_txt.id] && v[F.amenaza_txt.id]!=='Amenaza')
+      || (v[F.oportunidad_txt.id] && v[F.oportunidad_txt.id]!=='Oportuinad relacionada')
+      || leerRelacion(r,'Amenaza',F.amenaza.id)||leerRelacion(r,'Oportunidad relacionada',F.oportunidad_rel.id);
     if(tieneProceso) fuenteAct='Proceso';
     else if(tieneParte) fuenteAct='Partes interesadas';
     else if(tieneContexto) fuenteAct='Contexto';
@@ -1644,6 +1673,7 @@ function editarRiesgo(riesgoId){
 
       <div class="field origin-ed partes-ed hidden"><label>Parte interesada</label><select id="ed_parte"></select></div>
 
+      <div class="field origin-ed proceso-ed hidden full"><label>Proceso actual (referencia)</label><div class="readonly-pill" id="ed_proceso_actual">—</div></div>
       <div class="field origin-ed proceso-ed hidden"><label>Tipo de proceso</label><select id="ed_tipo"></select></div>
       <div class="field origin-ed proceso-ed hidden"><label>Proceso nivel 0</label><select id="ed_n0" disabled></select></div>
       <div class="field origin-ed proceso-ed hidden"><label>Proceso nivel 1</label><select id="ed_n1" disabled></select></div>
@@ -1686,6 +1716,10 @@ function editarRiesgo(riesgoId){
   showOriginEdit(fuenteAct);
   document.getElementById('ed_fuente').onchange = e => showOriginEdit(e.target.value);
 
+  // Mostrar la ruta de proceso actual como referencia
+  const refProc = document.getElementById('ed_proceso_actual');
+  if(refProc){ const rp = rutaProcesoDe(r); refProc.textContent = rp || '— (sin proceso asignado)'; }
+
   // Cargar desplegables dinámicos y preseleccionar valores actuales
   cargarRelEdit(v);
 }
@@ -1719,10 +1753,13 @@ async function cargarRelEdit(v){
       el.innerHTML='<option value="">Seleccione…</option>'+
         opts.map(o=>`<option value="${o.value}" ${match&&o.value===match.value?'selected':''}>${o.label}</option>`).join('');
     };
-    fillById('ed_amenaza', ams, leerRelacion(r,'Amenaza',F.amenaza.id));
-    fillById('ed_oport_rel', ops, leerRelacion(r,'Oportunidad relacionada',F.oportunidad_rel.id));
-    fillById('ed_parte', partes, leerRelacion(r,'Parte interesada',F.parte_interesada.id));
-    fillById('ed_responsable', resp, leerRelacion(r,'Responsable',F.responsable.id));
+    // Preferir el campo de texto nuevo; si no, traducir la relación.
+    const vv = r.values || {};
+    const txtO = (idTxt, fallback) => { const t=vv[idTxt]; return (t && t.length>0) ? t : fallback; };
+    fillById('ed_amenaza', ams, txtO(F.amenaza_txt.id, leerRelacion(r,'Amenaza',F.amenaza.id)));
+    fillById('ed_oport_rel', ops, txtO(F.oportunidad_txt.id, leerRelacion(r,'Oportunidad relacionada',F.oportunidad_rel.id)));
+    fillById('ed_parte', partes, txtO(F.parte_txt.id, leerRelacion(r,'Parte interesada',F.parte_interesada.id)));
+    fillById('ed_responsable', resp, txtO(F.responsable_txt.id, leerRelacion(r,'Responsable',F.responsable.id)));
     // Cascada de procesos con preselección
     await initCascadaEdit(v);
   }catch(e){ toast('No se pudieron cargar algunas listas: '+e.message, true); }
@@ -1833,12 +1870,12 @@ async function guardarEdit(){
   if(!EDIT_ACTUAL) return;
   const F=CONFIG.MATRIZ_FIELDS;
   const g=id=>{ const el=document.getElementById(id); return el?el.value:''; };
+  // Texto visible (nombre) de un select:
+  const gtxt=id=>{ const el=document.getElementById(id); return (el && el.selectedOptions && el.selectedOptions[0]) ? el.selectedOptions[0].text.trim() : ''; };
   const limpiar=t=>(t||'').replace(/<br\s*\/?>/gi,'\n');
   const btn=document.getElementById('editGuardar');
-  const values={};   // campos de texto/select → json_values
-  const rel={};      // relaciones (IDs) → json_rel_values
-  const set=(def,val)=>{ values[def.id]=val; };
-  const setRel=(def,val)=>{ if(val) rel[def.id]=val; };
+  const campos={};   // TODO va como texto (incluye proceso/responsable/etc.)
+  const set=(def,val)=>{ campos[def.id]=val; };
 
   // Identificación (texto)
   if(g('ed_fecha'))  set(F.fecha_evaluacion, g('ed_fecha'));
@@ -1846,41 +1883,22 @@ async function guardarEdit(){
   if(fuenteSel)      set(F.fuente, fuenteSel);
   set(F.actividad, g('ed_actividad'));
 
-  // Campos relacionales según la fuente (se envían como RELACIÓN con IDs)
+  // Origen según fuente → guardar el NOMBRE en el campo de texto correspondiente.
+  // Limpiamos primero los tres campos de texto de origen para no dejar datos viejos.
+  set(F.amenaza_txt, '');
+  set(F.oportunidad_txt, '');
+  set(F.parte_txt, '');
+  set(F.proceso_txt, '');
   if(fuenteSel==='Contexto'){
-    setRel(F.amenaza, g('ed_amenaza'));
-    setRel(F.oportunidad_rel, g('ed_oport_rel'));
+    if(gtxt('ed_amenaza'))   set(F.amenaza_txt, gtxt('ed_amenaza'));
+    if(gtxt('ed_oport_rel')) set(F.oportunidad_txt, gtxt('ed_oport_rel'));
   } else if(fuenteSel==='Partes interesadas'){
-    setRel(F.parte_interesada, g('ed_parte'));
+    if(gtxt('ed_parte')) set(F.parte_txt, gtxt('ed_parte'));
   } else if(fuenteSel==='Proceso'){
-    // Los desplegables de proceso manejan TEXTO; buscamos en el inventario la fila
-    // coincidente y tomamos los IDs de sus rel_values (igual que al crear).
-    const selTipo=g('ed_tipo'), selN0=g('ed_n0'), selN1=g('ed_n1'), selN2=g('ed_n2');
-    const fila = (STATE.inventario||[]).find(r=>{
-      const vv=r.values||{};
-      return vv[INV_COLS.tipo]===selTipo
-        && (!selN0 || vv[INV_COLS.n0]===selN0)
-        && (!selN1 || vv[INV_COLS.n1]===selN1)
-        && (!selN2 || vv[INV_COLS.n2]===selN2);
-    });
-    if(fila && fila.rel_values){
-      const RV=fila.rel_values, first=a=>Array.isArray(a)?a[0]:a, IF=CONFIG.INVENTARIO_FIELDS;
-      if(RV[IF.tipo_proceso.id]) rel[F.tipo_proceso.id]=first(RV[IF.tipo_proceso.id]);
-      if(RV[IF.proceso_n0.id])   rel[F.proceso_n0.id]=first(RV[IF.proceso_n0.id]);
-      if(RV[IF.proceso_n1.id])   rel[F.proceso_n1.id]=first(RV[IF.proceso_n1.id]);
-      if(RV[IF.proceso_n2.id])   rel[F.proceso_n2.id]=first(RV[IF.proceso_n2.id]);
-      console.log('[guardarEdit] Proceso resuelto por inventario →', rel);
-    } else {
-      // Respaldo: no se encontró fila (cascada vacía o incompleta). Conservar los
-      // IDs de proceso que el riesgo YA tenía, para no borrarlos al guardar.
-      const rOrig = STATE.matriz.find(x=>x.id===EDIT_ACTUAL);
-      const vo = rOrig ? (rOrig.values||{}) : {};
-      [F.tipo_proceso, F.proceso_n0, F.proceso_n1, F.proceso_n2].forEach(def=>{
-        const idOrig = vo[def.id];
-        if(idOrig) rel[def.id] = Array.isArray(idOrig)?idOrig[0]:idOrig;
-      });
-      console.warn('[guardarEdit] Sin fila de inventario; se conservan IDs de proceso originales →', rel);
-    }
+    // Ruta del proceso como texto: "Tipo › N0 › N1 › N2 › N3 › Proc"
+    const ruta = [g('ed_tipo'),g('ed_n0'),g('ed_n1'),g('ed_n2'),g('ed_n3'),g('ed_proc')]
+      .filter(Boolean).join(' › ');
+    if(ruta) set(F.proceso_txt, ruta);
   }
 
   // Naturaleza (texto)
@@ -1898,15 +1916,11 @@ async function guardarEdit(){
   set(F.control_establecido, limpiar(g('ed_control')));
   set(F.medida_respuesta, limpiar(g('ed_medida')));
   if(g('ed_cert')) set(F.certificacion_control, g('ed_cert'));
-  // Responsable es RELACIÓN (se envía el ID)
-  setRel(F.responsable, g('ed_responsable'));
+  // Responsable → nombre de oficina en campo de texto
+  if(gtxt('ed_responsable')) set(F.responsable_txt, gtxt('ed_responsable'));
 
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
   try{
-    // Combinamos texto + relaciones en un solo objeto de campos. El método de
-    // formulario (saveForm) los envía como values[id]=valor, que es lo que
-    // QuintaDB respeta para guardar relaciones al actualizar (PUT).
-    const campos = Object.assign({}, values, rel);
     console.log('[guardarEdit] Enviando (formulario):', {id:EDIT_ACTUAL, campos});
     const guardar = API.saveForm(EDIT_ACTUAL, campos);
     const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('Tardó demasiado (25s). Revisa la consola y recarga para verificar.')),25000));
@@ -2035,10 +2049,10 @@ function setConn(ok, msg) {
    ARRANQUE
    ============================================================ */
 (async function init(){
-  // Aplicativo en modo CONSULTA + SEGUIMIENTO: ya no se crean ni editan riesgos
-  // desde aquí (eso se hace en QuintaDB). Solo precargamos lo necesario para
-  // leer y traducir la información, y mostrar el tablero.
+  initStaticSelects();
   try {
+    await ensureRelOptions();
+    await initCascada();
     await precargarMaestrasProceso(); // diccionario id→nombre para traducir relaciones
     setConn(true);
     renderDashboard();
