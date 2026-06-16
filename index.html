@@ -1094,6 +1094,33 @@ function leerTexto(r, def, leerPorNombre){
   return '';
 }
 
+// Comprueba si la ruta de proceso guardada (texto) está desactualizada respecto
+// al inventario actual: es decir, si ALGÚN segmento de la ruta ya no existe en
+// ninguna columna del inventario. Devuelve el primer segmento faltante, o '' si
+// todo coincide. Solo aplica a riesgos con ruta de texto (los nuevos); los que
+// no tienen texto de proceso devuelven '' (no se evalúan).
+function segmentoDesactualizado(r){
+  const F = CONFIG.MATRIZ_FIELDS;
+  const v = r.values || {};
+  // Leer la ruta de texto igual que en la cascada (por ID o por nombre "Proceso").
+  const candA = v[F.proceso_txt.id];
+  const candB = v['Proceso'];
+  const rutaTxt = [candA, candB].find(x => x && x !== 'Proceso' && String(x).length > 3) || '';
+  if(!rutaTxt) return ''; // sin ruta de texto → no se evalúa
+  const segs = String(rutaTxt).split(/\s*[›>]\s*/).map(s=>s.trim()).filter(Boolean);
+  if(!segs.length) return '';
+  const inv = STATE.inventario || [];
+  if(!inv.length) return ''; // inventario no cargado aún → no marcar
+  const C = INV_COLS;
+  const cols = [C.tipo, C.n0, C.n1, C.n2, C.n3, C.proc];
+  // Conjunto de TODOS los valores existentes en el inventario (cualquier columna).
+  const existentes = new Set();
+  inv.forEach(rec=>{ const vv=rec.values||{}; cols.forEach(c=>{ if(vv[c]) existentes.add(vv[c]); }); });
+  // Buscar el primer segmento que ya no exista en el inventario.
+  for(const s of segs){ if(!existentes.has(s)) return s; }
+  return '';
+}
+
 // Usa leerRelacion(): si el nombre viene vacío, traduce el ID de relación.
 function rutaProcesoDe(r){
   const F = CONFIG.MATRIZ_FIELDS;
@@ -1271,7 +1298,8 @@ async function renderSeguimiento() {
       const sub=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
       const pr=procedeReeval(r);
       const ni=nivelInherenteDe(r);
-      return {id:r.id, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx};
+      const desact=segmentoDesactualizado(r);
+      return {id:r.id, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact};
     }).filter(f => !filtro || f.desc.toLowerCase().includes(filtro) || f.proc.toLowerCase().includes(filtro) || f.oficina.toLowerCase().includes(filtro));
 
     // Agrupar por oficina; dentro de cada grupo ordenar por nivel inherente (mayor arriba)
@@ -1287,7 +1315,7 @@ async function renderSeguimiento() {
         <td style="max-width:280px">
           <a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>80?f.desc.slice(0,80)+'…':f.desc}</a>
         </td>
-        <td title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>36?f.proc.slice(0,36)+'…':f.proc}</td>
+        <td title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>36?f.proc.slice(0,36)+'…':f.proc}${f.desact?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
         <td>${nivelBadge(f.nivel)}</td>
         <td><strong>${f.nReportes}</strong></td>
         <td id="estado-${f.id}" style="font-size:12px">${f.nReportes?'<span class="hint">…</span>':estadoPill('Pendiente')}</td>
@@ -1733,6 +1761,8 @@ function editarRiesgo(riesgoId){
     </div></div>`;
 
   document.getElementById('editModal').classList.remove('hidden');
+  // Asegurar que el botón Guardar esté activo (por si quedó deshabilitado de un guardado anterior)
+  const _bg=document.getElementById('editGuardar'); if(_bg){ _bg.disabled=false; _bg.textContent='Guardar cambios'; }
 
   // Mostrar el grupo correcto según la fuente, y enganchar el cambio
   showOriginEdit(fuenteAct);
@@ -1776,12 +1806,14 @@ async function cargarRelEdit(v){
         opts.map(o=>`<option value="${o.value}" ${match&&o.value===match.value?'selected':''}>${o.label}</option>`).join('');
     };
     // Preferir el campo de texto nuevo; si no, traducir la relación.
-    const vv = r.values || {};
-    const txtO = (idTxt, fallback) => { const t=vv[idTxt]; return (t && t.length>0) ? t : fallback; };
-    fillById('ed_amenaza', ams, txtO(F.amenaza_txt.id, leerRelacion(r,'Amenaza',F.amenaza.id)));
-    fillById('ed_oport_rel', ops, txtO(F.oportunidad_txt.id, leerRelacion(r,'Oportunidad relacionada',F.oportunidad_rel.id)));
-    fillById('ed_parte', partes, txtO(F.parte_txt.id, leerRelacion(r,'Parte interesada',F.parte_interesada.id)));
-    fillById('ed_responsable', resp, txtO(F.responsable_txt.id, leerRelacion(r,'Responsable',F.responsable.id)));
+    // OJO: el valor por ID puede venir como el NOMBRE del campo (señal de vacío),
+    // p.ej. "Responsable", "Amenaza". Lo descartamos con leerTexto (que ya filtra
+    // ese caso y los IDs de 22 chars) antes de caer al respaldo por relación.
+    const txtO = (def, fallback) => { const t = leerTexto(r, def, false); return t || fallback; };
+    fillById('ed_amenaza', ams, txtO(F.amenaza_txt, leerRelacion(r,'Amenaza',F.amenaza.id)));
+    fillById('ed_oport_rel', ops, txtO(F.oportunidad_txt, leerRelacion(r,'Oportunidad relacionada',F.oportunidad_rel.id)));
+    fillById('ed_parte', partes, txtO(F.parte_txt, leerRelacion(r,'Parte interesada',F.parte_interesada.id)));
+    fillById('ed_responsable', resp, txtO(F.responsable_txt, leerRelacion(r,'Responsable',F.responsable.id)));
     // Cascada de procesos con preselección
     await initCascadaEdit(v);
   }catch(e){ toast('No se pudieron cargar algunas listas: '+e.message, true); }
@@ -1931,6 +1963,7 @@ async function guardarEdit(){
     const resp = await Promise.race([guardar, timeout]);
     console.log('[guardarEdit] Respuesta:', resp);
     toast('Cambios guardados.');
+    btn.disabled=false; btn.textContent='Guardar cambios'; // reactivar antes de cerrar
     STATE.matriz=[]; await loadMatriz(true);
     cerrarEdit(); renderSeguimiento();
   }catch(err){
