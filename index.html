@@ -161,6 +161,48 @@
 
   @media(max-width:900px){.grid,.dash-grid,.kpis{grid-template-columns:1fr}.bar-row .lbl{width:110px}}
 
+  /* ===== RESPONSIVE MÓVIL ===== */
+  /* Las tablas pueden desplazarse horizontalmente en pantallas medianas */
+  .tabla-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  @media(max-width:760px){
+    body{zoom:1}                              /* el zoom grande estorba en móvil */
+    .wrap,main{padding-left:10px;padding-right:10px}
+    /* Modales ocupan casi toda la pantalla y permiten scroll */
+    .modal{max-width:96vw!important;width:96vw;max-height:92vh;margin:4vh auto;overflow-y:auto}
+    .modal .grid{grid-template-columns:1fr!important}
+    /* Filtros y controles se apilan */
+    .filtros-head{flex-direction:column;align-items:stretch}
+    .filtro-cond{flex-wrap:wrap}
+    .filtro-cond select,.filtro-cond input{width:100%;min-width:0}
+    /* Botones de pestañas y selectores envuelven */
+    .seg-tab-btn{padding:7px 10px!important;font-size:12px!important}
+  }
+  /* ===== Vista de TARJETAS en celular (≤560px) ===== */
+  /* Cada fila de la tabla de seguimiento se reorganiza como tarjeta apilada. */
+  @media(max-width:560px){
+    table.tabla-cards thead{display:none}
+    table.tabla-cards, table.tabla-cards tbody{display:block;width:100%}
+    table.tabla-cards tr.grupo-row{display:block;margin:14px 0 6px}
+    table.tabla-cards tr.grupo-row td{display:block;padding:6px 2px}
+    table.tabla-cards tr:not(.grupo-row):not(.hist-row){
+      display:block;border:1px solid var(--line);border-radius:12px;
+      margin:0 0 10px;padding:10px 12px;background:var(--card);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    table.tabla-cards tr:not(.grupo-row):not(.hist-row) td{
+      display:flex;justify-content:space-between;align-items:flex-start;gap:10px;
+      padding:5px 0;border:0;text-align:right;max-width:none!important}
+    /* Etiqueta del campo a la izquierda usando data-label */
+    table.tabla-cards tr:not(.grupo-row):not(.hist-row) td::before{
+      content:attr(data-label);font-weight:600;color:var(--mist);font-size:12px;
+      text-align:left;flex:0 0 42%;white-space:nowrap}
+    /* La primera celda (descripción) ocupa todo el ancho, sin etiqueta */
+    table.tabla-cards tr:not(.grupo-row):not(.hist-row) td.cards-main{
+      display:block;text-align:left;font-weight:600;margin-bottom:4px}
+    table.tabla-cards tr:not(.grupo-row):not(.hist-row) td.cards-main::before{content:none}
+    table.tabla-cards tr:not(.grupo-row):not(.hist-row) td.cards-acciones{justify-content:flex-end}
+    table.tabla-cards tr:not(.grupo-row):not(.hist-row) td.cards-acciones::before{content:none}
+    table.tabla-cards .hist-row td{padding:0}
+  }
+
   /* Modal */
   .modal-overlay{position:fixed;inset:0;background:rgba(16,22,29,.5);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
   .modal-overlay.hidden{display:none}
@@ -412,7 +454,7 @@
       <div id="filtrosLista"></div>
     </div>
 
-    <div class="card"><div style="padding:6px 4px"><table>
+    <div class="card"><div class="tabla-wrap" style="padding:6px 4px"><table class="tabla-cards">
       <thead><tr><th style="width:38px;text-align:center">#</th><th id="thSegPrimera">Riesgo</th><th>Proceso</th><th style="white-space:nowrap">Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>% avance</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
       <tbody id="tablaSeguimiento"><tr><td colspan="9" class="empty"><h3>Cargando…</h3></td></tr></tbody>
     </table></div></div>
@@ -483,7 +525,7 @@
       <h1>Reevaluación</h1>
       <p>Solo procede cuando el control está <strong>Certificado/Operativo</strong> y al menos una acción de respuesta está <strong>Culminada/Ejecutada</strong>. El resto permanece bloqueado hasta cumplir ambas condiciones.</p>
     </div>
-    <div class="card"><div style="padding:6px 4px"><table>
+    <div class="card"><div class="tabla-wrap" style="padding:6px 4px"><table>
       <thead><tr><th>Riesgo</th><th>Proceso</th><th>Nivel inherente</th><th>¿Procede?</th><th>Nivel residual</th><th></th></tr></thead>
       <tbody id="tablaReeval"><tr><td colspan="6" class="empty"><h3>Cargando…</h3></td></tr></tbody>
     </table></div></div>
@@ -1588,21 +1630,21 @@ async function renderSeguimiento() {
 
     const filaHTML = (f, num) => `
       <tr>
-        <td style="text-align:center;color:var(--mist);font-variant-numeric:tabular-nums">${num}</td>
-        <td style="max-width:280px">
+        <td data-label="#" style="text-align:center;color:var(--mist);font-variant-numeric:tabular-nums">${num}</td>
+        <td class="cards-main" data-label="Descripción" style="max-width:280px">
           ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>80?f.desc.slice(0,80)+'…':f.desc}</a>
         </td>
-        <td title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>36?f.proc.slice(0,36)+'…':f.proc}${f.desact?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
-        <td>${nivelBadge(f.nivel)}</td>
-        <td><strong>${f.nReportes}</strong></td>
-        <td id="estado-${f.id}" style="font-size:12px">${f.nReportes?'<span class="hint">…</span>':estadoPill('Pendiente')}</td>
-        <td id="avance-${f.id}" style="min-width:110px">${f.nReportes?'<span class="hint">…</span>':'<span class="hint">—</span>'}</td>
-        <td title="${(f.procedeTexto||'').replace(/"/g,'&quot;')}">${
+        <td data-label="Proceso" title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>36?f.proc.slice(0,36)+'…':f.proc}${f.desact?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
+        <td data-label="Nivel inh.">${nivelBadge(f.nivel)}</td>
+        <td data-label="Reportes"><strong>${f.nReportes}</strong></td>
+        <td data-label="Último estado" id="estado-${f.id}" style="font-size:12px">${f.nReportes?'<span class="hint">…</span>':estadoPill('Pendiente')}</td>
+        <td data-label="% avance" id="avance-${f.id}" style="min-width:110px">${f.nReportes?'<span class="hint">…</span>':'<span class="hint">—</span>'}</td>
+        <td data-label="¿Procede reev.?" title="${(f.procedeTexto||'').replace(/"/g,'&quot;')}">${
           f.procede
             ? '<span class="tag tag-proc">✓ Procede</span>'
             : '<span class="tag tag-noproc">No procede</span>'
         }</td>
-        <td style="text-align:right;white-space:nowrap">
+        <td class="cards-acciones" style="text-align:right;white-space:nowrap">
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
           <button class="icon-btn" title="Editar" onclick="editarRiesgo('${f.id}')">✏️</button>
           <button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
