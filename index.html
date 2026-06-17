@@ -1271,11 +1271,14 @@ function rutaProcesoDe(r){
 function nivel1De(r){
   const F = CONFIG.MATRIZ_FIELDS;
   const v = r.values || {};
-  // Si hay texto de proceso, tomar el segmento más específico de la ruta.
-  const txt = v[F.proceso_txt.id];
-  if (txt && txt !== 'Proceso') {
-    const segs = txt.split('›').map(s=>s.trim()).filter(Boolean);
-    return segs.length>=2 ? segs[Math.min(2,segs.length-1)] : segs[0] || 'Sin proceso';
+  // Leer la ruta de proceso por ID o por nombre "Proceso" (igual que la cascada).
+  const txt = [v[F.proceso_txt.id], v['Proceso']].find(x => x && x !== 'Proceso' && String(x).length > 3) || '';
+  if (txt) {
+    // Partir aceptando los separadores › o > (con o sin espacios).
+    const segs = String(txt).split(/\s*[›>]\s*/).map(s=>s.trim()).filter(Boolean);
+    // El nivel 1 es el 3.er segmento (Tipo › N0 › N1 › …). Si hay menos, tomar el más específico disponible.
+    if (segs.length>=3) return segs[2];
+    return segs[segs.length-1] || 'Sin proceso';
   }
   return leerRelacion(r, 'Procesos nivel 1', F.proceso_n1.id)
       || leerRelacion(r, 'Proceso nivel 1', F.proceso_n1.id)
