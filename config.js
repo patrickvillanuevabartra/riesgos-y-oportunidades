@@ -87,7 +87,9 @@ const CONFIG = {
     responsable_txt:         { id: "ayFSodvNDcMOorwCocW7jx", type: "string", col: "Responsable - string" },
     amenaza_txt:             { id: "cMWRZdJLjcPzT8WQpdNmox", type: "string", col: "Amenaza - string" },
     oportunidad_txt:         { id: "cgBSoSWODdRPRcJdazW7eO", type: "string", col: "Oportunidad relacionada" },
-    parte_txt:               { id: "cpWRGkWRfhAi8sW45VjHzi", type: "string", col: "Parte interesada " }
+    parte_txt:               { id: "cpWRGkWRfhAi8sW45VjHzi", type: "string", col: "Parte interesada " },
+    requisitos_txt:          { id: "bbB2XUWOvcMyoSsmogySov", type: "string", col: "Requisitos - texto" },
+    expectativas_txt:        { id: "afWQOyW7bap4JcNJJdGeyV", type: "string", col: "Expectativas - texto" }
   },
 
   // ---- Campos de la SUBTABLA Reporte de acciones (IDs reales verificados) ----
