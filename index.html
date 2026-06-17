@@ -167,6 +167,11 @@
   @media(max-width:760px){
     body{zoom:1}                              /* el zoom grande estorba en móvil */
     .wrap,main{padding-left:10px;padding-right:10px}
+    /* Header: logo arriba, menú abajo ocupando todo el ancho */
+    .bar{flex-direction:column;align-items:stretch;gap:10px;padding:12px 14px}
+    .logo{justify-content:flex-start}
+    nav{margin-left:0;width:100%;display:flex;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+    nav button{flex:1 0 auto;white-space:nowrap;font-size:13px;padding:9px 12px;text-align:center}
     /* Modales ocupan casi toda la pantalla y permiten scroll */
     .modal{max-width:96vw!important;width:96vw;max-height:92vh;margin:4vh auto;overflow-y:auto}
     .modal .grid{grid-template-columns:1fr!important}
@@ -1647,6 +1652,7 @@ async function renderSeguimiento() {
         <td class="cards-acciones" style="text-align:right;white-space:nowrap">
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
           <button class="icon-btn" title="Editar" onclick="editarRiesgo('${f.id}')">✏️</button>
+          <button class="icon-btn" title="Duplicar (crear una copia)" onclick="duplicarRiesgo('${f.id}')">📋</button>
           <button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
           <button class="icon-btn" title="Eliminar" onclick="eliminarRiesgo('${f.id}')">🗑️</button>
         </td>
@@ -2000,6 +2006,58 @@ function verDetalle(riesgoId){
   document.getElementById('modalSeg').classList.remove('hidden');
 }
 window.verDetalle = verDetalle;
+
+// === Duplicar / Clonar registro ===
+// Abre el formulario de Registrar precargado con los datos del original.
+// El usuario revisa, ajusta (típicamente el procedimiento) y guarda como nuevo.
+// NO copia el historial de reportes ni fechas; el nuevo registro nace limpio.
+function duplicarRiesgo(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  if(!r) return;
+  const v = r.values||{};
+  const F = CONFIG.MATRIZ_FIELDS;
+  const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+  const limpioTxt = (def)=> leerTexto(r, def, true);
+
+  // 1) Navegar a la vista Registrar
+  const btnReg = document.querySelector('nav button[data-view="registrar"]');
+  if(btnReg) btnReg.click();
+
+  // 2) Precargar tras un instante (para que la vista esté visible)
+  setTimeout(()=>{
+    const set = (id,val)=>{ const el=document.getElementById(id); if(el!=null && val!=null) el.value=val; };
+    // Identificación
+    set('f_fecha', fechaParaInput(cur('Fecha de evaluación')) || new Date().toISOString().slice(0,10));
+    const fuente = cur('Fuente de identificación del riesgo u oportunidad');
+    if(fuente){ set('f_fuente', fuente); if(typeof showOrigin==='function') showOrigin(fuente); }
+    set('f_actividad', cur('Actividad específica'));
+    // Tipo y descripciones
+    const tipoRO = cur('¿Riesgo u oportunidad?') || 'Riesgo';
+    set('f_tipo_ro', tipoRO); if(typeof showEval==='function') showEval(tipoRO);
+    set('f_riesgo_desc', cur('Riesgo'));
+    set('f_oport_desc', cur('Oportunidad - text'));
+    set('f_causas', cur('Causas'));
+    set('f_consec', cur('Consecuencias'));
+    // Evaluación inherente
+    set('f_prob_r_inh', cur('Probabilidad riesgo inherente'));
+    set('f_imp_r_inh', cur('Impacto riesgo inherente'));
+    set('f_prob_o_inh', cur('Probabilidad oportunidad inherente'));
+    set('f_imp_o_inh', cur('Impacto oportunidad inherente'));
+    // Controles / respuesta / responsable
+    set('f_existe_ctrl', cur('¿Existen controles?'));
+    set('f_control', cur('Control establecido'));
+    set('f_respuesta', cur('Respuesta al riesgo u oportunidad'));
+    set('f_medida', cur('Medida(s) de respuesta'));
+    // Recalcular vista previa de índice/nivel si la función existe
+    if(typeof calcIndice==='function') try{ calcIndice(); }catch(e){}
+    // Aviso al usuario
+    toast('Datos copiados. Revisa y AJUSTA el proceso/procedimiento antes de guardar. Se creará un registro NUEVO.');
+    // Llevar el foco al inicio del formulario
+    const cont = document.getElementById('view-registrar');
+    if(cont && cont.scrollIntoView) cont.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 150);
+}
+window.duplicarRiesgo = duplicarRiesgo;
 
 // === Eliminar riesgo (con confirmación) ===
 async function eliminarRiesgo(riesgoId){
