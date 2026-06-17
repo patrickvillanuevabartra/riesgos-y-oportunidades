@@ -1940,7 +1940,7 @@ function verDetalle(riesgoId){
     ['Fuente de identificación','Fuente de identificación del riesgo u oportunidad'],
     ['¿Riesgo u oportunidad?','¿Riesgo u oportunidad?'],
     ['Riesgo','Riesgo'],
-    ['Oportunidad','Oportunidad'],
+    ['Oportunidad','Oportunidad - text'],
     ['Causas','Causas'],
     ['Consecuencias','Consecuencias'],
     ['Ruta del proceso','__proceso__'],
@@ -1977,9 +1977,25 @@ function verDetalle(riesgoId){
     return `<div class="det-row"><div class="det-k">${etq}</div><div class="det-v">${val}</div></div>`;
   }).filter(Boolean).join('');
 
-  const desc=limpio('Riesgo')||limpio('Oportunidad')||'(sin descripción)';
+  // Pie con metadatos automáticos de QuintaDB (creación, actualización, autor).
+  const fmtFecha = s => {
+    if(!s) return '';
+    // QuintaDB entrega "DD-MM-YYYY HH:MM:SS"; lo dejamos legible.
+    return String(s).replace(/(\d{2})-(\d{2})-(\d{4})\s*(.*)/, '$1/$2/$3 $4').trim();
+  };
+  const metaItems = [];
+  if(r.created_at) metaItems.push(`<span><strong>Creado:</strong> ${fmtFecha(r.created_at)}</span>`);
+  if(r.updated_at) metaItems.push(`<span><strong>Última actualización:</strong> ${fmtFecha(r.updated_at)}</span>`);
+  // El "Autor" se omite por ahora: como el aplicativo usa una sola cuenta (API key),
+  // todos los registros mostrarían el mismo autor, lo que sería engañoso.
+  // Se reactivará cuando exista login/trazabilidad real por usuario.
+  const metaHTML = metaItems.length
+    ? `<div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mist)">${metaItems.join('')}</div>`
+    : '';
+
+  const desc=limpio('Riesgo')||leerTexto(r, F2.oportunidad_desc, true)||'(sin descripción)';
   document.getElementById('modalTitulo').textContent = desc.length>80?desc.slice(0,80)+'…':desc;
-  document.getElementById('modalHistorial').innerHTML = html || '<p class="hint">Sin datos.</p>';
+  document.getElementById('modalHistorial').innerHTML = (html || '<p class="hint">Sin datos.</p>') + metaHTML;
   // Ocultar el formulario "añadir reporte" del modal viejo (en detalle no aplica)
   document.getElementById('modalSeg').classList.remove('hidden');
 }
