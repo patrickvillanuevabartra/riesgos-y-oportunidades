@@ -308,7 +308,7 @@
           <div class="field origin contexto hidden"><label>Oportunidad(es)</label><div id="f_oportunidad_rel" class="multiselect"></div></div>
 
           <!-- Origen: Partes interesadas -->
-          <div class="field origin partes hidden"><label>Parte interesada</label><select id="f_parte"></select></div>
+          <div class="field origin partes hidden"><label>Parte interesada</label><select id="f_parte" onchange="autocompletarParte('f_parte','f_requisitos','f_expectativas')"></select></div>
           <div class="field origin partes hidden"><label>Requisitos principales</label><div class="readonly-pill" id="f_requisitos">Se autocompleta según la parte interesada</div></div>
           <div class="field origin partes hidden full"><label>Expectativas</label><div class="readonly-pill" id="f_expectativas">Se autocompleta según la parte interesada</div></div>
 
@@ -684,6 +684,49 @@ async function loadMaestra(entityKey, labelCol) {
   return opts;
 }
 
+// Mapa nombre-de-parte → { requisitos, expectativas } leído de la tabla PARTES.
+// Permite autocompletar esos dos campos al elegir una parte interesada.
+let MAPA_PARTES = null;
+async function cargarMapaPartes(){
+  if (MAPA_PARTES) return MAPA_PARTES;
+  MAPA_PARTES = {};
+  try {
+    const data = await API.records(CONFIG.ENTITIES.PARTES);
+    (data.records||[]).forEach(r=>{
+      const v = r.values||{};
+      const nombre = v['Parte interesada'];
+      if (!nombre || nombre === 'Parte interesada') return;
+      const req = v['Requisitos principales (necesidades)'];
+      const exp = v['Expectativas'];
+      const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x)) && x!=='Requisitos principales (necesidades)' && x!=='Expectativas') ? String(x) : '';
+      MAPA_PARTES[String(nombre).replace(/\s+/g,' ').trim()] = { requisitos: limpio(req), expectativas: limpio(exp) };
+    });
+  } catch(e){ /* si falla, los campos quedan vacíos */ }
+  return MAPA_PARTES;
+}
+window.cargarMapaPartes = cargarMapaPartes;
+
+// Rellena los pills/campos de requisitos y expectativas según la parte elegida.
+// selId = id del <select> de parte; reqId/expId = ids de los contenedores a llenar.
+async function autocompletarParte(selId, reqId, expId){
+  const sel = document.getElementById(selId);
+  const elReq = document.getElementById(reqId);
+  const elExp = document.getElementById(expId);
+  const nombre = sel && sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].text.trim() : '';
+  const placeholder = 'Se autocompleta según la parte interesada';
+  if (!nombre || (sel.selectedOptions[0] && sel.selectedOptions[0].value==='')) {
+    if (elReq) elReq.textContent = placeholder;
+    if (elExp) elExp.textContent = placeholder;
+    return;
+  }
+  const mapa = await cargarMapaPartes();
+  const key = nombre.replace(/\s+/g,' ').trim();
+  const info = mapa[key] || {};
+  if (elReq) elReq.textContent = info.requisitos || '(sin requisitos registrados)';
+  if (elExp) elExp.textContent = info.expectativas || '(sin expectativas registradas)';
+}
+window.autocompletarParte = autocompletarParte;
+
 // Traduce el valor de un campo de relación a su nombre legible.
 // QuintaDB devuelve la relación de dos formas: por NOMBRE de columna (a veces
 // null) y por field_id (devuelve el ID del registro relacionado). Esta función
@@ -882,7 +925,18 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
     if (amsNoms.length) campos[F.amenaza_txt.id] = amsNoms.join('; ');
     if (opsNoms.length) campos[F.oportunidad_txt.id] = opsNoms.join('; ');
   }
-  if (fuente === 'Partes interesadas') put(F.parte_txt, vtxt('f_parte'));
+  if (fuente === 'Partes interesadas') {
+    put(F.parte_txt, vtxt('f_parte'));
+    // Guardar también requisitos y expectativas autocompletados (texto, solo lectura).
+    const elReq = document.getElementById('f_requisitos');
+    const elExp = document.getElementById('f_expectativas');
+    const phReq = 'Se autocompleta según la parte interesada';
+    const txtReq = elReq ? elReq.textContent.trim() : '';
+    const txtExp = elExp ? elExp.textContent.trim() : '';
+    const valido = t => t && t!==phReq && t!=='(sin requisitos registrados)' && t!=='(sin expectativas registradas)';
+    if (valido(txtReq)) put(F.requisitos_txt, txtReq);
+    if (valido(txtExp)) put(F.expectativas_txt, txtExp);
+  }
   if (fuente === 'Proceso') {
     // Construir la ruta del proceso como texto: "Tipo › N0 › N1 › N2 › N3 › Proc"
     const ruta = [v('f_tipo'), v('f_n0'), v('f_n1'), v('f_n2'), v('f_n3'), v('f_proc')]
@@ -1919,7 +1973,9 @@ function editarRiesgo(riesgoId){
       <div class="field origin-ed contexto-ed hidden"><label>Amenaza(s)</label><select id="ed_amenaza"></select></div>
       <div class="field origin-ed contexto-ed hidden"><label>Oportunidad(es) relacionada(s)</label><select id="ed_oport_rel"></select></div>
 
-      <div class="field origin-ed partes-ed hidden"><label>Parte interesada</label><select id="ed_parte"></select></div>
+      <div class="field origin-ed partes-ed hidden"><label>Parte interesada</label><select id="ed_parte" onchange="autocompletarParte('ed_parte','ed_requisitos','ed_expectativas')"></select></div>
+      <div class="field origin-ed partes-ed hidden"><label>Requisitos principales</label><div class="readonly-pill" id="ed_requisitos">Se autocompleta según la parte interesada</div></div>
+      <div class="field origin-ed partes-ed hidden full"><label>Expectativas</label><div class="readonly-pill" id="ed_expectativas">Se autocompleta según la parte interesada</div></div>
 
       <div class="field origin-ed proceso-ed hidden full"><label>Proceso actual (referencia)</label><div class="readonly-pill" id="ed_proceso_actual">—</div></div>
       <div class="field origin-ed proceso-ed hidden"><label>Tipo de proceso</label><select id="ed_tipo"></select></div>
@@ -2013,6 +2069,7 @@ async function cargarRelEdit(v){
     fillById('ed_amenaza', ams, txtO(F.amenaza_txt, leerRelacion(r,'Amenaza',F.amenaza.id)));
     fillById('ed_oport_rel', ops, txtO(F.oportunidad_txt, leerRelacion(r,'Oportunidad relacionada',F.oportunidad_rel.id)));
     fillById('ed_parte', partes, txtO(F.parte_txt, leerRelacion(r,'Parte interesada',F.parte_interesada.id)));
+    autocompletarParte('ed_parte','ed_requisitos','ed_expectativas');
     fillById('ed_responsable', resp, txtO(F.responsable_txt, leerRelacion(r,'Responsable',F.responsable.id)));
     // Cascada de procesos con preselección
     await initCascadaEdit(v);
@@ -2129,6 +2186,15 @@ async function guardarEdit(){
     if(gtxt('ed_oport_rel')) set(F.oportunidad_txt, gtxt('ed_oport_rel'));
   } else if(fuenteSel==='Partes interesadas'){
     if(gtxt('ed_parte')) set(F.parte_txt, gtxt('ed_parte'));
+    // Guardar requisitos y expectativas autocompletados (texto, solo lectura).
+    const elReq = document.getElementById('ed_requisitos');
+    const elExp = document.getElementById('ed_expectativas');
+    const phReq = 'Se autocompleta según la parte interesada';
+    const txtReq = elReq ? elReq.textContent.trim() : '';
+    const txtExp = elExp ? elExp.textContent.trim() : '';
+    const valido = t => t && t!==phReq && t!=='(sin requisitos registrados)' && t!=='(sin expectativas registradas)';
+    if (valido(txtReq)) set(F.requisitos_txt, txtReq);
+    if (valido(txtExp)) set(F.expectativas_txt, txtExp);
   } else if(fuenteSel==='Proceso'){
     // Ruta del proceso como texto: "Tipo › N0 › N1 › N2 › N3 › Proc"
     const ruta = [g('ed_tipo'),g('ed_n0'),g('ed_n1'),g('ed_n2'),g('ed_n3'),g('ed_proc')]
