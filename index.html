@@ -413,8 +413,8 @@
     </div>
 
     <div class="card"><div style="padding:6px 4px"><table>
-      <thead><tr><th id="thSegPrimera">Riesgo</th><th>Proceso</th><th style="white-space:nowrap">Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>% avance</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
-      <tbody id="tablaSeguimiento"><tr><td colspan="8" class="empty"><h3>Cargando…</h3></td></tr></tbody>
+      <thead><tr><th style="width:38px;text-align:center">#</th><th id="thSegPrimera">Riesgo</th><th>Proceso</th><th style="white-space:nowrap">Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>% avance</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
+      <tbody id="tablaSeguimiento"><tr><td colspan="9" class="empty"><h3>Cargando…</h3></td></tr></tbody>
     </table></div></div>
   </section>
 
@@ -1551,7 +1551,7 @@ async function renderSeguimiento() {
     // Encabezado de la primera columna según el tipo seleccionado
     const thP = document.getElementById('thSegPrimera');
     if(thP) thP.textContent = SEG_TIPO==='oportunidades' ? 'Oportunidad' : (SEG_TIPO==='riesgos' ? 'Riesgo' : 'Riesgo / Oportunidad');
-    if(!recs.length){ tb.innerHTML='<tr><td colspan="8"><div class="empty"><h3>Sin registros</h3></div></td></tr>'; return; }
+    if(!recs.length){ tb.innerHTML='<tr><td colspan="9"><div class="empty"><h3>Sin registros</h3></div></td></tr>'; return; }
 
     const filtro = (document.getElementById('segBuscar').value||'').toLowerCase();
     const filas = recs
@@ -1586,8 +1586,9 @@ async function renderSeguimiento() {
       ? (f.op ? '<span class="tag tag-proc" style="margin-right:6px">Oportunidad</span>' : '<span class="tag tag-noproc" style="margin-right:6px">Riesgo</span>')
       : '';
 
-    const filaHTML = f => `
+    const filaHTML = (f, num) => `
       <tr>
+        <td style="text-align:center;color:var(--mist);font-variant-numeric:tabular-nums">${num}</td>
         <td style="max-width:280px">
           ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>80?f.desc.slice(0,80)+'…':f.desc}</a>
         </td>
@@ -1608,23 +1609,24 @@ async function renderSeguimiento() {
           <button class="icon-btn" title="Eliminar" onclick="eliminarRiesgo('${f.id}')">🗑️</button>
         </td>
       </tr>
-      <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="8" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
+      <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="9" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
 
     const palabra = SEG_TIPO==='oportunidades' ? 'oportunidad' : (SEG_TIPO==='riesgos' ? 'riesgo' : 'registro');
+    let _n = 0; // contador continuo a lo largo de todos los grupos
     tb.innerHTML = oficinasOrdenadas.length ? oficinasOrdenadas.map(of => `
-      <tr class="grupo-row"><td colspan="8">
+      <tr class="grupo-row"><td colspan="9">
         <span class="grupo-nombre">${of}</span>
         <span class="grupo-count">${grupos[of].length} ${palabra}${grupos[of].length!==1?'s':''}</span>
       </td></tr>
-      ${grupos[of].map(filaHTML).join('')}
-    `).join('') : '<tr><td colspan="8"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
+      ${grupos[of].map(f => filaHTML(f, ++_n)).join('')}
+    `).join('') : '<tr><td colspan="9"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
 
     setConn(true);
 
     // Cargar "último estado" de forma diferida (solo riesgos con reportes)
     cargarUltimosEstados(filas.filter(f=>f.subIds.length));
   } catch(e){ setConn(false,e.message);
-    tb.innerHTML=`<tr><td colspan="8"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
+    tb.innerHTML=`<tr><td colspan="9"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
 }
 
 // Lee el último reporte de cada riesgo con reportes y muestra su estado en la columna.
