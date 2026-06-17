@@ -542,14 +542,19 @@ const API = {
         partes.push('values[' + encodeURIComponent(fid) + ']=' + encodeURIComponent(val));
       }
     });
-    const bodyStr = partes.join('&');
     const method = recordId ? 'PUT' : 'POST';
-    // Al ACTUALIZAR: /dtypes/{recordId}.json
-    // Al CREAR: hay que indicar la TABLA → /dtypes/entity/{entityId}.json
     const ent = entityId || CONFIG.ENTITIES.MATRIZ;
-    const path = recordId
-      ? `/apps/${CONFIG.APP_ID}/dtypes/${recordId}.json`
-      : `/apps/${CONFIG.APP_ID}/dtypes/entity/${ent}.json`;
+    let path, bodyStr;
+    if (recordId) {
+      // ACTUALIZAR: PUT a /dtypes/{recordId}.json
+      path = `/apps/${CONFIG.APP_ID}/dtypes/${recordId}.json`;
+      bodyStr = partes.join('&');
+    } else {
+      // CREAR: POST a /dtypes.json con entity_id DENTRO del body (método verificado
+      // que funciona en el otro aplicativo). La ruta /dtypes/entity/{id}.json NO crea.
+      path = `/apps/${CONFIG.APP_ID}/dtypes.json`;
+      bodyStr = 'entity_id=' + encodeURIComponent(ent) + (partes.length ? '&' + partes.join('&') : '');
+    }
     return this.call(path, method, bodyStr, 'application/x-www-form-urlencoded');
   }
 };
