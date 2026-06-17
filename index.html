@@ -459,6 +459,7 @@
       <div id="filtrosLista"></div>
     </div>
 
+    <div id="segTotales" style="margin-bottom:12px"></div>
     <div class="card"><div class="tabla-wrap" style="padding:6px 4px"><table class="tabla-cards">
       <thead><tr><th style="width:38px;text-align:center">#</th><th id="thSegPrimera">Riesgo</th><th>Proceso</th><th style="white-space:nowrap">Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>% avance</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
       <tbody id="tablaSeguimiento"><tr><td colspan="9" class="empty"><h3>Cargando…</h3></td></tr></tbody>
@@ -1620,6 +1621,26 @@ async function renderSeguimiento() {
     // Filtro por el selector Todos/Riesgos/Oportunidades
     .filter(f => SEG_TIPO==='todos' || (SEG_TIPO==='oportunidades'?f.op:!f.op))
     .filter(f => !filtro || f.desc.toLowerCase().includes(filtro) || f.proc.toLowerCase().includes(filtro) || f.oficina.toLowerCase().includes(filtro));
+
+    // ── Etiqueta de totales (según la pestaña y el estado activo/archivado) ──
+    const nR = filas.filter(f=>!f.op).length;
+    const nO = filas.filter(f=>f.op).length;
+    const nT = filas.length;
+    const sufArch = SEG_VER_ARCHIVADOS ? ' (archivados)' : '';
+    const chip = (txt, val, color) => `<span style="display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--ink)"><span style="color:${color};font-size:16px">●</span>${txt}: ${val}</span>`;
+    let totalesHTML = '';
+    if(SEG_TIPO==='riesgos'){
+      totalesHTML = chip('Riesgos registrados'+sufArch, nR, 'var(--n3)');
+    } else if(SEG_TIPO==='oportunidades'){
+      totalesHTML = chip('Oportunidades registradas'+sufArch, nO, 'var(--n1)');
+    } else {
+      totalesHTML =
+        chip('Total'+sufArch, nT, 'var(--brand)') +
+        ' ' + chip('Riesgos', nR, 'var(--n3)') +
+        ' ' + chip('Oportunidades', nO, 'var(--n1)');
+    }
+    const cntCont = document.getElementById('segTotales');
+    if(cntCont) cntCont.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${totalesHTML}</div>`;
 
     // Agrupar por oficina; dentro de cada grupo ordenar por nivel inherente (mayor arriba)
     const grupos = {};
