@@ -89,7 +89,8 @@ const CONFIG = {
     oportunidad_txt:         { id: "cgBSoSWODdRPRcJdazW7eO", type: "string", col: "Oportunidad relacionada" },
     parte_txt:               { id: "cpWRGkWRfhAi8sW45VjHzi", type: "string", col: "Parte interesada " },
     requisitos_txt:          { id: "bbB2XUWOvcMyoSsmogySov", type: "string", col: "Requisitos - texto" },
-    expectativas_txt:        { id: "afWQOyW7bap4JcNJJdGeyV", type: "string", col: "Expectativas - texto" }
+    expectativas_txt:        { id: "afWQOyW7bap4JcNJJdGeyV", type: "string", col: "Expectativas - texto" },
+    estado_registro:         { id: "ddK1hdOc5dmi4nmMZdSCop", type: "select", options: ["Activo","Archivado"], col: "Estado del registro" }
   },
 
   // ---- Campos de la SUBTABLA Reporte de acciones (IDs reales verificados) ----
