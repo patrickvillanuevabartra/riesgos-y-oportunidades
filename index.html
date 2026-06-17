@@ -392,6 +392,7 @@
         <button class="seg-tab-btn" data-segtipo="riesgos" onclick="setSegTipo('riesgos')" style="border:0;background:transparent;color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer">Riesgos</button>
         <button class="seg-tab-btn" data-segtipo="oportunidades" onclick="setSegTipo('oportunidades')" style="border:0;background:transparent;color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer">Oportunidades</button>
       </div>
+      <button id="btnVerArchivados" onclick="toggleArchivados()" style="border:1px solid var(--line);background:var(--card);color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer" title="Mostrar u ocultar los registros archivados">🗄️ Ver archivados</button>
     </div>
 
     <!-- Filtros avanzados -->
@@ -1033,6 +1034,7 @@ async function renderDashboard() {
     const fechaReg = r => fechaParaInput((r.values||{})['Fecha de evaluación']);
     // ── Aplicar los filtros ──
     const recs = recsAll.filter(r=>{
+      if(esArchivado(r)) return false; // los archivados no cuentan en el tablero
       if(fResp && oficinaDe(r)!==fResp) return false;
       if(fProc && nivel1De(r)!==fProc) return false;
       if(fDesde){ const f=fechaReg(r); if(!f || f<fDesde) return false; }
@@ -1224,6 +1226,7 @@ function emptyCard(t,m){ return `<div class="empty" style="grid-column:1/-1"><h3
 const SUBFORM_FIELD_ID = CONFIG.MATRIZ_FIELDS.reporte_acciones.id; // bfyfu...
 let SEG_RIESGO_ACTUAL = null; // {id, subIds:[]}
 let SEG_TIPO = 'todos'; // 'todos' | 'riesgos' | 'oportunidades'
+let SEG_VER_ARCHIVADOS = false; // false = solo activos; true = solo archivados
 function setSegTipo(t){
   SEG_TIPO = t;
   // Resaltar el botón activo
@@ -1234,7 +1237,18 @@ function setSegTipo(t){
   });
   renderSeguimiento();
 }
+function toggleArchivados(){
+  SEG_VER_ARCHIVADOS = !SEG_VER_ARCHIVADOS;
+  const b = document.getElementById('btnVerArchivados');
+  if(b){
+    b.style.background = SEG_VER_ARCHIVADOS ? 'var(--brand)' : 'var(--card)';
+    b.style.color = SEG_VER_ARCHIVADOS ? '#fff' : 'var(--slate)';
+    b.textContent = SEG_VER_ARCHIVADOS ? '🗄️ Viendo archivados' : '🗄️ Ver archivados';
+  }
+  renderSeguimiento();
+}
 window.setSegTipo = setSegTipo;
+window.toggleArchivados = toggleArchivados;
 
 // Devuelve el proceso MÁS ESPECÍFICO que tenga el riesgo (n2 → n1 → n0 → tipo).
 // Lee por nombre de columna; ignora valores que sean el propio nombre del campo.
@@ -1407,6 +1421,13 @@ function esOportunidad(r){
   return (t && t!=='¿Riesgo u oportunidad?') ? (String(t).trim()==='Oportunidad') : false;
 }
 
+// ¿El registro está ARCHIVADO? (campo "Estado del registro" = "Archivado")
+function esArchivado(r){
+  const v=r.values||{};
+  const e = v['Estado del registro'];
+  return (e && e!=='Estado del registro') ? (String(e).trim()==='Archivado') : false;
+}
+
 // Nivel de una OPORTUNIDAD. Su impacto va de 1-3 y la probabilidad de 1-4,
 // así que el índice va de 1 a 12. Se mapea a 4 niveles proporcionalmente:
 //   1-3 Bajo · 4-6 Medio · 7-9 Alto · 10-12 Muy alto.
@@ -1533,7 +1554,10 @@ async function renderSeguimiento() {
     if(!recs.length){ tb.innerHTML='<tr><td colspan="8"><div class="empty"><h3>Sin registros</h3></div></td></tr>'; return; }
 
     const filtro = (document.getElementById('segBuscar').value||'').toLowerCase();
-    const filas = recs.filter(pasaFiltros).map(r=>{
+    const filas = recs
+      // Filtro por estado: por defecto solo Activos; con el toggle, solo Archivados.
+      .filter(r => SEG_VER_ARCHIVADOS ? esArchivado(r) : !esArchivado(r))
+      .filter(pasaFiltros).map(r=>{
       const op = esOportunidad(r);
       const desc = descripcionDe(r);
       const proc=rutaProcesoDe(r) || '—';
@@ -1543,7 +1567,8 @@ async function renderSeguimiento() {
       // Nivel según tipo: riesgo usa su escala (1-4 impacto), oportunidad la suya (1-3 impacto).
       const ni = op ? nivelOportInherenteDe(r) : nivelInherenteDe(r);
       const desact=segmentoDesactualizado(r);
-      return {id:r.id, op, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact};
+      const arch=esArchivado(r);
+      return {id:r.id, op, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch};
     })
     // Filtro por el selector Todos/Riesgos/Oportunidades
     .filter(f => SEG_TIPO==='todos' || (SEG_TIPO==='oportunidades'?f.op:!f.op))
@@ -1579,6 +1604,7 @@ async function renderSeguimiento() {
         <td style="text-align:right;white-space:nowrap">
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
           <button class="icon-btn" title="Editar" onclick="editarRiesgo('${f.id}')">✏️</button>
+          <button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
           <button class="icon-btn" title="Eliminar" onclick="eliminarRiesgo('${f.id}')">🗑️</button>
         </td>
       </tr>
@@ -1931,6 +1957,28 @@ async function eliminarRiesgo(riesgoId){
 }
 window.eliminarRiesgo = eliminarRiesgo;
 
+// === Archivar / Desarchivar registro ===
+// Cambia "Estado del registro" entre Activo y Archivado (PUT, no borra nada).
+async function archivarRiesgo(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  if(!r) return;
+  const F=CONFIG.MATRIZ_FIELDS;
+  const archivar = !esArchivado(r); // si está activo → archivar; si archivado → reactivar
+  const desc = descripcionDe(r);
+  const corto = desc.length>60?desc.slice(0,60)+'…':desc;
+  const accion = archivar ? 'archivar' : 'reactivar';
+  const nota = archivar
+    ? 'Saldrá de las vistas activas (tablero y seguimiento) pero se conserva su historial. Podrás verlo en el filtro "Archivados".'
+    : 'Volverá a las vistas activas (tablero y seguimiento).';
+  if(!confirm('¿Deseas '+accion+' este registro?\n\n"'+corto+'"\n\n'+nota)) return;
+  try {
+    await API.saveForm(riesgoId, { [F.estado_registro.id]: archivar ? 'Archivado' : 'Activo' });
+    toast(archivar ? 'Registro archivado.' : 'Registro reactivado.');
+    STATE.matriz=[]; await loadMatriz(true); renderSeguimiento(); renderDashboard();
+  } catch(e){ toast('Error al '+accion+': '+e.message, true); }
+}
+window.archivarRiesgo = archivarRiesgo;
+
 // === Editar riesgo (campos principales editables) ===
 function editarRiesgo(riesgoId){
   const r = STATE.matriz.find(x=>x.id===riesgoId);
@@ -2256,7 +2304,7 @@ function genId22(){
 async function renderReeval() {
   const tb = document.getElementById('tablaReeval');
   try {
-    const recs = await loadMatriz();
+    const recs = (await loadMatriz()).filter(r=>!esArchivado(r));
     await precargarMaestrasProceso(); // garantizar diccionario id→nombre
     const F = CONFIG.MATRIZ_FIELDS;
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
