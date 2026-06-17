@@ -247,13 +247,34 @@
       <p>Estado consolidado de la matriz: cuánto se ha reducido el riesgo tras el tratamiento, distribución por nivel y avance de las medidas de respuesta.</p>
     </div>
     <div class="kpis" id="kpis"></div>
+
+    <!-- Filtros del tablero (afectan a los mapas de calor) -->
+    <div class="filtros-card" style="margin-bottom:20px">
+      <div class="filtros-head" style="margin-bottom:0">
+        <span>Filtrar mapas de calor</span>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <select id="dashFiltroResp" onchange="renderDashboard()" style="padding:6px 9px;font-size:13px;border:1px solid var(--line);border-radius:8px;width:auto;max-width:220px">
+            <option value="">Todas las oficinas</option>
+          </select>
+          <select id="dashFiltroProc" onchange="renderDashboard()" style="padding:6px 9px;font-size:13px;border:1px solid var(--line);border-radius:8px;width:auto;max-width:220px">
+            <option value="">Todos los procesos</option>
+          </select>
+          <label style="font-size:12px;color:var(--mist)">Desde <input type="date" id="dashFiltroDesde" onchange="renderDashboard()" style="padding:5px 7px;font-size:13px;width:auto"></label>
+          <label style="font-size:12px;color:var(--mist)">Hasta <input type="date" id="dashFiltroHasta" onchange="renderDashboard()" style="padding:5px 7px;font-size:13px;width:auto"></label>
+          <button class="btn btn-ghost" style="padding:6px 12px;font-size:13px" onclick="limpiarFiltrosDash()">Limpiar</button>
+        </div>
+      </div>
+    </div>
+
     <div class="dash-grid">
       <div class="panel"><h3>Mapa de calor · riesgo inherente</h3><div id="heatmap"></div></div>
       <div class="panel"><h3>Mapa de calor · riesgo residual</h3><div id="heatmapRes"></div></div>
+      <div class="panel"><h3>Mapa de calor · oportunidad inherente</h3><div id="heatmapOp"></div></div>
+      <div class="panel"><h3>Mapa de calor · oportunidad residual</h3><div id="heatmapOpRes"></div></div>
       <div class="panel"><h3>Distribución por nivel · inherente vs. residual</h3><div id="distNiveles"></div></div>
       <div class="panel"><h3>Avance de medidas de respuesta</h3><div id="estadoMedidas"></div></div>
-      <div class="panel"><h3>Riesgos por proceso (nivel 1)</h3><div id="porProceso"></div></div>
-      <div class="panel"><h3>Riesgos por oficina responsable</h3><div id="porOficina"></div></div>
+      <div class="panel"><h3>Registros por proceso (nivel 1)</h3><div id="porProceso"></div></div>
+      <div class="panel"><h3>Registros por oficina responsable</h3><div id="porOficina"></div></div>
     </div>
   </section>
 
@@ -918,27 +939,68 @@ async function loadMatriz(forzar) {
   return STATE.matriz;
 }
 
+// Puebla los selects de filtro del tablero (oficinas y procesos) una sola vez.
+let _dashFiltrosPoblados = false;
+function poblarFiltrosDash(recs){
+  if(_dashFiltrosPoblados) return;
+  const selResp = document.getElementById('dashFiltroResp');
+  const selProc = document.getElementById('dashFiltroProc');
+  if(!selResp || !selProc) return;
+  const oficinas = [...new Set(recs.map(r=>oficinaDe(r)).filter(x=>x && x!=='Sin oficina asignada'))].sort();
+  const procesos = [...new Set(recs.map(r=>nivel1De(r)).filter(x=>x && x!=='Sin proceso'))].sort();
+  selResp.innerHTML = '<option value="">Todas las oficinas</option>' + oficinas.map(o=>`<option value="${o.replace(/"/g,'&quot;')}">${o}</option>`).join('');
+  selProc.innerHTML = '<option value="">Todos los procesos</option>' + procesos.map(p=>`<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`).join('');
+  _dashFiltrosPoblados = true;
+}
+function limpiarFiltrosDash(){
+  ['dashFiltroResp','dashFiltroProc','dashFiltroDesde','dashFiltroHasta'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  renderDashboard();
+}
+window.limpiarFiltrosDash = limpiarFiltrosDash;
+
 async function renderDashboard() {
   try {
-    const recs = await loadMatriz();
+    const recsAll = await loadMatriz();
     await precargarMaestrasProceso(); // garantizar diccionario id→nombre
     const F = CONFIG.MATRIZ_FIELDS;
     // helper: lee por nombre de columna (name_value=1) o por id
     const get = (r, def, nombre) => (r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
 
+    // ── Poblar los selects de filtro (oficinas y procesos) una sola vez ──
+    poblarFiltrosDash(recsAll);
+    // ── Leer los filtros activos del tablero ──
+    const fResp  = (document.getElementById('dashFiltroResp')||{}).value || '';
+    const fProc  = (document.getElementById('dashFiltroProc')||{}).value || '';
+    const fDesde = (document.getElementById('dashFiltroDesde')||{}).value || '';
+    const fHasta = (document.getElementById('dashFiltroHasta')||{}).value || '';
+    // Fecha de evaluación de un registro como yyyy-mm-dd (para comparar rango)
+    const fechaReg = r => fechaParaInput((r.values||{})['Fecha de evaluación']);
+    // ── Aplicar los filtros ──
+    const recs = recsAll.filter(r=>{
+      if(fResp && oficinaDe(r)!==fResp) return false;
+      if(fProc && nivel1De(r)!==fProc) return false;
+      if(fDesde){ const f=fechaReg(r); if(!f || f<fDesde) return false; }
+      if(fHasta){ const f=fechaReg(r); if(!f || f>fHasta) return false; }
+      return true;
+    });
+
     let total=recs.length, conResidual=0, sumInh=0, sumRes=0, bajaron=0;
     let numRiesgos=0, numOportunidades=0; // conteo separado
     const distInh={1:0,2:0,3:0,4:0}, distRes={1:0,2:0,3:0,4:0};
-    const heat={}; // "p-i" -> count
+    const heat={}; // "p-i" -> count  (riesgo)
     const heatRes={};
+    const heatOp={}; // oportunidad inherente
+    const heatOpRes={}; // oportunidad residual
     const porProc={};
     const porOfi={};
 
     recs.forEach(r=>{
       const esOp = esOportunidad(r);
       if(esOp) numOportunidades++; else numRiesgos++;
-      // Los gráficos de nivel/mapa de calor de RIESGO solo consideran riesgos.
       if(!esOp){
+        // ── RIESGO ──
         const idxInh = num(get(r,F.indice_riesgo_inh,'Índice de prioridad riesgo inherente'))
                     || num(get(r,F.prob_riesgo_inh,'Probabilidad riesgo inherente'))*num(get(r,F.imp_riesgo_inh,'Impacto riesgo inherente'));
         const idxRes = num(get(r,F.indice_riesgo_res,'Índice de prioridad riesgo residual'));
@@ -950,6 +1012,13 @@ async function renderDashboard() {
         if(p&&i){ const k=p+'-'+i; heat[k]=(heat[k]||0)+1; }
         const pr=num(get(r,F.prob_riesgo_res,'Probabilidad riesgo residual')), ir=num(get(r,F.imp_riesgo_res,'Impacto riesgo residual'));
         if(pr&&ir){ const k=pr+'-'+ir; heatRes[k]=(heatRes[k]||0)+1; }
+      } else {
+        // ── OPORTUNIDAD (impacto 1-3) ──
+        const v=r.values||{};
+        const po=num(v['Probabilidad oportunidad inherente']), io=num(v['Impacto oportunidad inherente']);
+        if(po&&io){ const k=po+'-'+io; heatOp[k]=(heatOp[k]||0)+1; }
+        const por=num(v['Probabilidad oportunidad residual']), ior=num(v['Impacto oportunidad residual']);
+        if(por&&ior){ const k=por+'-'+ior; heatOpRes[k]=(heatOpRes[k]||0)+1; }
       }
       // Proceso y oficina cuentan todos (riesgos y oportunidades).
       const proc=nivel1De(r);
@@ -1016,6 +1085,26 @@ async function renderDashboard() {
       '<p class="heat-sub">Evaluación residual (tras tratamiento)</p>' +
       (totalRes ? construirHeatmap(heatRes) + leyenda
                 : '<p class="hint" style="padding:20px 0">Aún no hay riesgos reevaluados. Aparecerán aquí conforme registres reevaluaciones.</p>');
+
+    // Mapa de calor de OPORTUNIDAD: probabilidad 1-4 × impacto 1-3.
+    // El nivel usa nivelOportDe (escala 1-12 → 4 niveles).
+    function construirHeatmapOport(datos){
+      let hm='<div class="heat-grid"><div class="heat-ylabel">Probabilidad →</div><div class="matrix" style="grid-template-columns:auto repeat(3,1fr)"><div class="axis"></div>';
+      for(let i=1;i<=3;i++) hm+=`<div class="axis">I${i}</div>`;
+      for(let p=4;p>=1;p--){ hm+=`<div class="axis">P${p}</div>`;
+        for(let i=1;i<=3;i++){ const idx=p*i,n=nivelOportDe(idx),c=datos[p+'-'+i]||'';
+          hm+=`<div class="cell" style="background:${NIVEL_COLORS[n]};opacity:${c?1:.25}">${c}</div>`; } }
+      hm+='</div></div><div class="heat-xlabel" style="padding-left:30px">Impacto →</div>';
+      return hm;
+    }
+    const totalOp = Object.values(heatOp).reduce((a,b)=>a+b,0);
+    const totalOpRes = Object.values(heatOpRes).reduce((a,b)=>a+b,0);
+    document.getElementById('heatmapOp').innerHTML = totalOp
+      ? '<p class="heat-sub">Oportunidad inherente (impacto 1-3)</p>' + construirHeatmapOport(heatOp) + leyenda
+      : '<p class="hint" style="padding:20px 0">Aún no hay oportunidades evaluadas. Aparecerán aquí cuando registres oportunidades con probabilidad e impacto.</p>';
+    document.getElementById('heatmapOpRes').innerHTML = totalOpRes
+      ? '<p class="heat-sub">Oportunidad residual (tras tratamiento)</p>' + construirHeatmapOport(heatOpRes) + leyenda
+      : '<p class="hint" style="padding:20px 0">Aún no hay oportunidades reevaluadas.</p>';
 
     // Avance de medidas: se carga de forma diferida leyendo la subtabla de reportes
     document.getElementById('estadoMedidas').innerHTML = '<p class="hint">Calculando avance de las medidas…</p>';
@@ -1294,9 +1383,11 @@ const FILTRO_CAMPOS = {
   tipo:         { label:'Tipo de proceso',       get:r=>{const x=(r.values||{})['Tipo de proceso'];return (x&&x!=='Tipo de proceso')?x:'';} },
   ro:           { label:'¿Riesgo u oportunidad?',get:r=>{const x=(r.values||{})['¿Riesgo u oportunidad?'];return (x&&x!=='¿Riesgo u oportunidad?')?x:'';}, opciones:['Riesgo','Oportunidad'] },
   respuesta:    { label:'Respuesta',             get:r=>{const x=(r.values||{})['Respuesta al riesgo u oportunidad'];return (x&&!x.includes('Respuesta'))?x:'';}, opciones:['Eliminar','Mitigar','Trasladar','Asumir'] },
-  certificacion:{ label:'Certificación control', get:r=>{const x=(r.values||{})['Certificación de Implementación del Control'];return (x&&!x.includes('Certificación'))?x:'';}, opciones:['No Implementado','Implementado sin validar','Certificado/Operativo'] }
+  certificacion:{ label:'Certificación control', get:r=>{const x=(r.values||{})['Certificación de Implementación del Control'];return (x&&!x.includes('Certificación'))?x:'';}, opciones:['No Implementado','Implementado sin validar','Certificado/Operativo'] },
+  fecha:        { label:'Fecha de evaluación', get:r=>fechaParaInput((r.values||{})['Fecha de evaluación'])||'', esFecha:true }
 };
 const FILTRO_OPERADORES = { contiene:'contiene', es:'es igual a', noes:'no es' };
+const FILTRO_OPERADORES_FECHA = { fes:'es igual a', fdesde:'desde (≥)', fhasta:'hasta (≤)' };
 let CONDICIONES = []; // [{campo, op, valor}]
 
 function agregarCondicion(){
@@ -1304,7 +1395,16 @@ function agregarCondicion(){
   renderFiltros();
 }
 function quitarCondicion(i){ CONDICIONES.splice(i,1); renderFiltros(); renderSeguimiento(); }
-function actualizarCondicion(i, prop, val){ CONDICIONES[i][prop]=val; if(prop==='campo'){CONDICIONES[i].valor='';} renderFiltros(); renderSeguimiento(); }
+function actualizarCondicion(i, prop, val){
+  CONDICIONES[i][prop]=val;
+  if(prop==='campo'){
+    CONDICIONES[i].valor='';
+    // Al cambiar a/desde un campo de fecha, ajustar el operador por defecto
+    const esF = FILTRO_CAMPOS[val] && FILTRO_CAMPOS[val].esFecha;
+    CONDICIONES[i].op = esF ? 'fdesde' : 'contiene';
+  }
+  renderFiltros(); renderSeguimiento();
+}
 window.agregarCondicion=agregarCondicion;
 window.quitarCondicion=quitarCondicion;
 window.actualizarCondicion=actualizarCondicion;
@@ -1314,12 +1414,20 @@ function renderFiltros(){
   if(!CONDICIONES.length){ cont.innerHTML='<p class="hint" style="padding:4px 0">Sin condiciones. Agrega una para filtrar.</p>'; return; }
   cont.innerHTML = CONDICIONES.map((c,i)=>{
     const def=FILTRO_CAMPOS[c.campo];
+    const esF = def && def.esFecha;
     const campoSel = Object.entries(FILTRO_CAMPOS).map(([k,v])=>`<option value="${k}" ${k===c.campo?'selected':''}>${v.label}</option>`).join('');
-    const opSel = Object.entries(FILTRO_OPERADORES).map(([k,v])=>`<option value="${k}" ${k===c.op?'selected':''}>${v}</option>`).join('');
-    // valor: si el campo tiene opciones fijas, mostrar select; si no, input texto
-    const valInput = def.opciones
-      ? `<select onchange="actualizarCondicion(${i},'valor',this.value)"><option value="">—</option>${def.opciones.map(o=>`<option ${o===c.valor?'selected':''}>${o}</option>`).join('')}</select>`
-      : `<input value="${(c.valor||'').replace(/"/g,'&quot;')}" placeholder="valor…" oninput="CONDICIONES[${i}].valor=this.value" onkeyup="renderSeguimiento()">`;
+    // Operadores: de fecha si el campo es fecha, normales si no
+    const ops = esF ? FILTRO_OPERADORES_FECHA : FILTRO_OPERADORES;
+    const opSel = Object.entries(ops).map(([k,v])=>`<option value="${k}" ${k===c.op?'selected':''}>${v}</option>`).join('');
+    // valor: fecha → input date; con opciones → select; si no → texto
+    let valInput;
+    if(esF){
+      valInput = `<input type="date" value="${(c.valor||'').replace(/"/g,'&quot;')}" onchange="actualizarCondicion(${i},'valor',this.value)" style="width:auto">`;
+    } else if(def.opciones){
+      valInput = `<select onchange="actualizarCondicion(${i},'valor',this.value)"><option value="">—</option>${def.opciones.map(o=>`<option ${o===c.valor?'selected':''}>${o}</option>`).join('')}</select>`;
+    } else {
+      valInput = `<input value="${(c.valor||'').replace(/"/g,'&quot;')}" placeholder="valor…" oninput="CONDICIONES[${i}].valor=this.value" onkeyup="renderSeguimiento()">`;
+    }
     return `<div class="filtro-cond">
       <select onchange="actualizarCondicion(${i},'campo',this.value)">${campoSel}</select>
       <select onchange="actualizarCondicion(${i},'op',this.value)">${opSel}</select>
@@ -1336,6 +1444,15 @@ function pasaFiltros(r){
   const resultados = CONDICIONES.map(c=>{
     if(!c.valor) return logica==='AND'; // condición sin valor: no restringe en AND, no aporta en OR
     const def=FILTRO_CAMPOS[c.campo];
+    // Comparación de FECHAS (yyyy-mm-dd se ordena lexicográficamente)
+    if(def.esFecha){
+      const fReg=String(def.get(r)||'');
+      if(!fReg) return false;
+      if(c.op==='fes')     return fReg===c.valor;
+      if(c.op==='fdesde')  return fReg>=c.valor;
+      if(c.op==='fhasta')  return fReg<=c.valor;
+      return true;
+    }
     const valor=String(def.get(r)||'').toLowerCase();
     const buscado=String(c.valor).toLowerCase();
     if(c.op==='contiene') return valor.includes(buscado);
