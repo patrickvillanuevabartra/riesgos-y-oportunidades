@@ -14,6 +14,7 @@
   :root{
     --ink:#11161d; --slate:#3a4754; --mist:#6b7785; --line:#e2e6ea;
     --paper:#f7f8fa; --card:#ffffff; --brand:#1f5641; --brand-2:#2e7d5b;
+    --brand:#15a06b; --brand-2:#10b981;
     --n1:#3a8c5f; --n2:#c9a227; --n3:#d97706; --n4:#c0392b; /* niveles 1-4 */
     --ok:#3a8c5f; --warn:#d97706; --shadow:0 1px 2px rgba(16,22,29,.04),0 4px 16px rgba(16,22,29,.06);
   }
@@ -440,6 +441,7 @@
         <button class="seg-tab-btn" data-segtipo="oportunidades" onclick="setSegTipo('oportunidades')" style="border:0;background:transparent;color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer">Oportunidades</button>
       </div>
       <button id="btnVerArchivados" onclick="toggleArchivados()" style="border:1px solid var(--line);background:var(--card);color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer" title="Mostrar u ocultar los registros archivados">🗄️ Ver archivados</button>
+      <button onclick="descargarExcel()" style="border:1px solid var(--line);background:var(--card);color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer" title="Descargar la tabla actual a Excel">⬇️ Descargar a Excel</button>
     </div>
 
     <!-- Filtros avanzados -->
@@ -1512,12 +1514,16 @@ const FILTRO_CAMPOS = {
   certificacion:{ label:'Certificación control', get:r=>{const x=(r.values||{})['Certificación de Implementación del Control'];return (x&&!x.includes('Certificación'))?x:'';}, opciones:['No Implementado','Implementado sin validar','Certificado/Operativo'] },
   fecha:        { label:'Fecha de evaluación', get:r=>fechaParaInput((r.values||{})['Fecha de evaluación'])||'', esFecha:true }
 };
-const FILTRO_OPERADORES = { contiene:'contiene', es:'es igual a', noes:'no es' };
+const FILTRO_OPERADORES = {
+  similar:'Similar a', contiene:'Contiene', nocontiene:'No contiene',
+  es:'Es', noes:'No es', empieza:'Comienza con', termina:'Termina con',
+  vacio:'Está vacío', novacio:'No está vacío'
+};
 const FILTRO_OPERADORES_FECHA = { fes:'es igual a', fdesde:'desde (≥)', fhasta:'hasta (≤)' };
 let CONDICIONES = []; // [{campo, op, valor}]
 
 function agregarCondicion(){
-  CONDICIONES.push({ campo:'oficina', op:'contiene', valor:'' });
+  CONDICIONES.push({ campo:'oficina', op:'similar', valor:'' });
   renderFiltros();
 }
 function quitarCondicion(i){ CONDICIONES.splice(i,1); renderFiltros(); renderSeguimiento(); }
@@ -1527,7 +1533,7 @@ function actualizarCondicion(i, prop, val){
     CONDICIONES[i].valor='';
     // Al cambiar a/desde un campo de fecha, ajustar el operador por defecto
     const esF = FILTRO_CAMPOS[val] && FILTRO_CAMPOS[val].esFecha;
-    CONDICIONES[i].op = esF ? 'fdesde' : 'contiene';
+    CONDICIONES[i].op = esF ? 'fdesde' : 'similar';
   }
   renderFiltros(); renderSeguimiento();
 }
@@ -1547,7 +1553,9 @@ function renderFiltros(){
     const opSel = Object.entries(ops).map(([k,v])=>`<option value="${k}" ${k===c.op?'selected':''}>${v}</option>`).join('');
     // valor: fecha → input date; con opciones → select; si no → texto
     let valInput;
-    if(esF){
+    if(c.op==='vacio' || c.op==='novacio'){
+      valInput = `<span class="hint" style="font-size:12px;align-self:center">(sin valor)</span>`;
+    } else if(esF){
       valInput = `<input type="date" value="${(c.valor||'').replace(/"/g,'&quot;')}" onchange="actualizarCondicion(${i},'valor',this.value)" style="width:auto">`;
     } else if(def.opciones){
       valInput = `<select onchange="actualizarCondicion(${i},'valor',this.value)"><option value="">—</option>${def.opciones.map(o=>`<option ${o===c.valor?'selected':''}>${o}</option>`).join('')}</select>`;
@@ -1567,11 +1575,15 @@ function renderFiltros(){
 function pasaFiltros(r){
   if(!CONDICIONES.length) return true;
   const logica=document.getElementById('filtroLogica').value;
+  // Normaliza texto: minúsculas, sin acentos, espacios colapsados (para "Similar a")
+  const norm = s => String(s||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ').trim();
   const resultados = CONDICIONES.map(c=>{
-    if(!c.valor) return logica==='AND'; // condición sin valor: no restringe en AND, no aporta en OR
     const def=FILTRO_CAMPOS[c.campo];
     // Comparación de FECHAS (yyyy-mm-dd se ordena lexicográficamente)
     if(def.esFecha){
+      if(!c.valor) return logica==='AND';
       const fReg=String(def.get(r)||'');
       if(!fReg) return false;
       if(c.op==='fes')     return fReg===c.valor;
@@ -1579,15 +1591,91 @@ function pasaFiltros(r){
       if(c.op==='fhasta')  return fReg<=c.valor;
       return true;
     }
-    const valor=String(def.get(r)||'').toLowerCase();
+    const crudo = String(def.get(r)||'');
+    // Operadores que NO necesitan valor
+    if(c.op==='vacio')   return crudo.trim()==='';
+    if(c.op==='novacio') return crudo.trim()!=='';
+    // Los demás requieren valor; sin valor no restringe en AND ni aporta en OR
+    if(!c.valor) return logica==='AND';
+    const valor=crudo.toLowerCase();
     const buscado=String(c.valor).toLowerCase();
-    if(c.op==='contiene') return valor.includes(buscado);
-    if(c.op==='es')       return valor===buscado;
-    if(c.op==='noes')     return valor!==buscado;
+    if(c.op==='contiene')   return valor.includes(buscado);
+    if(c.op==='nocontiene') return !valor.includes(buscado);
+    if(c.op==='es')         return valor===buscado;
+    if(c.op==='noes')       return valor!==buscado;
+    if(c.op==='empieza')    return valor.startsWith(buscado);
+    if(c.op==='termina')    return valor.endsWith(buscado);
+    if(c.op==='similar')    return norm(crudo).includes(norm(c.valor)); // flexible: sin acentos/espacios
     return true;
   });
   return logica==='AND' ? resultados.every(Boolean) : resultados.some(Boolean);
 }
+
+// === Descargar la tabla actual a Excel ===
+// Genera un .xls (tabla HTML que Excel abre con formato) con los registros visibles,
+// respetando el filtro de tipo (Todos/Riesgos/Oportunidades), estado y filtros avanzados.
+async function descargarExcel(){
+  try{
+    const recs = await loadMatriz();
+    const F = CONFIG.MATRIZ_FIELDS;
+    const g = (r,nombre,id) => { const v=r.values||{}; const x=v[nombre]; if(x && x!==nombre) return x; return v[id]||''; };
+    // Mismo filtrado que la vista
+    const visibles = recs
+      .filter(r => SEG_VER_ARCHIVADOS ? esArchivado(r) : !esArchivado(r))
+      .filter(pasaFiltros)
+      .filter(r => { const op=esOportunidad(r); return SEG_TIPO==='todos' || (SEG_TIPO==='oportunidades'?op:!op); });
+
+    if(!visibles.length){ toast('No hay registros para descargar con los filtros actuales.', true); return; }
+
+    // Columnas a exportar (nombre visible → cómo obtener el valor)
+    const cols = [
+      ['N°', (r,i)=>i+1],
+      ['Tipo', r=>esOportunidad(r)?'Oportunidad':'Riesgo'],
+      ['Estado', r=>esArchivado(r)?'Archivado':'Activo'],
+      ['Fecha de evaluación', r=>fechaParaInput(g(r,'Fecha de evaluación',F.fecha_evaluacion.id))||''],
+      ['Fuente', r=>g(r,'Fuente de identificación del riesgo u oportunidad',F.fuente.id)],
+      ['Descripción', r=>descripcionDe(r)],
+      ['Proceso', r=>rutaProcesoDe(r)||''],
+      ['Actividad específica', r=>g(r,'Actividad específica',F.actividad.id)],
+      ['Causas', r=>g(r,'Causas',F.causas.id)],
+      ['Consecuencias', r=>g(r,'Consecuencias',F.consecuencias.id)],
+      ['Oficina responsable', r=>oficinaDe(r)],
+      ['Responsable', r=>leerTexto(r,F.responsable_txt,true)],
+      ['Prob. inherente', r=>g(r,'Probabilidad riesgo inherente',F.prob_riesgo_inh.id)],
+      ['Imp. inherente', r=>g(r,'Impacto riesgo inherente',F.imp_riesgo_inh.id)],
+      ['Nivel inherente', r=>{ const op=esOportunidad(r); return (op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel||''; }],
+      ['Respuesta', r=>g(r,'Respuesta al riesgo u oportunidad',F.respuesta.id)],
+      ['Control establecido', r=>g(r,'Control establecido',F.control_establecido.id)],
+      ['Prob. residual', r=>g(r,'Probabilidad riesgo residual',F.prob_riesgo_res.id)],
+      ['Imp. residual', r=>g(r,'Impacto riesgo residual',F.imp_riesgo_res.id)],
+      ['Nivel residual', r=>{ const idx=num(g(r,'Índice de prioridad riesgo residual',F.indice_riesgo_res.id)); return nivelDe(idx)||''; }],
+      ['Certificación control', r=>g(r,'Certificación de Implementación del Control',F.certificacion_control.id)],
+      ['Creado', r=>r.created_at||''],
+      ['Última actualización', r=>r.updated_at||'']
+    ];
+
+    const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    let filas = '<tr>'+cols.map(c=>`<th style="background:#15a06b;color:#fff;border:1px solid #ccc;padding:4px;font-weight:bold">${esc(c[0])}</th>`).join('')+'</tr>';
+    visibles.forEach((r,i)=>{
+      filas += '<tr>'+cols.map(c=>`<td style="border:1px solid #ccc;padding:4px;mso-number-format:'\\@'">${esc(c[1](r,i))}</td>`).join('')+'</tr>';
+    });
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="utf-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Matriz</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
+      <body><table>${filas}</table></body></html>`;
+
+    const blob = new Blob(['\ufeff', html], {type:'application/vnd.ms-excel;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const hoy = new Date().toISOString().slice(0,10);
+    const tipoNom = SEG_TIPO==='todos'?'todos':SEG_TIPO;
+    a.href = url;
+    a.download = `matriz_riesgos_${tipoNom}_${hoy}.xls`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Descargando '+visibles.length+' registro(s) a Excel.');
+  }catch(e){ toast('Error al descargar: '+e.message, true); }
+}
+window.descargarExcel = descargarExcel;
 
 async function renderSeguimiento() {
   const tb = document.getElementById('tablaSeguimiento');
