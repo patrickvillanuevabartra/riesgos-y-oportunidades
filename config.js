@@ -21,6 +21,7 @@ const CONFIG = {
     INVENTARIO:   "dcUCouymnkz4ovWRVdOmk0", // Inventario de procesos y procedimientos
     REPORTES:     "czW791qCnmdj49WPxdRmoH", // Subtabla "Reporte de acciones"
     MONITOREO:    "aWFSovFfrlWOHejZmpWR9O", // Subtabla "Reporte de monitoreo del control"
+    PROG_METAS:   "aXhCkeWPLcVyojDCoklSoL", // Subtabla "Programación de metas monitoreo riesgos"
     // Tablas maestras (origen de los desplegables de relación)
     AMENAZAS:     "ddLmklpYHlqOGGWRauyf8c",
     OPORTUNIDADES:"cCn3pdNt9odOogW4euW5Xw",
@@ -102,6 +103,7 @@ const CONFIG = {
     frecuencia_medicion:     { id: "bCgxukowHep4ZdP8k0qCow", type: "select", col: "Frecuencia de medición", options: ["Diaria","Semanal","Quincenal","Mensual","Trimestral","Semestral","Anual"] },
     frecuencia_calculo:      { id: "cmWOT4WPPcQ68wWOelgSkj", type: "select", col: "Frecuencia de cálculo", options: ["Diaria","Semanal","Quincenal","Mensual","Trimestral","Semestral","Anual"] },
     plan_monitoreo:          { id: "cLibRcOSnfW4HEtSoCcZus", type: "text", col: "Plan de monitoreo" },
+    prog_metas:              { id: "cuB8khWOPcVRFdHgxcMJDC", type: "subform", entity: "PROG_METAS" },
     reporte_monitoreo:       { id: "a8zLxdQqvdOA12W4FcN20X", type: "subform", entity: "MONITOREO" }
   },
 
@@ -118,10 +120,25 @@ const CONFIG = {
   // ---- Campos del subformulario "Reporte de monitoreo del control" -------
   MONITOREO_FIELDS: {
     fecha_monitoreo: { id: "ddPcxcHSnhkiVdLJxdR8k4", type: "date", col: "Fecha de monitoreo" },
-    descripcion:     { id: "dcNCkGgMflW49sq8kIqSk2", type: "text", col: "Descripción del avance" },
-    pct_cumplimiento:{ id: "bFlmohWRXcTiRdT8khW4yv", type: "integer", col: "% cumplimiento" },
-    estado:          { id: "blBCoTqmjoW5DuWPlcKmo3", type: "select", col: "Estado", options: ["Pendiente","En Proceso","Culminado/Ejecutado"] },
-    evidencia:       { id: "bAW4xcGmjcW5FdPvNcGwHm", type: "url", col: "Evidencia (link)" }
+    pct_cumplimiento:{ id: "bFlmohWRXcTiRdT8khW4yv", type: "float", col: "% cumplimiento" },
+    evidencia:       { id: "bAW4xcGmjcW5FdPvNcGwHm", type: "url", col: "Evidencia (link)" },
+    indicador:       { id: "dcICoDpmjjg4krW7PSsSkW", type: "string", col: "Indicador" },
+    formula:         { id: "crlupcN8nhW5FdGe_cPmki", type: "text", col: "Texto multilínea" },
+    valor_ref:       { id: "cbWOa0fajhqiobW7fjxYjk", type: "float", col: "Valor de referencia" },
+    valor_meta:      { id: "a0zmk1bSnhW6uJqc7cTCkZ", type: "float", col: "Valor meta" },
+    valor_real:      { id: "ddLCkrW4fcSAatsI3dQ0HI", type: "float", col: "Valor real obtenido" },
+    plan_remediacion:{ id: "dcPsRdVCjlzikIWReVnCkN", type: "url", col: "Plan de remediación" }
+  },
+
+  // ---- Campos del subformulario "Programación de metas monitoreo riesgos" ----
+  PROG_METAS_FIELDS: {
+    fecha_prog:    { id: "aMW7biW7TdROoFnmoMdCkx", type: "date", col: "Fecha de programación" },
+    indicador:     { id: "ddKbmCp8njmOkxcHn8W6CD", type: "string", col: "Indicador" },
+    formula:       { id: "cJWQ3cP2fdMik2W7BdRmkJ", type: "text", col: "Fórmula " },
+    valor_ref:     { id: "bnW5VcGCjapRddRCkpvtLO", type: "float", col: "Valor de referencia" },
+    valor_meta:    { id: "bkW5JdVIPpWRiacCorW4OZ", type: "float", col: "Valor meta" },
+    plan_link:     { id: "bzfsRcTGXlW5XJWOhdLZSP", type: "url", col: "Plan de monitoreo para el cumplimiento de la meta" },
+    observacion:   { id: "cdWPpcJ8jgAiobWORdILOf", type: "text", col: "Observación" }
   },
 
   // ---- Campos del INVENTARIO (para la cascada) ---------------------------
