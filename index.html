@@ -2799,7 +2799,7 @@ async function guardarEdit(){
   if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
   set(F.control_establecido, limpiar(g('ed_control')));
   set(F.medida_respuesta, limpiar(g('ed_medida')));
-  if(g('ed_cert')) set(F.certificacion_control, g('ed_cert'));
+  set(F.certificacion_control, g('ed_cert')); // guardar siempre, permite volver a vacío (Seleccione…)
   // Responsable → nombre de oficina en campo de texto
   if(gtxt('ed_responsable')) set(F.responsable_txt, gtxt('ed_responsable'));
   // Responsable de proceso, celular y correo (autocompletados desde la oficina)
