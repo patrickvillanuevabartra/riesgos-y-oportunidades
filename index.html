@@ -411,8 +411,10 @@
           <div class="field"><label>¿Existen controles?</label><select id="f_existe_ctrl"><option value="">Seleccione…</option><option>Sí</option><option>No</option></select></div>
           <div class="field"><label>Respuesta</label><select id="f_respuesta"><option value="">Seleccione…</option><option>Eliminar</option><option>Mitigar</option><option>Trasladar</option><option>Asumir</option></select></div>
           <div class="field full"><label>Control establecido</label><textarea id="f_control"></textarea></div>
-          <div class="field"><label>Responsable</label><select id="f_responsable"></select></div>
-          <div class="field"></div>
+          <div class="field"><label>Responsable</label><select id="f_responsable" onchange="autocompletarRespProceso('f_responsable','f_resp_proc','f_resp_cel','f_resp_cor')"></select></div>
+          <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="f_resp_proc">—</div></div>
+          <div class="field"><label>Celular responsable</label><div class="readonly-pill" id="f_resp_cel">—</div></div>
+          <div class="field"><label>Correo responsable</label><div class="readonly-pill" id="f_resp_cor">—</div></div>
           <div class="field full"><label>Medida(s) de respuesta</label><textarea id="f_medida"></textarea></div>
         </div>
       </div>
@@ -442,6 +444,7 @@
       </div>
       <button id="btnVerArchivados" onclick="toggleArchivados()" style="border:1px solid var(--line);background:var(--card);color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer" title="Mostrar u ocultar los registros archivados">🗄️ Ver archivados</button>
       <button onclick="descargarExcel()" style="border:1px solid var(--line);background:var(--card);color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer" title="Descargar la tabla actual a Excel">⬇️ Descargar a Excel</button>
+      <button onclick="abrirEditorPlantillas()" style="border:1px solid var(--line);background:var(--card);color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer" title="Configurar las plantillas de notificación">⚙️ Plantillas</button>
     </div>
 
     <!-- Filtros avanzados -->
@@ -484,8 +487,50 @@
     </div>
   </div>
 
-  <!-- Modal de edición de riesgo -->
-  <div id="editModal" class="modal-overlay hidden">
+  <!-- Modal: Editor de plantillas de notificación -->
+  <div id="modalPlantillas" class="modal-overlay hidden">
+    <div class="modal" style="max-width:760px">
+      <div class="modal-head">
+        <div>
+          <div class="eyebrow">Notificaciones</div>
+          <h2 style="font-size:18px">Plantillas de mensaje</h2>
+        </div>
+        <button class="modal-close" onclick="cerrarEditorPlantillas()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint" style="margin-bottom:10px">Escribe el mensaje e inserta campos con los botones. Al notificar, cada campo se reemplaza por el dato real del registro.</p>
+        <div style="margin-bottom:10px">
+          <div style="font-size:12px;font-weight:600;color:var(--mist);margin-bottom:5px">Campos disponibles (clic para insertar en el último cuadro enfocado):</div>
+          <div id="paletaMarcadores" style="display:flex;flex-wrap:wrap;gap:5px"></div>
+        </div>
+        <div class="field full" style="margin-bottom:6px">
+          <label>📱 Plantilla WhatsApp</label>
+          <textarea id="pl_wa" rows="6" onfocus="window._plTarget='pl_wa'" oninput="actualizarPreviewPlantilla()" style="width:100%;font-family:inherit"></textarea>
+        </div>
+        <div style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:14px">
+          <div style="font-size:11px;font-weight:600;color:var(--mist);text-transform:uppercase;margin-bottom:4px">Vista previa WhatsApp</div>
+          <div id="pl_prev_wa" style="white-space:pre-wrap;font-size:13px;color:var(--ink)"></div>
+        </div>
+        <div class="field full" style="margin-bottom:6px">
+          <label>✉️ Asunto del correo</label>
+          <input id="pl_asunto" onfocus="window._plTarget='pl_asunto'" oninput="actualizarPreviewPlantilla()" style="width:100%;font-family:inherit">
+        </div>
+        <div class="field full" style="margin-bottom:6px">
+          <label>✉️ Plantilla correo</label>
+          <textarea id="pl_correo" rows="6" onfocus="window._plTarget='pl_correo'" oninput="actualizarPreviewPlantilla()" style="width:100%;font-family:inherit"></textarea>
+        </div>
+        <div style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:14px">
+          <div style="font-size:11px;font-weight:600;color:var(--mist);text-transform:uppercase;margin-bottom:4px">Vista previa correo</div>
+          <div id="pl_prev_correo" style="white-space:pre-wrap;font-size:13px;color:var(--ink)"></div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-ghost" onclick="cerrarEditorPlantillas()">Cancelar</button>
+          <button class="btn btn-primary" id="btnGuardarPlantillas" onclick="guardarPlantillas()">Guardar plantillas</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
     <div class="modal">
       <div class="modal-head">
         <div>
@@ -757,6 +802,197 @@ async function cargarMapaPartes(){
 }
 window.cargarMapaPartes = cargarMapaPartes;
 
+// Mapa oficina (nombre) → { responsable, celular, correo } desde la tabla Responsable de proceso.
+let MAPA_RESP_PROCESO = null;
+async function cargarMapaRespProceso(){
+  if (MAPA_RESP_PROCESO) return MAPA_RESP_PROCESO;
+  MAPA_RESP_PROCESO = {};
+  try {
+    const data = await API.records(CONFIG.ENTITIES.RESP_PROCESO);
+    const norm = s => String(s||'').replace(/\s+/g,' ').trim().toLowerCase();
+    (data.records||[]).forEach(r=>{
+      const v = r.values||{};
+      const oficina = v['Unidad responsable'];
+      if (!oficina || oficina === 'Unidad responsable') return;
+      const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x)) && x!=='Responsable proceso' && x!=='Celular responsable proceso' && x!=='Correo electrónico responsable proceso') ? String(x) : '';
+      MAPA_RESP_PROCESO[norm(oficina)] = {
+        responsable: limpio(v['Responsable proceso']),
+        celular: limpio(v['Celular responsable proceso']),
+        correo: limpio(v['Correo electrónico responsable proceso'])
+      };
+    });
+  } catch(e){ /* si falla, los campos quedan vacíos */ }
+  return MAPA_RESP_PROCESO;
+}
+window.cargarMapaRespProceso = cargarMapaRespProceso;
+
+// Autocompleta responsable de proceso / celular / correo según la oficina elegida.
+async function autocompletarRespProceso(selOficinaId, repId, celId, correoId){
+  const sel = document.getElementById(selOficinaId);
+  const oficina = sel && sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].text.trim() : '';
+  const elRep = document.getElementById(repId);
+  const elCel = document.getElementById(celId);
+  const elCor = document.getElementById(correoId);
+  const ph = '—';
+  if (!oficina || (sel.selectedOptions[0] && sel.selectedOptions[0].value==='')) {
+    if(elRep) elRep.textContent = ph; if(elCel) elCel.textContent = ph; if(elCor) elCor.textContent = ph;
+    return;
+  }
+  const mapa = await cargarMapaRespProceso();
+  const info = mapa[String(oficina).replace(/\s+/g,' ').trim().toLowerCase()] || {};
+  if(elRep) elRep.textContent = info.responsable || '(sin responsable registrado)';
+  if(elCel) elCel.textContent = info.celular || '(sin celular)';
+  if(elCor) elCor.textContent = info.correo || '(sin correo)';
+}
+window.autocompletarRespProceso = autocompletarRespProceso;
+
+// === Notificar al responsable por WhatsApp / Correo, usando PLANTILLAS personalizables ===
+// Mapa de marcadores {campo} → valor real del riesgo.
+function _datosNotif(r){
+  const v=r.values||{};
+  const F=CONFIG.MATRIZ_FIELDS;
+  const op=esOportunidad(r);
+  const gv=(nombre,def)=>{ const x=v[nombre]; if(x && x!==nombre) return x; return def&&v[def.id]?v[def.id]:''; };
+  const limpiarSel=x=>{ const s=String(x||''); return (s==='Seleccione'||s==='Seleccione…')?'':s; };
+  return {
+    descripcion: descripcionDe(r),
+    tipo: op?'oportunidad':'riesgo',
+    nivel: (op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel||'—',
+    proceso: rutaProcesoDe(r)||'—',
+    actividad: gv('Actividad específica',F.actividad),
+    fuente: gv('Fuente de identificación del riesgo u oportunidad',F.fuente),
+    oficina: (oficinaDe(r)==='Sin oficina asignada'?'':oficinaDe(r)),
+    responsable: leerTexto(r,F.resp_proceso_txt,true)||'',
+    celular: leerTexto(r,F.resp_celular,true)||'',
+    correo: leerTexto(r,F.resp_correo,true)||'',
+    probabilidad: limpiarSel(gv('Probabilidad riesgo inherente',F.prob_riesgo_inh)),
+    impacto: limpiarSel(gv('Impacto riesgo inherente',F.imp_riesgo_inh)),
+    respuesta: limpiarSel(gv('Respuesta al riesgo u oportunidad',F.respuesta)),
+    control: gv('Control establecido',F.control_establecido),
+    medida: gv('Medida(s) de respuesta',F.medida_respuesta),
+    estado: limpiarSel(gv('Certificación de Implementación del Control',F.certificacion_control)),
+    fecha: fechaParaInput(gv('Fecha de evaluación',F.fecha_evaluacion))||'',
+    certificacion: limpiarSel(gv('Certificación de Implementación del Control',F.certificacion_control)),
+    procede_reev: (procedeReeval(r).procede?'Sí':'No')
+  };
+}
+// Lista de marcadores disponibles (para la paleta del editor)
+const MARCADORES_NOTIF = ['responsable','descripcion','tipo','nivel','proceso','oficina','actividad','fuente','celular','correo','probabilidad','impacto','respuesta','control','medida','estado','fecha','certificacion','procede_reev'];
+
+// Reemplaza {marcador} por el valor real
+function aplicarPlantilla(txt, datos){
+  return String(txt||'').replace(/\{(\w+)\}/g, (m,k)=> (datos[k]!=null && datos[k]!=='') ? datos[k] : '');
+}
+
+// Plantillas por defecto (si no hay nada configurado en QuintaDB)
+const PLANTILLA_WA_DEFECTO = 'Estimado/a {responsable},\n\nLe notificamos sobre el siguiente {tipo} bajo su responsabilidad:\n\n• Descripción: {descripcion}\n• Nivel: {nivel}\n• Proceso: {proceso}\n\nPor favor revisar y dar seguimiento.\n\n— Sistema de Gestión ISO 21000, Facultad de Ingeniería URP';
+const PLANTILLA_ASUNTO_DEFECTO = 'Notificación de {tipo} — Sistema de Gestión ISO 21000 URP';
+const PLANTILLA_CORREO_DEFECTO = 'Estimado/a {responsable},\n\nLe notificamos sobre el siguiente {tipo} bajo su responsabilidad:\n\n• Descripción: {descripcion}\n• Nivel: {nivel}\n• Proceso: {proceso}\n• Respuesta planificada: {respuesta}\n\nPor favor revisar y dar seguimiento.\n\nSaludos cordiales,\nSistema de Gestión ISO 21000 — Facultad de Ingeniería URP';
+
+// Cache de plantillas cargadas desde QuintaDB
+let PLANTILLAS = null;       // {wa, asunto, correo}
+let PLANTILLAS_REC_ID = null; // id del registro en Config notificaciones
+async function cargarPlantillas(){
+  if (PLANTILLAS) return PLANTILLAS;
+  PLANTILLAS = { wa:PLANTILLA_WA_DEFECTO, asunto:PLANTILLA_ASUNTO_DEFECTO, correo:PLANTILLA_CORREO_DEFECTO };
+  try {
+    const data = await API.records(CONFIG.ENTITIES.CONFIG_NOTIF);
+    const recs = data.records||[];
+    if(recs.length){
+      const r = recs[0]; const v = r.values||{};
+      PLANTILLAS_REC_ID = r.id;
+      const wa = v['Plantilla WhatsApp']; const asu = v['Asunto correo']; const cor = v['Plantilla correo'];
+      if(wa && wa!=='Plantilla WhatsApp') PLANTILLAS.wa = wa;
+      if(asu && asu!=='Asunto correo') PLANTILLAS.asunto = asu;
+      if(cor && cor!=='Plantilla correo') PLANTILLAS.correo = cor;
+    }
+  } catch(e){ /* usa defaults */ }
+  return PLANTILLAS;
+}
+
+function _telWa(cel){
+  let n=String(cel||'').replace(/\D/g,'');
+  if(!n) return '';
+  if(n.length===9) n='51'+n;
+  return n;
+}
+async function notificarWhatsApp(riesgoId){
+  const r=STATE.matriz.find(x=>x.id===riesgoId); if(!r) return;
+  const d=_datosNotif(r);
+  const tel=_telWa(d.celular);
+  if(!tel){ toast('Este registro no tiene celular del responsable de proceso.', true); return; }
+  const p=await cargarPlantillas();
+  const url='https://wa.me/'+tel+'?text='+encodeURIComponent(aplicarPlantilla(p.wa,d));
+  window.open(url,'_blank');
+}
+async function notificarCorreo(riesgoId){
+  const r=STATE.matriz.find(x=>x.id===riesgoId); if(!r) return;
+  const d=_datosNotif(r);
+  if(!d.correo){ toast('Este registro no tiene correo del responsable de proceso.', true); return; }
+  const p=await cargarPlantillas();
+  const url='mailto:'+encodeURIComponent(d.correo)+'?subject='+encodeURIComponent(aplicarPlantilla(p.asunto,d))+'&body='+encodeURIComponent(aplicarPlantilla(p.correo,d));
+  window.location.href=url;
+}
+window.notificarWhatsApp=notificarWhatsApp;
+window.notificarCorreo=notificarCorreo;
+
+// === Editor de plantillas (modal) ===
+async function abrirEditorPlantillas(){
+  const p = await cargarPlantillas();
+  const modal = document.getElementById('modalPlantillas');
+  document.getElementById('pl_wa').value = p.wa;
+  document.getElementById('pl_asunto').value = p.asunto;
+  document.getElementById('pl_correo').value = p.correo;
+  window._plTarget = 'pl_wa';
+  // Construir la paleta de marcadores
+  const pal = document.getElementById('paletaMarcadores');
+  if(pal) pal.innerHTML = MARCADORES_NOTIF.map(m=>`<button onclick="insertarMarcador(window._plTarget||'pl_wa','${m}')" style="border:1px solid var(--line);background:var(--card);color:var(--brand);font-family:inherit;font-size:12px;padding:4px 9px;border-radius:14px;cursor:pointer">{${m}}</button>`).join('');
+  modal.classList.remove('hidden');
+  actualizarPreviewPlantilla();
+}
+function cerrarEditorPlantillas(){ document.getElementById('modalPlantillas').classList.add('hidden'); }
+function insertarMarcador(targetId, marcador){
+  const el=document.getElementById(targetId); if(!el) return;
+  const ini=el.selectionStart||el.value.length, fin=el.selectionEnd||el.value.length;
+  el.value = el.value.slice(0,ini)+'{'+marcador+'}'+el.value.slice(fin);
+  el.focus(); actualizarPreviewPlantilla();
+}
+function actualizarPreviewPlantilla(){
+  // Usa el primer riesgo activo como ejemplo, o datos genéricos
+  const ej = (STATE.matriz||[]).find(r=>!esArchivado(r)) || (STATE.matriz||[])[0];
+  const d = ej ? _datosNotif(ej) : {responsable:'María Pérez',descripcion:'Ejemplo de riesgo',tipo:'riesgo',nivel:'3',proceso:'Proceso ejemplo'};
+  const prevWa = document.getElementById('pl_prev_wa');
+  const prevCor = document.getElementById('pl_prev_correo');
+  if(prevWa) prevWa.textContent = aplicarPlantilla(document.getElementById('pl_wa').value, d);
+  if(prevCor) prevCor.textContent = 'Asunto: '+aplicarPlantilla(document.getElementById('pl_asunto').value, d)+'\n\n'+aplicarPlantilla(document.getElementById('pl_correo').value, d);
+}
+async function guardarPlantillas(){
+  const wa=document.getElementById('pl_wa').value;
+  const asunto=document.getElementById('pl_asunto').value;
+  const correo=document.getElementById('pl_correo').value;
+  const F = { wa:'c8zuC8W75eWPRdKx1qW7qk', asunto:'ddUmkQcIbah7RcQgFdRgON', correo:'c2WPPzj8naW5FcQuOEqCoK', clave:'ddN8olfMbiWQldJHdcR8kY' };
+  const btn=document.getElementById('btnGuardarPlantillas');
+  if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  try{
+    const campos = {}; campos[F.clave]='plantillas'; campos[F.wa]=wa; campos[F.asunto]=asunto; campos[F.correo]=correo;
+    if(PLANTILLAS_REC_ID){
+      await API.saveForm(PLANTILLAS_REC_ID, campos);
+    } else {
+      const resp = await API.saveForm(null, campos, CONFIG.ENTITIES.CONFIG_NOTIF);
+      if(resp && resp.record) PLANTILLAS_REC_ID = resp.record.id;
+    }
+    PLANTILLAS = { wa, asunto, correo }; // actualizar cache
+    toast('Plantillas guardadas.');
+    cerrarEditorPlantillas();
+  }catch(e){ toast('Error al guardar: '+e.message, true); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Guardar plantillas'; } }
+}
+window.abrirEditorPlantillas=abrirEditorPlantillas;
+window.cerrarEditorPlantillas=cerrarEditorPlantillas;
+window.insertarMarcador=insertarMarcador;
+window.actualizarPreviewPlantilla=actualizarPreviewPlantilla;
+window.guardarPlantillas=guardarPlantillas;
+
 // Rellena los pills/campos de requisitos y expectativas según la parte elegida.
 // selId = id del <select> de parte; reqId/expId = ids de los contenedores a llenar.
 async function autocompletarParte(selId, reqId, expId){
@@ -1004,6 +1240,11 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   }
   // Responsable → nombre de la oficina en campo de texto
   put(F.responsable_txt, vtxt('f_responsable'));
+  // Responsable de proceso, celular y correo (autocompletados desde la oficina)
+  const txtRP = (id)=>{ const el=document.getElementById(id); const t=el?el.textContent.trim():''; return (t && t!=='—' && !t.startsWith('(sin '))?t:''; };
+  if(txtRP('f_resp_proc')) put(F.resp_proceso_txt, txtRP('f_resp_proc'));
+  if(txtRP('f_resp_cel'))  put(F.resp_celular, txtRP('f_resp_cel'));
+  if(txtRP('f_resp_cor'))  put(F.resp_correo, txtRP('f_resp_cor'));
 
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Guardando…';
   try {
@@ -1763,6 +2004,8 @@ async function renderSeguimiento() {
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
           <button class="icon-btn" title="Editar" onclick="editarRiesgo('${f.id}')">✏️</button>
           <button class="icon-btn" title="Duplicar (crear una copia)" onclick="duplicarRiesgo('${f.id}')">📋</button>
+          <button class="icon-btn" title="Notificar por WhatsApp" onclick="notificarWhatsApp('${f.id}')">📱</button>
+          <button class="icon-btn" title="Notificar por correo" onclick="notificarCorreo('${f.id}')">✉️</button>
           <button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
           <button class="icon-btn" title="Eliminar" onclick="eliminarRiesgo('${f.id}')">🗑️</button>
         </td>
@@ -2072,6 +2315,9 @@ function verDetalle(riesgoId){
     ['Control establecido','Control establecido'],
     ['Respuesta','Respuesta al riesgo u oportunidad'],
     ['Responsable (oficina)','Responsable'],
+    ['Responsable de proceso','Responsable proceso'],
+    ['Celular responsable','Celular responsable'],
+    ['Correo responsable','Correo responsable'],
     ['Medida(s) de respuesta','Medida(s) de respuesta'],
     ['Certificación del control','Certificación de Implementación del Control'],
     ['Nivel residual','Nivel de riesgo residual'],
@@ -2111,7 +2357,15 @@ function verDetalle(riesgoId){
 
   const desc=limpio('Riesgo')||leerTexto(r, F2.oportunidad_desc, true)||'(sin descripción)';
   document.getElementById('modalTitulo').textContent = desc.length>80?desc.slice(0,80)+'…':desc;
-  document.getElementById('modalHistorial').innerHTML = (html || '<p class="hint">Sin datos.</p>') + metaHTML;
+  // Botones de notificación (solo si hay celular o correo del responsable de proceso)
+  const dN=_datosNotif(r);
+  const btns=[];
+  if(dN.cel) btns.push(`<button class="btn btn-primary" style="padding:8px 14px;font-size:13px" onclick="notificarWhatsApp('${r.id}')">📱 Notificar por WhatsApp</button>`);
+  if(dN.cor) btns.push(`<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="notificarCorreo('${r.id}')">✉️ Notificar por correo</button>`);
+  const notifHTML = btns.length
+    ? `<div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);display:flex;gap:8px;flex-wrap:wrap">${btns.join('')}</div>`
+    : '';
+  document.getElementById('modalHistorial').innerHTML = (html || '<p class="hint">Sin datos.</p>') + notifHTML + metaHTML;
   // Ocultar el formulario "añadir reporte" del modal viejo (en detalle no aplica)
   document.getElementById('modalSeg').classList.remove('hidden');
 }
@@ -2285,7 +2539,10 @@ function editarRiesgo(riesgoId){
       <div class="field"><label>¿Existen controles?</label><select id="ed_ctrl">${opt(['Sí','No'],cur('¿Existen controles?'))}</select></div>
       <div class="field"><label>Respuesta</label><select id="ed_resp">${opt(['Eliminar','Mitigar','Trasladar','Asumir'],cur('Respuesta al riesgo u oportunidad'))}</select></div>
       <div class="field full"><label>Control establecido</label><textarea id="ed_control">${cur('Control establecido')}</textarea></div>
-      <div class="field full"><label>Responsable (oficina)</label><select id="ed_responsable"></select></div>
+      <div class="field full"><label>Responsable (oficina)</label><select id="ed_responsable" onchange="autocompletarRespProceso('ed_responsable','ed_resp_proc','ed_resp_cel','ed_resp_cor')"></select></div>
+      <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="ed_resp_proc">—</div></div>
+      <div class="field"><label>Celular responsable</label><div class="readonly-pill" id="ed_resp_cel">—</div></div>
+      <div class="field full"><label>Correo responsable</label><div class="readonly-pill" id="ed_resp_cor">—</div></div>
       <div class="field full"><label>Medida(s) de respuesta</label><textarea id="ed_medida">${cur('Medida(s) de respuesta')}</textarea></div>
       <div class="field"><label>Certificación del control</label><select id="ed_cert">${opt(['No Implementado','Implementado sin validar','Certificado/Operativo'],cur('Certificación de Implementación del Control'))}</select></div>
     </div></div>`;
@@ -2347,6 +2604,7 @@ async function cargarRelEdit(v){
     fillById('ed_parte', partes, txtO(F.parte_txt, leerRelacion(r,'Parte interesada',F.parte_interesada.id)));
     autocompletarParte('ed_parte','ed_requisitos','ed_expectativas');
     fillById('ed_responsable', resp, txtO(F.responsable_txt, leerRelacion(r,'Responsable',F.responsable.id)));
+    autocompletarRespProceso('ed_responsable','ed_resp_proc','ed_resp_cel','ed_resp_cor');
     // Cascada de procesos con preselección
     await initCascadaEdit(v);
   }catch(e){ toast('No se pudieron cargar algunas listas: '+e.message, true); }
@@ -2496,6 +2754,11 @@ async function guardarEdit(){
   if(g('ed_cert')) set(F.certificacion_control, g('ed_cert'));
   // Responsable → nombre de oficina en campo de texto
   if(gtxt('ed_responsable')) set(F.responsable_txt, gtxt('ed_responsable'));
+  // Responsable de proceso, celular y correo (autocompletados desde la oficina)
+  const txtRPe = (id)=>{ const el=document.getElementById(id); const t=el?el.textContent.trim():''; return (t && t!=='—' && !t.startsWith('(sin '))?t:''; };
+  if(txtRPe('ed_resp_proc')) set(F.resp_proceso_txt, txtRPe('ed_resp_proc'));
+  if(txtRPe('ed_resp_cel'))  set(F.resp_celular, txtRPe('ed_resp_cel'));
+  if(txtRPe('ed_resp_cor'))  set(F.resp_correo, txtRPe('ed_resp_cor'));
 
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
   try{
