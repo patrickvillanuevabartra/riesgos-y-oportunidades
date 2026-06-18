@@ -421,7 +421,7 @@
           <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_formula"><label>Fórmula del indicador</label><textarea id="f_formula"></textarea></div>
           <div class="field ctrl-si ctrl-n4 hidden" id="f_wrap_frec_calc"><label>Frecuencia de cálculo</label><select id="f_frec_calc"><option value="">Seleccione…</option><option>Diaria</option><option>Semanal</option><option>Quincenal</option><option>Mensual</option><option>Trimestral</option><option>Semestral</option><option>Anual</option></select></div>
           <div class="field"></div>
-          <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_plan"><label>Plan de monitoreo</label><textarea id="f_plan"></textarea></div>
+          <!-- Plan de monitoreo se movió al subformulario de metas -->
           <!-- Responsable: siempre visible -->
           <div class="field"><label>Responsable</label><select id="f_responsable" onchange="autocompletarRespProceso('f_responsable','f_resp_proc','f_resp_cel','f_resp_cor')"></select></div>
           <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="f_resp_proc">—</div></div>
@@ -1291,7 +1291,7 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
       put(F.formula_indicador, v('f_formula'));
       put(F.frecuencia_medicion, v('f_frec_med'));
       put(F.frecuencia_calculo, v('f_frec_calc'));
-      put(F.plan_monitoreo, v('f_plan'));
+      // Plan de monitoreo se gestiona ahora en el subformulario de metas
     }
   }
 
@@ -2252,14 +2252,217 @@ async function toggleHistorial(riesgoId){
         <button class="btn btn-primary" onclick="guardarReporte('${riesgoId}')" id="addbtn-${riesgoId}">Guardar reporte</button>
       </div>
     </details>
+    <div id="monitoreo-panel-${riesgoId}"></div>
   </div>`;
 
   if(subIds.length){
     try { document.getElementById('histlist-'+riesgoId).innerHTML = await renderHistorialHTML(subIds); }
     catch(e){ document.getElementById('histlist-'+riesgoId).innerHTML = '<p class="hint">Error: '+e.message+'</p>'; }
   }
+
+  // Si el riesgo es NIVEL 4 con control "Sí", mostrar panel de monitoreo del control
+  const esRiesgo = !esOportunidad(r);
+  const nivelInh = esRiesgo ? nivelInherenteDe(r).nivel : nivelOportInherenteDe(r).nivel;
+  const tieneControl = (function(){ const c=(r.values||{})['¿Existen controles?']; return c && String(c).trim()==='Sí'; })();
+  if(esRiesgo && nivelInh===4 && tieneControl){
+    try { await renderPanelMonitoreo(riesgoId, r); }
+    catch(e){ const p=document.getElementById('monitoreo-panel-'+riesgoId); if(p) p.innerHTML='<p class="hint">Error en panel de monitoreo: '+e.message+'</p>'; }
+  }
 }
 window.toggleHistorial = toggleHistorial;
+
+// === Panel de monitoreo del control (metas programadas + reportes reales) ===
+// Solo para riesgos nivel 4 con control. Se inserta dentro del panel de seguimiento.
+function _fmtNum(x){ if(x===''||x==null) return ''; const n=parseFloat(x); return isNaN(n)?'':(''+n); }
+async function renderPanelMonitoreo(riesgoId, r){
+  const cont = document.getElementById('monitoreo-panel-'+riesgoId);
+  if(!cont) return;
+  const F = CONFIG.MATRIZ_FIELDS;
+  const v = r.values||{};
+  const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+  const indicadorRiesgo = cur('Indicador');
+  const formulaRiesgo = cur('Fórmula del indicador');
+  const metaIds = (r.subform_values && r.subform_values[F.prog_metas.id]) || [];
+  const monIds  = (r.subform_values && r.subform_values[F.reporte_monitoreo.id]) || [];
+
+  cont.innerHTML = `
+    <div style="margin-top:22px;padding-top:18px;border-top:2px solid var(--brand)">
+      <div class="hist-head" style="color:var(--brand)">Monitoreo del control (nivel 4)</div>
+      <p class="hint" style="margin-bottom:6px">Indicador: <strong>${indicadorRiesgo||'(no definido)'}</strong>${formulaRiesgo?(' · Fórmula: '+formulaRiesgo):''}</p>
+
+      <!-- Programación de metas -->
+      <div class="hist-head" style="font-size:14px;margin-top:14px">📅 Programación de metas <span class="grupo-count" style="color:var(--mist)">${metaIds.length}</span></div>
+      <div id="metaslist-${riesgoId}">${metaIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin metas programadas.</p>'}</div>
+      <details class="add-rep"><summary>+ Añadir meta</summary>
+        <div class="grid" style="margin-top:14px">
+          <div class="field"><label>Fecha de programación</label><input type="date" id="meta_fecha_${riesgoId}"></div>
+          <div class="field"><label>Valor de referencia</label><input type="number" step="any" id="meta_ref_${riesgoId}"></div>
+          <div class="field"><label>Valor meta</label><input type="number" step="any" id="meta_meta_${riesgoId}"></div>
+          <div class="field full"><label>Plan de monitoreo (link a Excel/MS Project)</label><input id="meta_plan_${riesgoId}" placeholder="https://…"></div>
+          <div class="field full"><label>Observación</label><textarea id="meta_obs_${riesgoId}"></textarea></div>
+        </div>
+        <p class="hint" style="margin-top:6px">El indicador y la fórmula se copian automáticamente del riesgo.</p>
+        <div style="text-align:right;margin-top:12px">
+          <button class="btn btn-primary" onclick="guardarMeta('${riesgoId}')" id="metabtn-${riesgoId}">Guardar meta</button>
+        </div>
+      </details>
+
+      <!-- Reportes de monitoreo (medición real) -->
+      <div class="hist-head" style="font-size:14px;margin-top:18px">📊 Reportes de monitoreo (medición real) <span class="grupo-count" style="color:var(--mist)">${monIds.length}</span></div>
+      <div id="monlist-${riesgoId}">${monIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes de monitoreo.</p>'}</div>
+      <details class="add-rep"><summary>+ Añadir reporte de monitoreo</summary>
+        <div class="grid" style="margin-top:14px">
+          <div class="field"><label>Fecha de evaluación</label><input type="date" id="mon_fecha_${riesgoId}"></div>
+          <div class="field"><label>Valor de referencia</label><input type="number" step="any" id="mon_ref_${riesgoId}"></div>
+          <div class="field"><label>Valor meta</label><input type="number" step="any" id="mon_meta_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
+          <div class="field"><label>Valor real obtenido</label><input type="number" step="any" id="mon_real_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
+          <div class="field"><label>% avance obtenido</label><div class="readonly-pill" id="mon_pct_${riesgoId}">—</div></div>
+          <div class="field full"><label>Evidencia (link)</label><input id="mon_evid_${riesgoId}" placeholder="https://…"></div>
+          <div class="field full"><label>Plan de remediación (link, de ser el caso)</label><input id="mon_plan_${riesgoId}" placeholder="https://…"></div>
+        </div>
+        <p class="hint" style="margin-top:6px">El indicador y la fórmula se copian automáticamente del riesgo. El % avance = (valor real / valor meta) × 100.</p>
+        <div style="text-align:right;margin-top:12px">
+          <button class="btn btn-primary" onclick="guardarMonitoreo('${riesgoId}')" id="monbtn-${riesgoId}">Guardar reporte de monitoreo</button>
+        </div>
+      </details>
+    </div>`;
+
+  // Cargar listas
+  if(metaIds.length){
+    try { document.getElementById('metaslist-'+riesgoId).innerHTML = await renderMetasHTML(metaIds); }
+    catch(e){ document.getElementById('metaslist-'+riesgoId).innerHTML = '<p class="hint">Error: '+e.message+'</p>'; }
+  }
+  if(monIds.length){
+    try { document.getElementById('monlist-'+riesgoId).innerHTML = await renderMonitoreoHTML(monIds); }
+    catch(e){ document.getElementById('monlist-'+riesgoId).innerHTML = '<p class="hint">Error: '+e.message+'</p>'; }
+  }
+}
+
+// Cálculo en vivo del % avance del reporte de monitoreo
+function calcAvanceMon(riesgoId){
+  const real = parseFloat(document.getElementById('mon_real_'+riesgoId).value);
+  const meta = parseFloat(document.getElementById('mon_meta_'+riesgoId).value);
+  const el = document.getElementById('mon_pct_'+riesgoId);
+  if(!isNaN(real) && !isNaN(meta) && meta!==0){
+    el.textContent = (Math.round((real/meta)*1000)/10) + '%';
+  } else { el.textContent = '—'; }
+}
+window.calcAvanceMon = calcAvanceMon;
+
+// Lista de metas programadas
+async function renderMetasHTML(ids){
+  const MF = CONFIG.PROG_METAS_FIELDS;
+  let html = '';
+  for(const id of ids){
+    try{
+      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+id+'.json','GET',{name_value:1});
+      const v = d.record.values||{};
+      const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+      const plan = g('Plan de monitoreo para el cumplimiento de la meta');
+      html += `<div class="rep-item">
+        <div><strong>${g('Fecha de programación')||'(sin fecha)'}</strong> · Ref: ${_fmtNum(g('Valor de referencia'))||'—'} → Meta: ${_fmtNum(g('Valor meta'))||'—'}</div>
+        ${g('Observación')?`<div class="hint">${g('Observación')}</div>`:''}
+        ${plan?`<div><a href="${plan}" target="_blank" class="riesgo-link">📎 Plan de monitoreo</a></div>`:''}
+      </div>`;
+    }catch(e){}
+  }
+  return html || '<p class="hint">Sin metas.</p>';
+}
+
+// Lista de reportes de monitoreo (medición real)
+async function renderMonitoreoHTML(ids){
+  let html = '';
+  for(const id of ids){
+    try{
+      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+id+'.json','GET',{name_value:1});
+      const v = d.record.values||{};
+      const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+      const real = _fmtNum(g('Valor real obtenido'));
+      const meta = _fmtNum(g('Valor meta'));
+      let pct = g('% cumplimiento');
+      if(pct==='' || pct==null){ // calcular si la fórmula no vino
+        const rN=parseFloat(real), mN=parseFloat(meta);
+        if(!isNaN(rN)&&!isNaN(mN)&&mN!==0) pct = Math.round((rN/mN)*1000)/10;
+      } else { pct = Math.round(parseFloat(pct)*10)/10; }
+      const evid = g('Evidencia (link)'); const plan = g('Plan de remediación');
+      html += `<div class="rep-item">
+        <div><strong>${g('Fecha de monitoreo')||'(sin fecha)'}</strong> · Real: ${real||'—'} / Meta: ${meta||'—'} · <strong style="color:var(--brand)">${pct!==''&&pct!=null?pct+'%':'—'}</strong></div>
+        <div style="display:flex;gap:12px;margin-top:3px">
+          ${evid?`<a href="${evid}" target="_blank" class="riesgo-link">📎 Evidencia</a>`:''}
+          ${plan?`<a href="${plan}" target="_blank" class="riesgo-link">🔧 Plan de remediación</a>`:''}
+        </div>
+      </div>`;
+    }catch(e){}
+  }
+  return html || '<p class="hint">Sin reportes.</p>';
+}
+
+// Guardar una meta programada
+async function guardarMeta(riesgoId){
+  const MF = CONFIG.PROG_METAS_FIELDS;
+  const F = CONFIG.MATRIZ_FIELDS;
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  const v = r.values||{};
+  const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+  const g = id => document.getElementById(id+'_'+riesgoId).value;
+  const btn = document.getElementById('metabtn-'+riesgoId);
+  const vals = {};
+  if(g('meta_fecha')) vals[MF.fecha_prog.id] = g('meta_fecha');
+  // Copiar indicador y fórmula del riesgo (Opción B)
+  if(cur('Indicador')) vals[MF.indicador.id] = cur('Indicador');
+  if(cur('Fórmula del indicador')) vals[MF.formula.id] = cur('Fórmula del indicador');
+  if(g('meta_ref')!=='') vals[MF.valor_ref.id] = parseFloat(g('meta_ref'));
+  if(g('meta_meta')!=='') vals[MF.valor_meta.id] = parseFloat(g('meta_meta'));
+  if(g('meta_plan')) vals[MF.plan_link.id] = g('meta_plan');
+  if(g('meta_obs')) vals[MF.observacion.id] = g('meta_obs');
+  if(!g('meta_fecha') && g('meta_meta')===''){ toast('Indica al menos la fecha o el valor meta.', true); return; }
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
+  try{
+    const newId = genId22();
+    const subforms = {};
+    subforms[F.prog_metas.id] = { entity_id: CONFIG.ENTITIES.PROG_METAS };
+    subforms[F.prog_metas.id][newId] = vals;
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', { json_subforms_values: JSON.stringify(subforms) });
+    toast('Meta agregada.');
+    STATE.matriz=[]; await loadMatriz(true); await renderSeguimiento();
+    setTimeout(()=>toggleHistorial(riesgoId), 100);
+  }catch(err){ toast('Error al guardar la meta: '+err.message, true); btn.disabled=false; btn.textContent='Guardar meta'; }
+}
+window.guardarMeta = guardarMeta;
+
+// Guardar un reporte de monitoreo (medición real)
+async function guardarMonitoreo(riesgoId){
+  const MF = CONFIG.MONITOREO_FIELDS;
+  const F = CONFIG.MATRIZ_FIELDS;
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  const v = r.values||{};
+  const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+  const g = id => document.getElementById(id+'_'+riesgoId).value;
+  const btn = document.getElementById('monbtn-'+riesgoId);
+  const vals = {};
+  if(g('mon_fecha')) vals[MF.fecha_monitoreo.id] = g('mon_fecha');
+  if(cur('Indicador')) vals[MF.indicador.id] = cur('Indicador');
+  if(cur('Fórmula del indicador')) vals[MF.formula.id] = cur('Fórmula del indicador');
+  if(g('mon_ref')!=='') vals[MF.valor_ref.id] = parseFloat(g('mon_ref'));
+  if(g('mon_meta')!=='') vals[MF.valor_meta.id] = parseFloat(g('mon_meta'));
+  if(g('mon_real')!=='') vals[MF.valor_real.id] = parseFloat(g('mon_real'));
+  if(g('mon_evid')) vals[MF.evidencia.id] = g('mon_evid');
+  if(g('mon_plan')) vals[MF.plan_remediacion.id] = g('mon_plan');
+  // % cumplimiento es fórmula en QuintaDB; no se envía (lo calcula QuintaDB)
+  if(!g('mon_fecha') && g('mon_real')===''){ toast('Indica al menos la fecha o el valor real.', true); return; }
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
+  try{
+    const newId = genId22();
+    const subforms = {};
+    subforms[F.reporte_monitoreo.id] = { entity_id: CONFIG.ENTITIES.MONITOREO };
+    subforms[F.reporte_monitoreo.id][newId] = vals;
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', { json_subforms_values: JSON.stringify(subforms) });
+    toast('Reporte de monitoreo agregado.');
+    STATE.matriz=[]; await loadMatriz(true); await renderSeguimiento();
+    setTimeout(()=>toggleHistorial(riesgoId), 100);
+  }catch(err){ toast('Error al guardar: '+err.message, true); btn.disabled=false; btn.textContent='Guardar reporte de monitoreo'; }
+}
+window.guardarMonitoreo = guardarMonitoreo;
 
 // === Guardar reporte (desde el acordeón) ===
 async function guardarReporte(riesgoId){
@@ -2655,7 +2858,8 @@ function editarRiesgo(riesgoId){
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_formula"><label>Fórmula del indicador</label><textarea id="ed_formula">${cur('Fórmula del indicador')}</textarea></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_calc"><label>Frecuencia de cálculo</label><select id="ed_frec_calc">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de cálculo'))}</select></div>
       <div class="field"></div>
-      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_plan"><label>Plan de monitoreo</label><textarea id="ed_plan">${cur('Plan de monitoreo')}</textarea></div>
+      <div class="field"></div>
+      <!-- Plan de monitoreo se movió al subformulario de metas -->
       <!-- Responsable: siempre -->
       <div class="field full"><label>Responsable (oficina)</label><select id="ed_responsable" onchange="autocompletarRespProceso('ed_responsable','ed_resp_proc','ed_resp_cel','ed_resp_cor')"></select></div>
       <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="ed_resp_proc">—</div></div>
@@ -2878,7 +3082,7 @@ async function guardarEdit(){
       set(F.formula_indicador, limpiar(g('ed_formula')));
       if(g('ed_frec_med')) set(F.frecuencia_medicion, g('ed_frec_med'));
       if(g('ed_frec_calc')) set(F.frecuencia_calculo, g('ed_frec_calc'));
-      set(F.plan_monitoreo, limpiar(g('ed_plan')));
+      // Plan de monitoreo se gestiona en el subformulario de metas
     }
   }
   set(F.certificacion_control, g('ed_cert')); // guardar siempre, permite volver a vacío (Seleccione…)
