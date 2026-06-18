@@ -14,7 +14,7 @@
   :root{
     --ink:#11161d; --slate:#3a4754; --mist:#6b7785; --line:#e2e6ea;
     --paper:#f7f8fa; --card:#ffffff; --brand:#1f5641; --brand-2:#2e7d5b;
-    --brand:#15a06b; --brand-2:#10b981;
+    --brand:#0f8f5e; --brand-2:#0fa968;
     --n1:#3a8c5f; --n2:#c9a227; --n3:#d97706; --n4:#c0392b; /* niveles 1-4 */
     --ok:#3a8c5f; --warn:#d97706; --shadow:0 1px 2px rgba(16,22,29,.04),0 4px 16px rgba(16,22,29,.06);
   }
@@ -1520,6 +1520,7 @@ const FILTRO_OPERADORES = {
   vacio:'Está vacío', novacio:'No está vacío'
 };
 const FILTRO_OPERADORES_FECHA = { fes:'es igual a', fdesde:'desde (≥)', fhasta:'hasta (≤)' };
+const FILTRO_OPERADORES_OPCION = { es:'Es', noes:'No es', vacio:'Está vacío', novacio:'No está vacío' };
 let CONDICIONES = []; // [{campo, op, valor}]
 
 function agregarCondicion(){
@@ -1531,9 +1532,9 @@ function actualizarCondicion(i, prop, val){
   CONDICIONES[i][prop]=val;
   if(prop==='campo'){
     CONDICIONES[i].valor='';
-    // Al cambiar a/desde un campo de fecha, ajustar el operador por defecto
-    const esF = FILTRO_CAMPOS[val] && FILTRO_CAMPOS[val].esFecha;
-    CONDICIONES[i].op = esF ? 'fdesde' : 'similar';
+    // Operador por defecto según el tipo de campo elegido
+    const d = FILTRO_CAMPOS[val] || {};
+    CONDICIONES[i].op = d.esFecha ? 'fdesde' : (d.opciones ? 'es' : 'similar');
   }
   renderFiltros(); renderSeguimiento();
 }
@@ -1548,8 +1549,8 @@ function renderFiltros(){
     const def=FILTRO_CAMPOS[c.campo];
     const esF = def && def.esFecha;
     const campoSel = Object.entries(FILTRO_CAMPOS).map(([k,v])=>`<option value="${k}" ${k===c.campo?'selected':''}>${v.label}</option>`).join('');
-    // Operadores: de fecha si el campo es fecha, normales si no
-    const ops = esF ? FILTRO_OPERADORES_FECHA : FILTRO_OPERADORES;
+    // Operadores según el tipo de campo: fecha, opciones (dropdown) o texto libre
+    const ops = esF ? FILTRO_OPERADORES_FECHA : (def.opciones ? FILTRO_OPERADORES_OPCION : FILTRO_OPERADORES);
     const opSel = Object.entries(ops).map(([k,v])=>`<option value="${k}" ${k===c.op?'selected':''}>${v}</option>`).join('');
     // valor: fecha → input date; con opciones → select; si no → texto
     let valInput;
