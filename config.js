@@ -29,7 +29,9 @@ const CONFIG = {
     NIVEL1:       "bjW7pcICjogOowWR_cISkf",
     NIVEL2:       "csA8ocWP1eW5aaW6lcUCkM",
     NIVEL3:       "dcRNhdP8ngEixcV8kmWP5v",
-    RESPONSABLES: "cXW7_dOCnctOlcRSo6W4LK"
+    RESPONSABLES: "cXW7_dOCnctOlcRSo6W4LK",
+    RESP_PROCESO: "cPW44qr3vlW6XMn01eWPiv",
+    CONFIG_NOTIF: "cahmk8WPDdPikOFmkHfSoB"
   },
 
   // ---- Campos de la MATRIZ (field_id por nombre lógico) ------------------
@@ -90,7 +92,10 @@ const CONFIG = {
     parte_txt:               { id: "cpWRGkWRfhAi8sW45VjHzi", type: "string", col: "Parte interesada " },
     requisitos_txt:          { id: "bbB2XUWOvcMyoSsmogySov", type: "string", col: "Requisitos - texto" },
     expectativas_txt:        { id: "afWQOyW7bap4JcNJJdGeyV", type: "string", col: "Expectativas - texto" },
-    estado_registro:         { id: "ddK1hdOc5dmi4nmMZdSCop", type: "select", options: ["Activo","Archivado"], col: "Estado del registro" }
+    estado_registro:         { id: "ddK1hdOc5dmi4nmMZdSCop", type: "select", options: ["Activo","Archivado"], col: "Estado del registro" },
+    resp_proceso_txt:        { id: "bDW5yrW5fjW6_cLgJcMmkN", type: "string", col: "Responsable proceso" },
+    resp_celular:            { id: "biW7xdQK1cJyonimkXa8o-", type: "phone", col: "Celular responsable" },
+    resp_correo:             { id: "cPWOD_W5bmWRpcMCk1W6zC", type: "email", col: "Correo responsable" }
   },
 
   // ---- Campos de la SUBTABLA Reporte de acciones (IDs reales verificados) ----
