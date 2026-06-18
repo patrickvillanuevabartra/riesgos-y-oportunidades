@@ -767,7 +767,9 @@ function nivelInherenteForm(){
 // Muestra/oculta campos según "¿Existen controles?" y el nivel inherente.
 // prefijo 'f' = Registrar, 'ed' = Editar.
 function toggleControles(pref){
-  const existe = (document.getElementById(pref+'_existe_ctrl')||{}).value || '';
+  // El select se llama distinto en cada formulario: f_existe_ctrl (registrar) y ed_ctrl (editar)
+  const selId = (pref==='f') ? 'f_existe_ctrl' : 'ed_ctrl';
+  const existe = (document.getElementById(selId)||{}).value || '';
   const esSi = existe==='Sí';
   const esNo = existe==='No';
   const nivel = (pref==='f') ? nivelInherenteForm() : (window._edNivelInherente||0);
