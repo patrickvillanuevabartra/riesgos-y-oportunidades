@@ -879,7 +879,35 @@ function _datosNotif(r){
   };
 }
 // Lista de marcadores disponibles (para la paleta del editor)
-const MARCADORES_NOTIF = ['responsable','descripcion','tipo','nivel','proceso','oficina','actividad','fuente','celular','correo','probabilidad','impacto','respuesta','control','medida','estado','fecha','certificacion','procede_reev'];
+const MARCADORES_NOTIF = ['responsable','descripcion','tipo','nivel','proceso','oficina','actividad','fuente','celular','correo','probabilidad','impacto','respuesta','control','medida','avance','ultimo_estado','certificacion','procede_reev','fecha'];
+
+// Obtiene el % de avance y el estado del reporte MÁS RECIENTE de acciones del riesgo.
+async function _avanceUltimoReporte(r){
+  try{
+    const F=CONFIG.MATRIZ_FIELDS; const RF=CONFIG.REPORTE_FIELDS;
+    const sub = (r.subform_values && r.subform_values[SUBFORM_FIELD_ID]) || [];
+    if(!sub || !sub.length) return {avance:'', ultimo_estado:''};
+    const fechaComparable = s => {
+      const m = String(s||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/);
+      if(!m) return 0;
+      return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]).getTime();
+    };
+    let mejor=null, mejorFecha=-1;
+    for(const rid of sub){
+      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','GET',{name_value:1});
+      const rec = d.record||{};
+      const ts = fechaComparable(rec.created_at);
+      if(ts>=mejorFecha){ mejorFecha=ts; mejor=rec; }
+    }
+    const v = (mejor && mejor.values) ? mejor.values : {};
+    const pct = v[RF.pct_completado.col];
+    const est = v[RF.estado.col] || '';
+    return {
+      avance: (pct!=='' && pct!=null) ? (parseInt(pct)||0)+'%' : '',
+      ultimo_estado: est
+    };
+  }catch(_){ return {avance:'', ultimo_estado:''}; }
+}
 
 // Reemplaza {marcador} por el valor real
 function aplicarPlantilla(txt, datos){
@@ -923,6 +951,7 @@ async function notificarWhatsApp(riesgoId){
   const d=_datosNotif(r);
   const tel=_telWa(d.celular);
   if(!tel){ toast('Este registro no tiene celular del responsable de proceso.', true); return; }
+  const av=await _avanceUltimoReporte(r); d.avance=av.avance; d.ultimo_estado=av.ultimo_estado;
   const p=await cargarPlantillas();
   const url='https://wa.me/'+tel+'?text='+encodeURIComponent(aplicarPlantilla(p.wa,d));
   window.open(url,'_blank');
@@ -931,6 +960,7 @@ async function notificarCorreo(riesgoId){
   const r=STATE.matriz.find(x=>x.id===riesgoId); if(!r) return;
   const d=_datosNotif(r);
   if(!d.correo){ toast('Este registro no tiene correo del responsable de proceso.', true); return; }
+  const av=await _avanceUltimoReporte(r); d.avance=av.avance; d.ultimo_estado=av.ultimo_estado;
   const p=await cargarPlantillas();
   const url='mailto:'+encodeURIComponent(d.correo)+'?subject='+encodeURIComponent(aplicarPlantilla(p.asunto,d))+'&body='+encodeURIComponent(aplicarPlantilla(p.correo,d));
   window.location.href=url;
@@ -963,6 +993,9 @@ function actualizarPreviewPlantilla(){
   // Usa el primer riesgo activo como ejemplo, o datos genéricos
   const ej = (STATE.matriz||[]).find(r=>!esArchivado(r)) || (STATE.matriz||[])[0];
   const d = ej ? _datosNotif(ej) : {responsable:'María Pérez',descripcion:'Ejemplo de riesgo',tipo:'riesgo',nivel:'3',proceso:'Proceso ejemplo'};
+  // El avance/último estado requieren consulta extra; en la vista previa se muestran como ejemplo
+  if(!d.avance) d.avance = '10%';
+  if(!d.ultimo_estado) d.ultimo_estado = 'En Proceso';
   const prevWa = document.getElementById('pl_prev_wa');
   const prevCor = document.getElementById('pl_prev_correo');
   if(prevWa) prevWa.textContent = aplicarPlantilla(document.getElementById('pl_wa').value, d);
@@ -2035,15 +2068,28 @@ async function renderSeguimiento() {
 // Lee el último reporte de cada riesgo con reportes y muestra su estado en la columna.
 async function cargarUltimosEstados(filasConReportes) {
   const RF = CONFIG.REPORTE_FIELDS;
+  // Convierte "DD-MM-YYYY HH:MM:SS" a algo comparable cronológicamente
+  const fechaComparable = s => {
+    const m = String(s||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/);
+    if(!m) return 0;
+    return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]).getTime();
+  };
   for (const f of filasConReportes) {
     try {
-      const ultimoId = f.subIds[f.subIds.length - 1]; // el último vinculado
-      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+ultimoId+'.json','GET',{name_value:1});
-      const v = (d.record && d.record.values) ? d.record.values : {};
+      // Consultar TODOS los reportes vinculados y quedarnos con el MÁS RECIENTE
+      // (el orden en subform_values no es necesariamente cronológico).
+      let mejor = null, mejorFecha = -1;
+      for (const rid of f.subIds) {
+        const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','GET',{name_value:1});
+        const rec = d.record || {};
+        const ts = fechaComparable(rec.created_at);
+        if (ts >= mejorFecha) { mejorFecha = ts; mejor = rec; }
+      }
+      const v = (mejor && mejor.values) ? mejor.values : {};
       const est = v[RF.estado.col] || '';
       const cel = document.getElementById('estado-'+f.id);
       if (cel) cel.innerHTML = est ? estadoPill(est) : '—';
-      // % avance = % completado del último reporte
+      // % avance = % completado del reporte más reciente
       const pctRaw = v[RF.pct_completado.col];
       const cav = document.getElementById('avance-'+f.id);
       if (cav) {
