@@ -20,6 +20,7 @@ const CONFIG = {
     MATRIZ:       "cKsCkOEcvgW59zuCkyFCkN", // Matriz de Riesgos y Oportunidades
     INVENTARIO:   "dcUCouymnkz4ovWRVdOmk0", // Inventario de procesos y procedimientos
     REPORTES:     "czW791qCnmdj49WPxdRmoH", // Subtabla "Reporte de acciones"
+    MONITOREO:    "aWFSovFfrlWOHejZmpWR9O", // Subtabla "Reporte de monitoreo del control"
     // Tablas maestras (origen de los desplegables de relación)
     AMENAZAS:     "ddLmklpYHlqOGGWRauyf8c",
     OPORTUNIDADES:"cCn3pdNt9odOogW4euW5Xw",
@@ -95,7 +96,13 @@ const CONFIG = {
     estado_registro:         { id: "ddK1hdOc5dmi4nmMZdSCop", type: "select", options: ["Activo","Archivado"], col: "Estado del registro" },
     resp_proceso_txt:        { id: "bDW5yrW5fjW6_cLgJcMmkN", type: "string", col: "Responsable proceso" },
     resp_celular:            { id: "biW7xdQK1cJyonimkXa8o-", type: "phone", col: "Celular responsable" },
-    resp_correo:             { id: "cPWOD_W5bmWRpcMCk1W6zC", type: "email", col: "Correo responsable" }
+    resp_correo:             { id: "cPWOD_W5bmWRpcMCk1W6zC", type: "email", col: "Correo responsable" },
+    indicador:               { id: "dcVhXxWOHlDiddVudcR8oe", type: "string", col: "Indicador" },
+    formula_indicador:       { id: "dcRCoXW6Tcwik-oCkAW6uz", type: "text", col: "Fórmula del indicador" },
+    frecuencia_medicion:     { id: "bCgxukowHep4ZdP8k0qCow", type: "select", col: "Frecuencia de medición", options: ["Diaria","Semanal","Quincenal","Mensual","Trimestral","Semestral","Anual"] },
+    frecuencia_calculo:      { id: "cmWOT4WPPcQ68wWOelgSkj", type: "select", col: "Frecuencia de cálculo", options: ["Diaria","Semanal","Quincenal","Mensual","Trimestral","Semestral","Anual"] },
+    plan_monitoreo:          { id: "cLibRcOSnfW4HEtSoCcZus", type: "text", col: "Plan de monitoreo" },
+    reporte_monitoreo:       { id: "a8zLxdQqvdOA12W4FcN20X", type: "subform", entity: "MONITOREO" }
   },
 
   // ---- Campos de la SUBTABLA Reporte de acciones (IDs reales verificados) ----
@@ -106,6 +113,15 @@ const CONFIG = {
     evidencia2:     { id: "aIWRX9W7TmW5TbwmoXcszL", type: "url",  col: "Evidencia 2" },
     observacion:    { id: "aQWOHyWRvcSiotbeSqWOen", type: "text", col: "Observación" },
     estado:         { id: "ddGIWLW6PcGikeWO88W6mU", type: "select", col: "Estado medida(s) de respuesta", options: ["Pendiente","En Proceso","Culminado/Ejecutado"] }
+  },
+
+  // ---- Campos del subformulario "Reporte de monitoreo del control" -------
+  MONITOREO_FIELDS: {
+    fecha_monitoreo: { id: "ddPcxcHSnhkiVdLJxdR8k4", type: "date", col: "Fecha de monitoreo" },
+    descripcion:     { id: "dcNCkGgMflW49sq8kIqSk2", type: "text", col: "Descripción del avance" },
+    pct_cumplimiento:{ id: "bFlmohWRXcTiRdT8khW4yv", type: "integer", col: "% cumplimiento" },
+    estado:          { id: "blBCoTqmjoW5DuWPlcKmo3", type: "select", col: "Estado", options: ["Pendiente","En Proceso","Culminado/Ejecutado"] },
+    evidencia:       { id: "bAW4xcGmjcW5FdPvNcGwHm", type: "url", col: "Evidencia (link)" }
   },
 
   // ---- Campos del INVENTARIO (para la cascada) ---------------------------
