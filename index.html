@@ -2572,6 +2572,7 @@ function editarRiesgo(riesgoId){
   const v = r.values||{};
   const F = CONFIG.MATRIZ_FIELDS;
   const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+  window._edNivelInherente = esOportunidad(r) ? (nivelOportInherenteDe(r).nivel||0) : (nivelInherenteDe(r).nivel||0);
 
   const opt = (arr,sel)=>'<option value="">Seleccione…</option>'+arr.map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('');
   const fRaw=cur('Fecha de evaluación');
@@ -2639,18 +2640,31 @@ function editarRiesgo(riesgoId){
 
     <div class="edit-sec"><div class="edit-sec-tit">4 · Controles y tratamiento</div>
     <div class="grid">
-      <div class="field"><label>¿Existen controles?</label><select id="ed_ctrl">${opt(['Sí','No'],cur('¿Existen controles?'))}</select></div>
-      <div class="field"><label>Respuesta</label><select id="ed_resp">${opt(['Eliminar','Mitigar','Trasladar','Asumir'],cur('Respuesta al riesgo u oportunidad'))}</select></div>
-      <div class="field full"><label>Control establecido</label><textarea id="ed_control">${cur('Control establecido')}</textarea></div>
+      <div class="field"><label>¿Existen controles?</label><select id="ed_ctrl" onchange="toggleControles('ed')">${opt(['Sí','No'],cur('¿Existen controles?'))}</select></div>
+      <div class="field"></div>
+      <!-- NO existen controles: Respuesta + Medida -->
+      <div class="field ctrl-no hidden" id="ed_wrap_respuesta"><label>Respuesta</label><select id="ed_resp">${opt(['Eliminar','Mitigar','Trasladar','Asumir'],cur('Respuesta al riesgo u oportunidad'))}</select></div>
+      <div class="field full ctrl-no hidden" id="ed_wrap_medida"><label>Medida(s) de respuesta</label><textarea id="ed_medida">${cur('Medida(s) de respuesta')}</textarea></div>
+      <!-- SÍ existen controles: Control (+ monitoreo si nivel 4) -->
+      <div class="field full ctrl-si hidden" id="ed_wrap_control"><label>Control establecido</label><textarea id="ed_control">${cur('Control establecido')}</textarea></div>
+      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monit_aviso"><div class="hint" style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px">Riesgo de nivel 4: defina el sistema de monitoreo del control.</div></div>
+      <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_indicador"><label>Indicador</label><input id="ed_indicador" value="${(cur('Indicador')||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_med"><label>Frecuencia de medición</label><select id="ed_frec_med">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de medición'))}</select></div>
+      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_formula"><label>Fórmula del indicador</label><textarea id="ed_formula">${cur('Fórmula del indicador')}</textarea></div>
+      <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_calc"><label>Frecuencia de cálculo</label><select id="ed_frec_calc">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de cálculo'))}</select></div>
+      <div class="field"></div>
+      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_plan"><label>Plan de monitoreo</label><textarea id="ed_plan">${cur('Plan de monitoreo')}</textarea></div>
+      <!-- Responsable: siempre -->
       <div class="field full"><label>Responsable (oficina)</label><select id="ed_responsable" onchange="autocompletarRespProceso('ed_responsable','ed_resp_proc','ed_resp_cel','ed_resp_cor')"></select></div>
       <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="ed_resp_proc">—</div></div>
       <div class="field"><label>Celular responsable</label><div class="readonly-pill" id="ed_resp_cel">—</div></div>
       <div class="field full"><label>Correo responsable</label><div class="readonly-pill" id="ed_resp_cor">—</div></div>
-      <div class="field full"><label>Medida(s) de respuesta</label><textarea id="ed_medida">${cur('Medida(s) de respuesta')}</textarea></div>
+      <!-- Certificación: siempre visible en sección 4 -->
       <div class="field"><label>Certificación del control</label><select id="ed_cert">${opt(['No Implementado','Implementado sin validar','Certificado/Operativo'],cur('Certificación de Implementación del Control'))}</select></div>
     </div></div>`;
 
   document.getElementById('editModal').classList.remove('hidden');
+  toggleControles('ed'); // aplicar visibilidad condicional según controles y nivel
   // Asegurar que el botón Guardar esté activo (por si quedó deshabilitado de un guardado anterior)
   const _bg=document.getElementById('editGuardar'); if(_bg){ _bg.disabled=false; _bg.textContent='Guardar cambios'; }
 
@@ -2851,9 +2865,20 @@ async function guardarEdit(){
   if(g('ed_imp'))  set(F.imp_riesgo_inh, g('ed_imp'));
   // Controles (texto)
   if(g('ed_ctrl')) set(F.existen_controles, g('ed_ctrl'));
-  if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
-  set(F.control_establecido, limpiar(g('ed_control')));
-  set(F.medida_respuesta, limpiar(g('ed_medida')));
+  const _edExiste = g('ed_ctrl');
+  if(_edExiste==='No'){
+    if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
+    set(F.medida_respuesta, limpiar(g('ed_medida')));
+  } else if(_edExiste==='Sí'){
+    set(F.control_establecido, limpiar(g('ed_control')));
+    if((window._edNivelInherente||0)===4){
+      set(F.indicador, limpiar(g('ed_indicador')));
+      set(F.formula_indicador, limpiar(g('ed_formula')));
+      if(g('ed_frec_med')) set(F.frecuencia_medicion, g('ed_frec_med'));
+      if(g('ed_frec_calc')) set(F.frecuencia_calculo, g('ed_frec_calc'));
+      set(F.plan_monitoreo, limpiar(g('ed_plan')));
+    }
+  }
   set(F.certificacion_control, g('ed_cert')); // guardar siempre, permite volver a vacío (Seleccione…)
   // Responsable → nombre de oficina en campo de texto
   if(gtxt('ed_responsable')) set(F.responsable_txt, gtxt('ed_responsable'));
