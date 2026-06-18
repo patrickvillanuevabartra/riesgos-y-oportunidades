@@ -408,14 +408,25 @@
       <div class="section">
         <div class="section-title"><span class="section-num">4</span>Controles y tratamiento</div>
         <div class="grid">
-          <div class="field"><label>¿Existen controles?</label><select id="f_existe_ctrl"><option value="">Seleccione…</option><option>Sí</option><option>No</option></select></div>
-          <div class="field"><label>Respuesta</label><select id="f_respuesta"><option value="">Seleccione…</option><option>Eliminar</option><option>Mitigar</option><option>Trasladar</option><option>Asumir</option></select></div>
-          <div class="field full"><label>Control establecido</label><textarea id="f_control"></textarea></div>
+          <div class="field"><label>¿Existen controles?</label><select id="f_existe_ctrl" onchange="toggleControles('f')"><option value="">Seleccione…</option><option>Sí</option><option>No</option></select></div>
+          <div class="field"></div>
+          <!-- Si NO existen controles: Respuesta + Medida -->
+          <div class="field ctrl-no hidden" id="f_wrap_respuesta"><label>Respuesta</label><select id="f_respuesta"><option value="">Seleccione…</option><option>Eliminar</option><option>Mitigar</option><option>Trasladar</option><option>Asumir</option></select></div>
+          <div class="field full ctrl-no hidden" id="f_wrap_medida"><label>Medida(s) de respuesta</label><textarea id="f_medida"></textarea></div>
+          <!-- Si SÍ existen controles: Control establecido (+ monitoreo si nivel 4) -->
+          <div class="field full ctrl-si hidden" id="f_wrap_control"><label>Control establecido</label><textarea id="f_control"></textarea></div>
+          <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_monit_aviso"><div class="hint" style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px">Riesgo de nivel 4: defina el sistema de monitoreo del control.</div></div>
+          <div class="field ctrl-si ctrl-n4 hidden" id="f_wrap_indicador"><label>Indicador</label><input id="f_indicador"></div>
+          <div class="field ctrl-si ctrl-n4 hidden" id="f_wrap_frec_med"><label>Frecuencia de medición</label><select id="f_frec_med"><option value="">Seleccione…</option><option>Diaria</option><option>Semanal</option><option>Quincenal</option><option>Mensual</option><option>Trimestral</option><option>Semestral</option><option>Anual</option></select></div>
+          <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_formula"><label>Fórmula del indicador</label><textarea id="f_formula"></textarea></div>
+          <div class="field ctrl-si ctrl-n4 hidden" id="f_wrap_frec_calc"><label>Frecuencia de cálculo</label><select id="f_frec_calc"><option value="">Seleccione…</option><option>Diaria</option><option>Semanal</option><option>Quincenal</option><option>Mensual</option><option>Trimestral</option><option>Semestral</option><option>Anual</option></select></div>
+          <div class="field"></div>
+          <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_plan"><label>Plan de monitoreo</label><textarea id="f_plan"></textarea></div>
+          <!-- Responsable: siempre visible -->
           <div class="field"><label>Responsable</label><select id="f_responsable" onchange="autocompletarRespProceso('f_responsable','f_resp_proc','f_resp_cel','f_resp_cor')"></select></div>
           <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="f_resp_proc">—</div></div>
           <div class="field"><label>Celular responsable</label><div class="readonly-pill" id="f_resp_cel">—</div></div>
           <div class="field"><label>Correo responsable</label><div class="readonly-pill" id="f_resp_cor">—</div></div>
-          <div class="field full"><label>Medida(s) de respuesta</label><textarea id="f_medida"></textarea></div>
         </div>
       </div>
 
@@ -735,11 +746,42 @@ function calcIndice() {
   const idx = p*i;
   document.getElementById('calc_indice').textContent = idx || '—';
   const badge = document.getElementById('calc_nivel');
-  if (!idx) { badge.innerHTML = '<span class="lvl-badge" style="background:var(--mist)">Pendiente</span>'; return; }
+  if (!idx) { badge.innerHTML = '<span class="lvl-badge" style="background:var(--mist)">Pendiente</span>'; toggleControles('f'); return; }
   let lvl=1, txt='Bajo';
   if (idx>12){lvl=4;txt='Intolerable';} else if(idx>9){lvl=3;txt='Alto';} else if(idx>4){lvl=2;txt='Medio';}
   badge.innerHTML = `<span class="lvl-badge lvl-${lvl}">Nivel ${lvl} · ${txt}</span>`;
+  toggleControles('f'); // recalcular visibilidad de monitoreo según nivel
 }
+
+// Nivel inherente actual del formulario de Registrar (1-4); 0 si aún no calculable
+function nivelInherenteForm(){
+  const tipo = document.getElementById('f_tipo_ro').value;
+  let p=0,i=0;
+  if(tipo==='Riesgo'){ p=num(document.getElementById('f_prob_r_inh').value); i=num(document.getElementById('f_imp_r_inh').value); }
+  else if(tipo==='Oportunidad'){ p=num(document.getElementById('f_prob_o_inh').value); i=num(document.getElementById('f_imp_o_inh').value); }
+  const idx=p*i;
+  if(!idx) return 0;
+  if(idx>12) return 4; if(idx>9) return 3; if(idx>4) return 2; return 1;
+}
+
+// Muestra/oculta campos según "¿Existen controles?" y el nivel inherente.
+// prefijo 'f' = Registrar, 'ed' = Editar.
+function toggleControles(pref){
+  const existe = (document.getElementById(pref+'_existe_ctrl')||{}).value || '';
+  const esSi = existe==='Sí';
+  const esNo = existe==='No';
+  const nivel = (pref==='f') ? nivelInherenteForm() : (window._edNivelInherente||0);
+  const esN4 = nivel===4;
+  // Recorre todos los wrappers con id que empieza por prefijo_wrap_
+  document.querySelectorAll('[id^="'+pref+'_wrap_"]').forEach(el=>{
+    let mostrar = true;
+    if(el.classList.contains('ctrl-no'))  mostrar = esNo;
+    if(el.classList.contains('ctrl-si'))  mostrar = esSi;
+    if(el.classList.contains('ctrl-n4'))  mostrar = esSi && esN4;
+    el.classList.toggle('hidden', !mostrar);
+  });
+}
+window.toggleControles = toggleControles;
 ['f_prob_r_inh','f_imp_r_inh','f_prob_o_inh','f_imp_o_inh'].forEach(id=>{
   document.getElementById(id).addEventListener('change', calcIndice);
 });
@@ -1234,9 +1276,22 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   put(F.causas, v('f_causas'));
   put(F.consecuencias, v('f_consec'));
   put(F.existen_controles, v('f_existe_ctrl'));
-  put(F.respuesta, v('f_respuesta'));
-  put(F.control_establecido, v('f_control'));
-  put(F.medida_respuesta, v('f_medida'));
+  const _existe = v('f_existe_ctrl');
+  if(_existe==='No'){
+    // Sin controles: respuesta + medida
+    put(F.respuesta, v('f_respuesta'));
+    put(F.medida_respuesta, v('f_medida'));
+  } else if(_existe==='Sí'){
+    // Con control: control establecido (+ monitoreo si nivel 4)
+    put(F.control_establecido, v('f_control'));
+    if(nivelInherenteForm()===4){
+      put(F.indicador, v('f_indicador'));
+      put(F.formula_indicador, v('f_formula'));
+      put(F.frecuencia_medicion, v('f_frec_med'));
+      put(F.frecuencia_calculo, v('f_frec_calc'));
+      put(F.plan_monitoreo, v('f_plan'));
+    }
+  }
 
   // Origen según fuente → se guarda el NOMBRE en el campo de texto correspondiente
   const fuente = v('f_fuente');
@@ -1287,7 +1342,7 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
     toast('Registro guardado correctamente.');
     document.getElementById('formRiesgo').reset();
     limpiarMultiselects();
-    showOrigin(''); showEval(''); calcIndice();
+    showOrigin(''); showEval(''); calcIndice(); toggleControles('f');
     STATE.matriz = []; // invalidar caché
   } catch(err) {
     toast('Error al guardar: ' + err.message, true);
@@ -1304,7 +1359,7 @@ function limpiarMultiselects(){
   });
 }
 document.getElementById('btnReset').onclick = () => {
-  document.getElementById('formRiesgo').reset(); limpiarMultiselects(); showOrigin(''); showEval(''); calcIndice();
+  document.getElementById('formRiesgo').reset(); limpiarMultiselects(); showOrigin(''); showEval(''); calcIndice(); toggleControles('f');
 };
 
 /* ============================================================
