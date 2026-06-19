@@ -344,6 +344,10 @@
             <input type="date" id="f_fecha" required>
           </div>
           <div class="field">
+            <label>¿Riesgo u oportunidad? <span class="req">*</span></label>
+            <select id="f_tipo_ro" required><option value="">Seleccione…</option><option>Riesgo</option><option>Oportunidad</option></select>
+          </div>
+          <div class="field">
             <label>Fuente de identificación <span class="req">*</span></label>
             <select id="f_fuente" required>
               <option value="">Seleccione…</option>
@@ -351,9 +355,9 @@
             </select>
           </div>
 
-          <!-- Origen: Contexto -->
-          <div class="field origin contexto hidden"><label>Amenaza(s)</label><div id="f_amenaza" class="multiselect"></div></div>
-          <div class="field origin contexto hidden"><label>Oportunidad(es)</label><div id="f_oportunidad_rel" class="multiselect"></div></div>
+          <!-- Origen: Contexto (la tabla mostrada depende del tipo riesgo/oportunidad) -->
+          <div class="field origin contexto ctx-riesgo hidden"><label>Amenaza(s)</label><div id="f_amenaza" class="multiselect"></div></div>
+          <div class="field origin contexto ctx-oport hidden"><label>Oportunidad(es)</label><div id="f_oportunidad_rel" class="multiselect"></div></div>
 
           <!-- Origen: Partes interesadas -->
           <div class="field origin partes hidden"><label>Parte interesada</label><select id="f_parte" onchange="autocompletarParte('f_parte','f_requisitos','f_expectativas')"></select></div>
@@ -375,11 +379,6 @@
       <div class="section">
         <div class="section-title"><span class="section-num">2</span>Naturaleza y descripción</div>
         <div class="grid">
-          <div class="field">
-            <label>¿Riesgo u oportunidad? <span class="req">*</span></label>
-            <select id="f_tipo_ro" required><option value="">Seleccione…</option><option>Riesgo</option><option>Oportunidad</option></select>
-          </div>
-          <div class="field"></div>
           <div class="field full ro-riesgo hidden"><label>Descripción del riesgo</label><textarea id="f_riesgo_desc"></textarea></div>
           <div class="field full ro-oport hidden"><label>Descripción de la oportunidad</label><textarea id="f_oport_desc"></textarea></div>
           <div class="field full"><label>Causas</label><textarea id="f_causas"></textarea></div>
@@ -423,7 +422,7 @@
           <div class="field"></div>
           <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_aviso_metas"><div class="hint" style="background:var(--paper);border:1px dashed var(--brand);border-radius:8px;padding:10px;color:var(--brand)">💡 Guarda primero el riesgo. Luego, desde <strong>Editar</strong>, podrás programar las metas de monitoreo y registrar el cumplimiento real del control.</div></div>
           <!-- Responsable: siempre visible -->
-          <div class="field"><label>Responsable</label><select id="f_responsable" onchange="autocompletarRespProceso('f_responsable','f_resp_proc','f_resp_cel','f_resp_cor')"></select></div>
+          <div class="field"><label>Responsable (oficina)</label><select id="f_responsable" onchange="autocompletarRespProceso('f_responsable','f_resp_proc','f_resp_cel','f_resp_cor')"></select></div>
           <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="f_resp_proc">—</div></div>
           <div class="field"><label>Celular responsable</label><div class="readonly-pill" id="f_resp_cel">—</div></div>
           <div class="field"><label>Correo responsable</label><div class="readonly-pill" id="f_resp_cor">—</div></div>
@@ -724,6 +723,16 @@ function showOrigin(fuente) {
   document.querySelectorAll('.origin').forEach(e => e.classList.add('hidden'));
   const map = { 'Contexto':'contexto', 'Partes interesadas':'partes', 'Proceso':'proceso' };
   if (map[fuente]) document.querySelectorAll('.origin.' + map[fuente]).forEach(e => e.classList.remove('hidden'));
+  actualizarContextoTipo(); // si es Contexto, mostrar solo la tabla del tipo elegido
+}
+// En Contexto, muestra solo la tabla Amenazas (si Riesgo) u Oportunidades (si Oportunidad)
+function actualizarContextoTipo(){
+  const fuente = document.getElementById('f_fuente').value;
+  const tipo = document.getElementById('f_tipo_ro').value;
+  if(fuente!=='Contexto') return;
+  const esR = tipo==='Riesgo', esO = tipo==='Oportunidad';
+  document.querySelectorAll('.ctx-riesgo').forEach(e=>e.classList.toggle('hidden', !esR));
+  document.querySelectorAll('.ctx-oport').forEach(e=>e.classList.toggle('hidden', !esO));
 }
 function showEval(tipo) {
   const esR = tipo === 'Riesgo', esO = tipo === 'Oportunidad';
@@ -731,6 +740,7 @@ function showEval(tipo) {
   document.querySelectorAll('.ro-oport').forEach(e=>e.classList.toggle('hidden',!esO));
   document.querySelectorAll('.eval-riesgo').forEach(e=>e.classList.toggle('hidden',!esR));
   document.querySelectorAll('.eval-oport').forEach(e=>e.classList.toggle('hidden',!esO));
+  actualizarContextoTipo(); // actualizar la tabla de contexto según el nuevo tipo
   calcIndice();
 }
 document.getElementById('f_fuente').onchange = e => showOrigin(e.target.value);
@@ -3085,10 +3095,11 @@ function editarRiesgo(riesgoId){
     <div class="edit-sec"><div class="edit-sec-tit">1 · Identificación</div>
     <div class="grid">
       <div class="field"><label>Fecha de evaluación</label><input type="date" id="ed_fecha" value="${fechaISO}"></div>
+      <div class="field"><label>¿Riesgo u oportunidad?</label><select id="ed_tipo_ro" onchange="showEvalEdit(this.value)">${opt(['Riesgo','Oportunidad'],tipoRO)}</select></div>
       <div class="field"><label>Fuente de identificación</label><select id="ed_fuente">${opt(['Contexto','Partes interesadas','Proceso'],fuenteAct)}</select></div>
 
-      <div class="field origin-ed contexto-ed hidden"><label>Amenaza(s)</label><select id="ed_amenaza"></select></div>
-      <div class="field origin-ed contexto-ed hidden"><label>Oportunidad(es) relacionada(s)</label><select id="ed_oport_rel"></select></div>
+      <div class="field origin-ed contexto-ed ctxed-riesgo hidden"><label>Amenaza(s)</label><select id="ed_amenaza"></select></div>
+      <div class="field origin-ed contexto-ed ctxed-oport hidden"><label>Oportunidad(es) relacionada(s)</label><select id="ed_oport_rel"></select></div>
 
       <div class="field origin-ed partes-ed hidden"><label>Parte interesada</label><select id="ed_parte" onchange="autocompletarParte('ed_parte','ed_requisitos','ed_expectativas')"></select></div>
       <div class="field origin-ed partes-ed hidden"><label>Requisitos principales</label><div class="readonly-pill" id="ed_requisitos">Se autocompleta según la parte interesada</div></div>
@@ -3107,8 +3118,6 @@ function editarRiesgo(riesgoId){
 
     <div class="edit-sec"><div class="edit-sec-tit">2 · Naturaleza y descripción</div>
     <div class="grid">
-      <div class="field"><label>¿Riesgo u oportunidad?</label><select id="ed_tipo_ro">${opt(['Riesgo','Oportunidad'],tipoRO)}</select></div>
-      <div class="field"></div>
       <div class="field full"><label>Descripción del riesgo</label><textarea id="ed_riesgo">${cur('Riesgo')}</textarea></div>
       <div class="field full"><label>Descripción de la oportunidad</label><textarea id="ed_oport_desc">${cur('Oportunidad - text')}</textarea></div>
       <div class="field full"><label>Causas</label><textarea id="ed_causas">${cur('Causas')}</textarea></div>
@@ -3172,7 +3181,23 @@ function showOriginEdit(fuente){
   document.querySelectorAll('.origin-ed').forEach(e=>e.classList.add('hidden'));
   const map={'Contexto':'contexto-ed','Partes interesadas':'partes-ed','Proceso':'proceso-ed'};
   if(map[fuente]) document.querySelectorAll('.origin-ed.'+map[fuente]).forEach(e=>e.classList.remove('hidden'));
+  actualizarContextoTipoEdit();
 }
+// En Contexto (edición), muestra solo la tabla del tipo elegido
+function actualizarContextoTipoEdit(){
+  const fuente=(document.getElementById('ed_fuente')||{}).value;
+  const tipo=(document.getElementById('ed_tipo_ro')||{}).value;
+  if(fuente!=='Contexto') return;
+  const esR=tipo==='Riesgo', esO=tipo==='Oportunidad';
+  document.querySelectorAll('.ctxed-riesgo').forEach(e=>e.classList.toggle('hidden',!esR));
+  document.querySelectorAll('.ctxed-oport').forEach(e=>e.classList.toggle('hidden',!esO));
+}
+window.actualizarContextoTipoEdit = actualizarContextoTipoEdit;
+// Al cambiar el tipo en edición: actualiza descripción, evaluación y contexto
+function showEvalEdit(tipo){
+  actualizarContextoTipoEdit();
+}
+window.showEvalEdit = showEvalEdit;
 
 // Carga las listas dinámicas del modal de edición y preselecciona los valores actuales
 async function cargarRelEdit(v){
