@@ -391,11 +391,15 @@
         <div class="section-desc">Calificación inicial, sin considerar la efectividad de las medidas. El índice y el nivel se calculan al guardar.</div>
         <div class="grid">
           <!-- riesgo -->
-          <div class="field eval-riesgo hidden"><label>Probabilidad (riesgo)</label><select id="f_prob_r_inh"></select></div>
-          <div class="field eval-riesgo hidden"><label>Impacto (riesgo)</label><select id="f_imp_r_inh"></select></div>
+          <div class="field eval-riesgo hidden"><label>Probabilidad (riesgo)</label><select id="f_prob_r_inh" onchange="actualizarDescEval()"></select></div>
+          <div class="field eval-riesgo hidden"><label>Descripción probabilidad</label><div class="readonly-pill" id="f_desc_prob_r">—</div></div>
+          <div class="field eval-riesgo hidden"><label>Impacto (riesgo)</label><select id="f_imp_r_inh" onchange="actualizarDescEval()"></select></div>
+          <div class="field eval-riesgo hidden"><label>Descripción impacto</label><div class="readonly-pill" id="f_desc_imp_r">—</div></div>
           <!-- oportunidad -->
-          <div class="field eval-oport hidden"><label>Probabilidad (oportunidad)</label><select id="f_prob_o_inh"></select></div>
-          <div class="field eval-oport hidden"><label>Impacto (oportunidad)</label><select id="f_imp_o_inh"></select></div>
+          <div class="field eval-oport hidden"><label>Probabilidad (oportunidad)</label><select id="f_prob_o_inh" onchange="actualizarDescEval()"></select></div>
+          <div class="field eval-oport hidden"><label>Descripción probabilidad</label><div class="readonly-pill" id="f_desc_prob_o">—</div></div>
+          <div class="field eval-oport hidden"><label>Impacto (oportunidad)</label><select id="f_imp_o_inh" onchange="actualizarDescEval()"></select></div>
+          <div class="field eval-oport hidden"><label>Descripción impacto</label><div class="readonly-pill" id="f_desc_imp_o">—</div></div>
         </div>
         <div class="calc-row">
           <div class="calc"><div class="k">Índice de prioridad (P × I)</div><div class="v mono" id="calc_indice">—</div></div>
@@ -741,6 +745,7 @@ function showEval(tipo) {
   document.querySelectorAll('.eval-riesgo').forEach(e=>e.classList.toggle('hidden',!esR));
   document.querySelectorAll('.eval-oport').forEach(e=>e.classList.toggle('hidden',!esO));
   actualizarContextoTipo(); // actualizar la tabla de contexto según el nuevo tipo
+  actualizarDescEval();
   calcIndice();
 }
 document.getElementById('f_fuente').onchange = e => showOrigin(e.target.value);
@@ -748,6 +753,53 @@ document.getElementById('f_tipo_ro').onchange = e => showEval(e.target.value);
 
 // Cálculo local del índice P×I (vista previa)
 function num(v){ const m = String(v).match(/^(\d+)/); return m ? +m[1] : 0; }
+
+// Tablas de descripción de probabilidad e impacto (según definición ISO en QuintaDB)
+const DESC_PROBABILIDAD = {
+  '1: Muy raro': 'Ocasiones excepcionales (no hay estadísticas)',
+  '2: Ocasionalmente': 'En algún momento (al menos una vez al año)',
+  '3: Frecuente': 'En algún momento (al menos una vez cada 6 meses)',
+  '4: Muy frecuente': 'En la mayoría de las circunstancias (al menos una vez cada tres meses)'
+};
+const DESC_IMPACTO_RIESGO = {
+  '1: Muy bajo': 'Consecuencias mínimas',
+  '2: Bajo': 'Bajo impacto o efecto',
+  '3: Moderado': 'Medianas consecuencias o efecto',
+  '4: Alto': 'Altas consecuencias o efectos'
+};
+const DESC_IMPACTO_OPORT = {
+  '1: Bajo': 'Bajo impacto o efecto',
+  '2: Moderado': 'Medianas consecuencias o efecto',
+  '3: Alto': 'Altas consecuencias o efectos'
+};
+// Devuelve la descripción de una probabilidad (riesgo u oportunidad usan la misma tabla)
+function descProbabilidad(val){ return DESC_PROBABILIDAD[String(val||'').trim()] || ''; }
+// Devuelve la descripción de impacto según sea riesgo (4 niveles) u oportunidad (3 niveles)
+function descImpacto(val, esOport){
+  const v = String(val||'').trim();
+  return (esOport ? DESC_IMPACTO_OPORT[v] : DESC_IMPACTO_RIESGO[v]) || '';
+}
+// Actualiza las descripciones de probabilidad/impacto en vivo (Registrar)
+function actualizarDescEval(){
+  const set=(id,txt)=>{ const el=document.getElementById(id); if(el) el.textContent = txt||'—'; };
+  const g=id=>{ const el=document.getElementById(id); return el?el.value:''; };
+  set('f_desc_prob_r', descProbabilidad(g('f_prob_r_inh')));
+  set('f_desc_imp_r', descImpacto(g('f_imp_r_inh'), false));
+  set('f_desc_prob_o', descProbabilidad(g('f_prob_o_inh')));
+  set('f_desc_imp_o', descImpacto(g('f_imp_o_inh'), true));
+}
+window.actualizarDescEval = actualizarDescEval;
+
+// Descripciones en vivo en el formulario de Editar
+function actualizarDescEvalEdit(){
+  const r = STATE.matriz.find(x=>x.id===EDIT_ACTUAL);
+  const esOport = r ? esOportunidad(r) : false;
+  const set=(id,txt)=>{ const el=document.getElementById(id); if(el) el.textContent = txt||'—'; };
+  const g=id=>{ const el=document.getElementById(id); return el?el.value:''; };
+  set('ed_desc_prob', descProbabilidad(g('ed_prob')));
+  set('ed_desc_imp', descImpacto(g('ed_imp'), esOport));
+}
+window.actualizarDescEvalEdit = actualizarDescEvalEdit;
 function calcIndice() {
   const tipo = document.getElementById('f_tipo_ro').value;
   let p=0, i=0;
@@ -2912,7 +2964,9 @@ function verDetalle(riesgoId){
     ['Parte interesada','__parte__'],
     ['Actividad específica','Actividad específica'],
     ['Probabilidad inherente','Probabilidad riesgo inherente'],
+    ['Descripción probabilidad inherente','__desc_prob_inh__'],
     ['Impacto inherente','Impacto riesgo inherente'],
+    ['Descripción impacto inherente','__desc_imp_inh__'],
     ['Índice inherente','Índice de prioridad riesgo inherente'],
     ['Nivel inherente','Nivel de riesgo inherente'],
     ['¿Existen controles?','¿Existen controles?'],
@@ -2924,15 +2978,25 @@ function verDetalle(riesgoId){
     ['Correo responsable','Correo responsable'],
     ['Medida(s) de respuesta','Medida(s) de respuesta'],
     ['Certificación del control','Certificación de Implementación del Control'],
+    ['Probabilidad residual','Probabilidad riesgo residual'],
+    ['Descripción probabilidad residual','__desc_prob_res__'],
+    ['Impacto residual','Impacto riesgo residual'],
+    ['Descripción impacto residual','__desc_imp_res__'],
     ['Nivel residual','Nivel de riesgo residual'],
   ];
   const F2 = CONFIG.MATRIZ_FIELDS;
+  const _esOport = esOportunidad(r);
   const limpio = (col)=>{
     if(col==='__proceso__') return rutaProcesoDe(r);
     if(col==='Responsable') return oficinaDe(r)==='Sin oficina asignada' ? '' : oficinaDe(r);
     if(col==='__amenaza__'){ return leerTexto(r, F2.amenaza_txt, true); }
     if(col==='__oportunidad__'){ return leerTexto(r, F2.oportunidad_txt, true); }
     if(col==='__parte__'){ return leerTexto(r, F2.parte_txt, true); }
+    // Descripciones de probabilidad/impacto (calculadas según el nivel elegido)
+    if(col==='__desc_prob_inh__'){ const p=_esOport?v['Probabilidad oportunidad inherente']:v['Probabilidad riesgo inherente']; return descProbabilidad(p); }
+    if(col==='__desc_imp_inh__'){ const i=_esOport?v['Impacto oportunidad inherente']:v['Impacto riesgo inherente']; return descImpacto(i,_esOport); }
+    if(col==='__desc_prob_res__'){ const p=_esOport?v['Probabilidad oportunidad residual']:v['Probabilidad riesgo residual']; return descProbabilidad(p); }
+    if(col==='__desc_imp_res__'){ const i=_esOport?v['Impacto oportunidad residual']:v['Impacto riesgo residual']; return descImpacto(i,_esOport); }
     const val = v[col];
     if(!val || val===col) return '';
     return val;
@@ -3134,8 +3198,10 @@ function editarRiesgo(riesgoId){
 
     <div class="edit-sec"><div class="edit-sec-tit">3 · Evaluación inherente</div>
     <div class="grid">
-      <div class="field"><label>Probabilidad inherente</label><select id="ed_prob">${opt(['1: Muy raro','2: Ocasionalmente','3: Frecuente','4: Muy frecuente'],cur('Probabilidad riesgo inherente'))}</select></div>
-      <div class="field"><label>Impacto inherente</label><select id="ed_imp">${opt(['1: Muy bajo','2: Bajo','3: Moderado','4: Alto'],cur('Impacto riesgo inherente'))}</select></div>
+      <div class="field"><label>Probabilidad inherente</label><select id="ed_prob" onchange="actualizarDescEvalEdit()">${opt(['1: Muy raro','2: Ocasionalmente','3: Frecuente','4: Muy frecuente'],cur('Probabilidad riesgo inherente'))}</select></div>
+      <div class="field"><label>Descripción probabilidad</label><div class="readonly-pill" id="ed_desc_prob">—</div></div>
+      <div class="field"><label>Impacto inherente</label><select id="ed_imp" onchange="actualizarDescEvalEdit()">${opt(['1: Muy bajo','2: Bajo','3: Moderado','4: Alto'],cur('Impacto riesgo inherente'))}</select></div>
+      <div class="field"><label>Descripción impacto</label><div class="readonly-pill" id="ed_desc_imp">—</div></div>
     </div></div>
 
     <div class="edit-sec"><div class="edit-sec-tit">4 · Controles y tratamiento</div>
@@ -3165,6 +3231,7 @@ function editarRiesgo(riesgoId){
 
   document.getElementById('editModal').classList.remove('hidden');
   toggleControles('ed'); // aplicar visibilidad condicional según controles y nivel
+  actualizarDescEvalEdit(); // mostrar descripciones de prob/impacto
   // Cargar panel de metas y monitoreo (solo nivel 4 con control)
   renderPanelMonitoreoEdit(riesgoId, r);
   // Asegurar que el botón Guardar esté activo (por si quedó deshabilitado de un guardado anterior)
