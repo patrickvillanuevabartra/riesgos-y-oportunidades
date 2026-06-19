@@ -2261,6 +2261,24 @@ async function toggleHistorial(riesgoId){
 }
 window.toggleHistorial = toggleHistorial;
 
+// Recopila los campos de control/indicador del formulario de edición (para guardarlos junto con meta/monitoreo)
+function _camposControlForm(){
+  const F = CONFIG.MATRIZ_FIELDS;
+  const campos = {};
+  const g = id => { const el=document.getElementById(id); return el ? el.value : ''; };
+  const gtxt = id => { const el=document.getElementById(id); if(!(el && el.selectedOptions && el.selectedOptions[0])) return null; const o=el.selectedOptions[0]; return o.value===''? '' : o.text.trim(); };
+  // ¿Existen controles? Control. Certificación
+  const existe = gtxt('ed_ctrl'); if(existe!==null) campos[F.existen_controles.id] = existe;
+  if(document.getElementById('ed_control')) campos[F.control_establecido.id] = g('ed_control');
+  const cert = gtxt('ed_cert'); if(cert!==null) campos[F.certificacion_control.id] = cert;
+  // Indicador, fórmula, frecuencias (campos de monitoreo nivel 4)
+  if(document.getElementById('ed_indicador')) campos[F.indicador.id] = g('ed_indicador');
+  if(document.getElementById('ed_formula')) campos[F.formula_indicador.id] = g('ed_formula');
+  const fm = gtxt('ed_frec_med'); if(fm!==null) campos[F.frecuencia_medicion.id] = fm;
+  const fc = gtxt('ed_frec_calc'); if(fc!==null) campos[F.frecuencia_calculo.id] = fc;
+  return campos;
+}
+
 // Versión para el modal de EDICIÓN: llena #ed_monitoreo_cont
 async function renderPanelMonitoreoEdit(riesgoId, r){
   const cont = document.getElementById('ed_monitoreo_cont');
@@ -2322,7 +2340,7 @@ async function renderPanelMonitoreoEdit(riesgoId, r){
   if(metaIds.length){
     try {
       metasData = await cargarMetasData(metaIds);
-      document.getElementById('metaslist-'+riesgoId).innerHTML = renderMetasDataHTML(metasData);
+      document.getElementById('metaslist-'+riesgoId).innerHTML = renderMetasDataHTML(metasData, riesgoId);
       // poblar desplegable de metas en el reporte
       const sel = document.getElementById('mon_metasel_'+riesgoId);
       if(sel){
@@ -2337,7 +2355,7 @@ async function renderPanelMonitoreoEdit(riesgoId, r){
     }catch(e){}
   }
   if(monIds.length){
-    try { document.getElementById('monlist-'+riesgoId).innerHTML = await renderMonitoreoHTML(monIds); }catch(e){}
+    try { document.getElementById('monlist-'+riesgoId).innerHTML = await renderMonitoreoHTML(monIds, riesgoId); }catch(e){}
   }
 }
 window.renderPanelMonitoreoEdit = renderPanelMonitoreoEdit;
@@ -2353,6 +2371,7 @@ async function cargarMetasData(ids){
       out.push({
         id, fecha:g('Fecha de programación'),
         ref:g('Valor de referencia'), meta:g('Valor meta'),
+        indicador:g('Indicador'), formula:g('Fórmula ')||g('Fórmula'),
         plan:g('Plan de monitoreo para el cumplimiento de la meta'),
         obs:g('Observación')
       });
@@ -2360,12 +2379,17 @@ async function cargarMetasData(ids){
   }
   return out;
 }
-function renderMetasDataHTML(metas){
+function renderMetasDataHTML(metas, riesgoId){
   if(!metas.length) return '<p class="hint">Sin metas.</p>';
   return metas.map(m=>`<div class="rep-item">
+    ${m.indicador?`<div class="hint">Indicador: <strong>${m.indicador}</strong>${m.formula?(' · Fórmula: '+m.formula):''}</div>`:''}
     <div><strong>${m.fecha||'(sin fecha)'}</strong> · Ref: ${m.ref||'—'} → Meta: ${m.meta||'—'}</div>
     ${m.obs?`<div class="hint">${m.obs}</div>`:''}
-    ${m.plan?`<div><a href="${m.plan}" target="_blank" class="riesgo-link">📎 Plan de monitoreo</a></div>`:''}
+    <div style="display:flex;gap:12px;margin-top:3px;align-items:center">
+      ${m.plan?`<a href="${m.plan}" target="_blank" class="riesgo-link">📎 Plan de monitoreo</a>`:''}
+      ${riesgoId?`<a class="riesgo-link" style="margin-left:auto;cursor:pointer" onclick="editarMeta('${riesgoId}','${m.id}')">✏️ Editar</a>
+      <a class="riesgo-link" style="color:#c0392b;cursor:pointer" onclick="eliminarSubregistro('${riesgoId}','${m.id}','meta')">🗑️ Eliminar</a>`:''}
+    </div>
   </div>`).join('');
 }
 // Al elegir una meta en el desplegable, jala su valor de referencia y meta
@@ -2499,7 +2523,7 @@ async function renderMetasHTML(ids){
 }
 
 // Lista de reportes de monitoreo (medición real)
-async function renderMonitoreoHTML(ids){
+async function renderMonitoreoHTML(ids, riesgoId){
   let html = '';
   for(const id of ids){
     try{
@@ -2508,17 +2532,24 @@ async function renderMonitoreoHTML(ids){
       const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
       const real = _fmtNum(g('Valor real obtenido'));
       const meta = _fmtNum(g('Valor meta'));
+      const ref = _fmtNum(g('Valor de referencia'));
+      const ind = g('Indicador');
+      const form = g('Texto multilínea') || g('Fórmula');
       let pct = g('% cumplimiento');
-      if(pct==='' || pct==null){ // calcular si la fórmula no vino
+      if(pct==='' || pct==null){
         const rN=parseFloat(real), mN=parseFloat(meta);
         if(!isNaN(rN)&&!isNaN(mN)&&mN!==0) pct = Math.round((rN/mN)*1000)/10;
       } else { pct = Math.round(parseFloat(pct)*10)/10; }
       const evid = g('Evidencia (link)'); const plan = g('Plan de remediación');
       html += `<div class="rep-item">
-        <div><strong>${g('Fecha de monitoreo')||'(sin fecha)'}</strong> · Real: ${real||'—'} / Meta: ${meta||'—'} · <strong style="color:var(--brand)">${pct!==''&&pct!=null?pct+'%':'—'}</strong></div>
-        <div style="display:flex;gap:12px;margin-top:3px">
+        ${ind?`<div class="hint">Indicador: <strong>${ind}</strong>${form?(' · Fórmula: '+form):''}</div>`:''}
+        <div><strong>${g('Fecha de monitoreo')||'(sin fecha)'}</strong> · Meta monitoreada: ref ${ref||'—'} → meta ${meta||'—'}</div>
+        <div>Real obtenido: <strong>${real||'—'}</strong> · Avance: <strong style="color:var(--brand)">${pct!==''&&pct!=null?pct+'%':'—'}</strong></div>
+        <div style="display:flex;gap:12px;margin-top:3px;align-items:center">
           ${evid?`<a href="${evid}" target="_blank" class="riesgo-link">📎 Evidencia</a>`:''}
           ${plan?`<a href="${plan}" target="_blank" class="riesgo-link">🔧 Plan de remediación</a>`:''}
+          ${riesgoId?`<a class="riesgo-link" style="margin-left:auto;cursor:pointer" onclick="editarMonitoreo('${riesgoId}','${id}')">✏️ Editar</a>
+          <a class="riesgo-link" style="color:#c0392b;cursor:pointer" onclick="eliminarSubregistro('${riesgoId}','${id}','monitoreo')">🗑️ Eliminar</a>`:''}
         </div>
       </div>`;
     }catch(e){}
@@ -2555,7 +2586,9 @@ async function guardarMeta(riesgoId){
     const subforms = {};
     subforms[F.prog_metas.id] = { entity_id: CONFIG.ENTITIES.PROG_METAS };
     subforms[F.prog_metas.id][newId] = vals;
-    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', { json_subforms_values: JSON.stringify(subforms) });
+    // Guardar también los campos de control/indicador del formulario en el mismo PUT
+    const payload = Object.assign({}, _camposControlForm(), { json_subforms_values: JSON.stringify(subforms) });
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', payload);
     toast('Meta agregada.');
     STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
@@ -2595,7 +2628,9 @@ async function guardarMonitoreo(riesgoId){
     const subforms = {};
     subforms[F.reporte_monitoreo.id] = { entity_id: CONFIG.ENTITIES.MONITOREO };
     subforms[F.reporte_monitoreo.id][newId] = vals;
-    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', { json_subforms_values: JSON.stringify(subforms) });
+    // Guardar también los campos de control/indicador del formulario en el mismo PUT
+    const payload = Object.assign({}, _camposControlForm(), { json_subforms_values: JSON.stringify(subforms) });
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', payload);
     toast('Reporte de monitoreo agregado.');
     STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
@@ -2603,6 +2638,119 @@ async function guardarMonitoreo(riesgoId){
   }catch(err){ toast('Error al guardar: '+err.message, true); btn.disabled=false; btn.textContent='Guardar reporte de monitoreo'; }
 }
 window.guardarMonitoreo = guardarMonitoreo;
+
+// === Editar / eliminar metas y reportes de monitoreo ===
+// Eliminar un subregistro (meta o reporte de monitoreo)
+async function eliminarSubregistro(riesgoId, subId, tipo){
+  if(!confirm('¿Eliminar este '+(tipo==='meta'?'registro de meta':'reporte de monitoreo')+'? Esta acción no se puede deshacer.')) return;
+  try{
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+subId+'.json','DELETE');
+    toast('Registro eliminado.');
+    STATE.matriz=[]; await loadMatriz(true);
+    const rr = STATE.matriz.find(x=>x.id===riesgoId);
+    if(rr && document.getElementById('ed_monitoreo_cont')) renderPanelMonitoreoEdit(riesgoId, rr);
+  }catch(err){ toast('Error al eliminar: '+err.message, true); }
+}
+window.eliminarSubregistro = eliminarSubregistro;
+
+// Editar una meta: carga sus valores en el formulario de añadir meta y cambia el botón a "Actualizar"
+async function editarMeta(riesgoId, metaId){
+  try{
+    const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+metaId+'.json','GET',{name_value:1});
+    const v = d.record.values||{};
+    const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+    // Abrir el acordeón de añadir meta
+    const det = document.querySelector('#ed_monitoreo_cont details'); // primer details = metas
+    if(det) det.open = true;
+    const set=(id,val)=>{ const el=document.getElementById(id+'_'+riesgoId); if(el) el.value=val; };
+    set('meta_fecha', g('Fecha de programación'));
+    set('meta_ref', g('Valor de referencia'));
+    set('meta_meta', g('Valor meta'));
+    set('meta_plan', g('Plan de monitoreo para el cumplimiento de la meta'));
+    set('meta_obs', g('Observación'));
+    // Cambiar el botón a modo actualización
+    const btn=document.getElementById('metabtn-'+riesgoId);
+    btn.textContent='Actualizar meta';
+    btn.setAttribute('onclick',`actualizarMeta('${riesgoId}','${metaId}')`);
+    btn.scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(err){ toast('Error al cargar la meta: '+err.message, true); }
+}
+window.editarMeta = editarMeta;
+
+// Actualizar una meta existente (PUT al subregistro)
+async function actualizarMeta(riesgoId, metaId){
+  const MF = CONFIG.PROG_METAS_FIELDS;
+  const g = id => document.getElementById(id+'_'+riesgoId).value;
+  const btn = document.getElementById('metabtn-'+riesgoId);
+  const vals = {};
+  vals[MF.fecha_prog.id] = g('meta_fecha');
+  const indEd=document.getElementById('ed_indicador'), formEd=document.getElementById('ed_formula');
+  if(indEd) vals[MF.indicador.id]=indEd.value.trim();
+  if(formEd) vals[MF.formula.id]=formEd.value.trim();
+  vals[MF.valor_ref.id] = g('meta_ref')!==''?parseFloat(g('meta_ref')):'';
+  vals[MF.valor_meta.id] = g('meta_meta')!==''?parseFloat(g('meta_meta')):'';
+  vals[MF.plan_link.id] = g('meta_plan');
+  vals[MF.observacion.id] = g('meta_obs');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Actualizando…';
+  try{
+    await API.saveForm(metaId, vals, CONFIG.ENTITIES.PROG_METAS);
+    toast('Meta actualizada.');
+    STATE.matriz=[]; await loadMatriz(true);
+    const rr = STATE.matriz.find(x=>x.id===riesgoId);
+    if(rr && document.getElementById('ed_monitoreo_cont')) renderPanelMonitoreoEdit(riesgoId, rr);
+  }catch(err){ toast('Error al actualizar: '+err.message, true); btn.disabled=false; btn.textContent='Actualizar meta'; }
+}
+window.actualizarMeta = actualizarMeta;
+
+// Editar un reporte de monitoreo
+async function editarMonitoreo(riesgoId, monId){
+  try{
+    const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+monId+'.json','GET',{name_value:1});
+    const v = d.record.values||{};
+    const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+    const dets = document.querySelectorAll('#ed_monitoreo_cont details');
+    if(dets[1]) dets[1].open = true; // segundo details = monitoreo
+    const set=(id,val)=>{ const el=document.getElementById(id+'_'+riesgoId); if(el) el.value=val; };
+    set('mon_fecha', g('Fecha de monitoreo'));
+    set('mon_ref', g('Valor de referencia'));
+    set('mon_meta', g('Valor meta'));
+    set('mon_real', g('Valor real obtenido'));
+    set('mon_evid', g('Evidencia (link)'));
+    set('mon_plan', g('Plan de remediación'));
+    calcAvanceMon(riesgoId);
+    const btn=document.getElementById('monbtn-'+riesgoId);
+    btn.textContent='Actualizar reporte';
+    btn.setAttribute('onclick',`actualizarMonitoreo('${riesgoId}','${monId}')`);
+    btn.scrollIntoView({behavior:'smooth',block:'center'});
+  }catch(err){ toast('Error al cargar el reporte: '+err.message, true); }
+}
+window.editarMonitoreo = editarMonitoreo;
+
+// Actualizar un reporte de monitoreo existente
+async function actualizarMonitoreo(riesgoId, monId){
+  const MF = CONFIG.MONITOREO_FIELDS;
+  const g = id => document.getElementById(id+'_'+riesgoId).value;
+  const btn = document.getElementById('monbtn-'+riesgoId);
+  const vals = {};
+  vals[MF.fecha_monitoreo.id] = g('mon_fecha');
+  const indEd=document.getElementById('ed_indicador'), formEd=document.getElementById('ed_formula');
+  if(indEd) vals[MF.indicador.id]=indEd.value.trim();
+  if(formEd) vals[MF.formula.id]=formEd.value.trim();
+  vals[MF.valor_ref.id] = g('mon_ref')!==''?parseFloat(g('mon_ref')):'';
+  vals[MF.valor_meta.id] = g('mon_meta')!==''?parseFloat(g('mon_meta')):'';
+  vals[MF.valor_real.id] = g('mon_real')!==''?parseFloat(g('mon_real')):'';
+  vals[MF.evidencia.id] = g('mon_evid');
+  vals[MF.plan_remediacion.id] = g('mon_plan');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Actualizando…';
+  try{
+    await API.saveForm(monId, vals, CONFIG.ENTITIES.MONITOREO);
+    toast('Reporte actualizado.');
+    STATE.matriz=[]; await loadMatriz(true);
+    const rr = STATE.matriz.find(x=>x.id===riesgoId);
+    if(rr && document.getElementById('ed_monitoreo_cont')) renderPanelMonitoreoEdit(riesgoId, rr);
+  }catch(err){ toast('Error al actualizar: '+err.message, true); btn.disabled=false; btn.textContent='Actualizar reporte'; }
+}
+window.actualizarMonitoreo = actualizarMonitoreo;
 
 // === Guardar reporte (desde el acordeón) ===
 async function guardarReporte(riesgoId){
