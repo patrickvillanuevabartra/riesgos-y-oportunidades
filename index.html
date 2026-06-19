@@ -2586,9 +2586,10 @@ async function guardarMeta(riesgoId){
     const subforms = {};
     subforms[F.prog_metas.id] = { entity_id: CONFIG.ENTITIES.PROG_METAS };
     subforms[F.prog_metas.id][newId] = vals;
-    // Guardar también los campos de control/indicador del formulario en el mismo PUT
-    const payload = Object.assign({}, _camposControlForm(), { json_subforms_values: JSON.stringify(subforms) });
-    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', payload);
+    // 1) Guardar el subformulario (meta) con json_subforms_values
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', { json_subforms_values: JSON.stringify(subforms) });
+    // 2) Guardar los campos de control/indicador del riesgo (llamada aparte, método de formulario)
+    try { await API.saveForm(riesgoId, _camposControlForm()); } catch(e){ console.warn('No se guardaron los campos de control:', e.message); }
     toast('Meta agregada.');
     STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
@@ -2628,9 +2629,10 @@ async function guardarMonitoreo(riesgoId){
     const subforms = {};
     subforms[F.reporte_monitoreo.id] = { entity_id: CONFIG.ENTITIES.MONITOREO };
     subforms[F.reporte_monitoreo.id][newId] = vals;
-    // Guardar también los campos de control/indicador del formulario en el mismo PUT
-    const payload = Object.assign({}, _camposControlForm(), { json_subforms_values: JSON.stringify(subforms) });
-    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', payload);
+    // 1) Guardar el subformulario (reporte de monitoreo)
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', { json_subforms_values: JSON.stringify(subforms) });
+    // 2) Guardar los campos de control/indicador del riesgo (llamada aparte)
+    try { await API.saveForm(riesgoId, _camposControlForm()); } catch(e){ console.warn('No se guardaron los campos de control:', e.message); }
     toast('Reporte de monitoreo agregado.');
     STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
