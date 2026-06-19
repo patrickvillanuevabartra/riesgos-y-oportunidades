@@ -2299,30 +2299,88 @@ async function renderPanelMonitoreoEdit(riesgoId, r){
       <div class="hist-head" style="font-size:14px;margin-top:16px">📊 Reportes de monitoreo (medición real) <span class="grupo-count" style="color:var(--mist)">${monIds.length}</span></div>
       <div id="monlist-${riesgoId}">${monIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes de monitoreo.</p>'}</div>
       <details class="add-rep"><summary>+ Añadir reporte de monitoreo</summary>
-        <div class="grid" style="margin-top:14px">
+        <p class="hint" style="margin-top:10px" id="mon_indicador_ref2_${riesgoId}">Indicador: <strong>${indicadorRiesgo||'(escribe el indicador arriba)'}</strong>${formulaRiesgo?(' · Fórmula: '+formulaRiesgo):''}</p>
+        <div class="grid" style="margin-top:8px">
+          <div class="field full"><label>Meta que estás monitoreando</label><select id="mon_metasel_${riesgoId}" onchange="jalarMeta('${riesgoId}')"><option value="">Seleccione la meta…</option></select></div>
           <div class="field"><label>Fecha de evaluación</label><input type="date" id="mon_fecha_${riesgoId}"></div>
           <div class="field"><label>Valor de referencia</label><input type="number" step="any" id="mon_ref_${riesgoId}"></div>
           <div class="field"><label>Valor meta</label><input type="number" step="any" id="mon_meta_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
           <div class="field"><label>Valor real obtenido</label><input type="number" step="any" id="mon_real_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
           <div class="field"><label>% avance obtenido</label><div class="readonly-pill" id="mon_pct_${riesgoId}">—</div></div>
           <div class="field full"><label>Evidencia (link)</label><input id="mon_evid_${riesgoId}" placeholder="https://…"></div>
-          <div class="field full"><label>Plan de remediación (link, de ser el caso)</label><input id="mon_plan_${riesgoId}" placeholder="https://…"></div>
+          <div class="field full hidden" id="mon_wrap_plan_${riesgoId}"><label>Plan de remediación (link)</label><input id="mon_plan_${riesgoId}" placeholder="https://…"></div>
         </div>
-        <p class="hint" style="margin-top:6px">El % avance = (valor real / valor meta) × 100.</p>
+        <p class="hint" style="margin-top:6px">El % avance = (valor real / valor meta) × 100. El plan de remediación aparece si el avance es menor a 100%.</p>
         <div style="text-align:right;margin-top:12px">
           <button type="button" class="btn btn-primary" onclick="guardarMonitoreo('${riesgoId}')" id="monbtn-${riesgoId}">Guardar reporte de monitoreo</button>
         </div>
       </details>
     </div>`;
 
+  // Cargar metas (para lista y para el desplegable de selección)
+  let metasData = [];
   if(metaIds.length){
-    try { document.getElementById('metaslist-'+riesgoId).innerHTML = await renderMetasHTML(metaIds); }catch(e){}
+    try {
+      metasData = await cargarMetasData(metaIds);
+      document.getElementById('metaslist-'+riesgoId).innerHTML = renderMetasDataHTML(metasData);
+      // poblar desplegable de metas en el reporte
+      const sel = document.getElementById('mon_metasel_'+riesgoId);
+      if(sel){
+        metasData.forEach((m,i)=>{
+          const op = document.createElement('option');
+          op.value = i;
+          op.textContent = (m.fecha||'(sin fecha)')+' · ref '+(m.ref||'—')+' → meta '+(m.meta||'—');
+          sel.appendChild(op);
+        });
+        window['_metas_'+riesgoId] = metasData; // guardar para jalarMeta
+      }
+    }catch(e){}
   }
   if(monIds.length){
     try { document.getElementById('monlist-'+riesgoId).innerHTML = await renderMonitoreoHTML(monIds); }catch(e){}
   }
 }
 window.renderPanelMonitoreoEdit = renderPanelMonitoreoEdit;
+
+// Carga los datos de las metas (fecha, ref, meta) para el desplegable
+async function cargarMetasData(ids){
+  const out = [];
+  for(const id of ids){
+    try{
+      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+id+'.json','GET',{name_value:1});
+      const v = d.record.values||{};
+      const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+      out.push({
+        id, fecha:g('Fecha de programación'),
+        ref:g('Valor de referencia'), meta:g('Valor meta'),
+        plan:g('Plan de monitoreo para el cumplimiento de la meta'),
+        obs:g('Observación')
+      });
+    }catch(e){}
+  }
+  return out;
+}
+function renderMetasDataHTML(metas){
+  if(!metas.length) return '<p class="hint">Sin metas.</p>';
+  return metas.map(m=>`<div class="rep-item">
+    <div><strong>${m.fecha||'(sin fecha)'}</strong> · Ref: ${m.ref||'—'} → Meta: ${m.meta||'—'}</div>
+    ${m.obs?`<div class="hint">${m.obs}</div>`:''}
+    ${m.plan?`<div><a href="${m.plan}" target="_blank" class="riesgo-link">📎 Plan de monitoreo</a></div>`:''}
+  </div>`).join('');
+}
+// Al elegir una meta en el desplegable, jala su valor de referencia y meta
+function jalarMeta(riesgoId){
+  const sel = document.getElementById('mon_metasel_'+riesgoId);
+  const metas = window['_metas_'+riesgoId]||[];
+  const i = sel.value;
+  if(i===''||!metas[i]) return;
+  const m = metas[i];
+  if(m.ref!=='' && m.ref!=null) document.getElementById('mon_ref_'+riesgoId).value = m.ref;
+  if(m.meta!=='' && m.meta!=null) document.getElementById('mon_meta_'+riesgoId).value = m.meta;
+  calcAvanceMon(riesgoId);
+}
+window.jalarMeta = jalarMeta;
+window.cargarMetasData = cargarMetasData;
 
 // === Panel de monitoreo del control (metas programadas + reportes reales) ===
 // Solo para riesgos nivel 4 con control. Se inserta dentro del panel de seguimiento.
@@ -2396,17 +2454,25 @@ function calcAvanceMon(riesgoId){
   const real = parseFloat(document.getElementById('mon_real_'+riesgoId).value);
   const meta = parseFloat(document.getElementById('mon_meta_'+riesgoId).value);
   const el = document.getElementById('mon_pct_'+riesgoId);
+  let pct = null;
   if(!isNaN(real) && !isNaN(meta) && meta!==0){
-    el.textContent = (Math.round((real/meta)*1000)/10) + '%';
+    pct = Math.round((real/meta)*1000)/10;
+    el.textContent = pct + '%';
   } else { el.textContent = '—'; }
+  // Plan de remediación: visible solo si el avance es menor a 100%
+  const wrapPlan = document.getElementById('mon_wrap_plan_'+riesgoId);
+  if(wrapPlan){
+    const mostrar = (pct!==null && pct<100);
+    wrapPlan.classList.toggle('hidden', !mostrar);
+  }
 }
 window.calcAvanceMon = calcAvanceMon;
 
-// Actualiza el texto de referencia del indicador/fórmula en el panel de monitoreo (en vivo)
+// Actualiza la referencia indicador/fórmula en TODOS los textos del panel (en vivo)
 function actualizarRefIndicador(){
   const ind = (document.getElementById('ed_indicador')||{}).value || '';
   const form = (document.getElementById('ed_formula')||{}).value || '';
-  document.querySelectorAll('[id^="mon_indicador_ref_"]').forEach(el=>{
+  document.querySelectorAll('[id^="mon_indicador_ref_"], [id^="mon_indicador_ref2_"]').forEach(el=>{
     el.innerHTML = 'Indicador: <strong>'+(ind.trim()||'(escribe el indicador arriba)')+'</strong>'+(form.trim()?(' · Fórmula: '+form.trim()):'');
   });
 }
