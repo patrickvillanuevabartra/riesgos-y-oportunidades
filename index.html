@@ -2268,15 +2268,17 @@ async function renderPanelMonitoreoEdit(riesgoId, r){
   const F = CONFIG.MATRIZ_FIELDS;
   const v = r.values||{};
   const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
-  const indicadorRiesgo = cur('Indicador');
-  const formulaRiesgo = cur('Fórmula del indicador');
+  const indEd = document.getElementById('ed_indicador');
+  const formEd = document.getElementById('ed_formula');
+  const indicadorRiesgo = (indEd && indEd.value.trim()) ? indEd.value.trim() : cur('Indicador');
+  const formulaRiesgo = (formEd && formEd.value.trim()) ? formEd.value.trim() : cur('Fórmula del indicador');
   const metaIds = (r.subform_values && r.subform_values[F.prog_metas.id]) || [];
   const monIds  = (r.subform_values && r.subform_values[F.reporte_monitoreo.id]) || [];
 
   cont.innerHTML = `
     <div style="margin-top:8px;padding-top:14px;border-top:2px solid var(--brand)">
       <div class="hist-head" style="color:var(--brand)">Monitoreo del control</div>
-      <p class="hint" style="margin-bottom:6px">Indicador: <strong>${indicadorRiesgo||'(define el indicador arriba y guarda)'}</strong>${formulaRiesgo?(' · Fórmula: '+formulaRiesgo):''}</p>
+      <p class="hint" style="margin-bottom:6px" id="mon_indicador_ref_${riesgoId}">Indicador: <strong>${indicadorRiesgo||'(escribe el indicador arriba)'}</strong>${formulaRiesgo?(' · Fórmula: '+formulaRiesgo):''}</p>
 
       <div class="hist-head" style="font-size:14px;margin-top:12px">📅 Programación de metas <span class="grupo-count" style="color:var(--mist)">${metaIds.length}</span></div>
       <div id="metaslist-${riesgoId}">${metaIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin metas programadas.</p>'}</div>
@@ -2400,6 +2402,16 @@ function calcAvanceMon(riesgoId){
 }
 window.calcAvanceMon = calcAvanceMon;
 
+// Actualiza el texto de referencia del indicador/fórmula en el panel de monitoreo (en vivo)
+function actualizarRefIndicador(){
+  const ind = (document.getElementById('ed_indicador')||{}).value || '';
+  const form = (document.getElementById('ed_formula')||{}).value || '';
+  document.querySelectorAll('[id^="mon_indicador_ref_"]').forEach(el=>{
+    el.innerHTML = 'Indicador: <strong>'+(ind.trim()||'(escribe el indicador arriba)')+'</strong>'+(form.trim()?(' · Fórmula: '+form.trim()):'');
+  });
+}
+window.actualizarRefIndicador = actualizarRefIndicador;
+
 // Lista de metas programadas
 async function renderMetasHTML(ids){
   const MF = CONFIG.PROG_METAS_FIELDS;
@@ -2459,9 +2471,13 @@ async function guardarMeta(riesgoId){
   const btn = document.getElementById('metabtn-'+riesgoId);
   const vals = {};
   if(g('meta_fecha')) vals[MF.fecha_prog.id] = g('meta_fecha');
-  // Copiar indicador y fórmula del riesgo (Opción B)
-  if(cur('Indicador')) vals[MF.indicador.id] = cur('Indicador');
-  if(cur('Fórmula del indicador')) vals[MF.formula.id] = cur('Fórmula del indicador');
+  // Indicador y fórmula: tomar del campo en vivo del formulario de edición, o del registro guardado
+  const indEd = document.getElementById('ed_indicador');
+  const formEd = document.getElementById('ed_formula');
+  const indicadorVivo = (indEd && indEd.value.trim()) ? indEd.value.trim() : cur('Indicador');
+  const formulaVivo = (formEd && formEd.value.trim()) ? formEd.value.trim() : cur('Fórmula del indicador');
+  if(indicadorVivo) vals[MF.indicador.id] = indicadorVivo;
+  if(formulaVivo) vals[MF.formula.id] = formulaVivo;
   if(g('meta_ref')!=='') vals[MF.valor_ref.id] = parseFloat(g('meta_ref'));
   if(g('meta_meta')!=='') vals[MF.valor_meta.id] = parseFloat(g('meta_meta'));
   if(g('meta_plan')) vals[MF.plan_link.id] = g('meta_plan');
@@ -2493,8 +2509,13 @@ async function guardarMonitoreo(riesgoId){
   const btn = document.getElementById('monbtn-'+riesgoId);
   const vals = {};
   if(g('mon_fecha')) vals[MF.fecha_monitoreo.id] = g('mon_fecha');
-  if(cur('Indicador')) vals[MF.indicador.id] = cur('Indicador');
-  if(cur('Fórmula del indicador')) vals[MF.formula.id] = cur('Fórmula del indicador');
+  // Indicador y fórmula: del campo en vivo o del registro guardado
+  const indEd2 = document.getElementById('ed_indicador');
+  const formEd2 = document.getElementById('ed_formula');
+  const indicadorVivo2 = (indEd2 && indEd2.value.trim()) ? indEd2.value.trim() : cur('Indicador');
+  const formulaVivo2 = (formEd2 && formEd2.value.trim()) ? formEd2.value.trim() : cur('Fórmula del indicador');
+  if(indicadorVivo2) vals[MF.indicador.id] = indicadorVivo2;
+  if(formulaVivo2) vals[MF.formula.id] = formulaVivo2;
   if(g('mon_ref')!=='') vals[MF.valor_ref.id] = parseFloat(g('mon_ref'));
   if(g('mon_meta')!=='') vals[MF.valor_meta.id] = parseFloat(g('mon_meta'));
   if(g('mon_real')!=='') vals[MF.valor_real.id] = parseFloat(g('mon_real'));
@@ -2908,9 +2929,9 @@ function editarRiesgo(riesgoId){
       <div class="field ctrl-si hidden" id="ed_wrap_cert"><label>Certificación del control</label><select id="ed_cert">${opt(['No Implementado','Implementado sin validar','Certificado/Operativo'],cur('Certificación de Implementación del Control'))}</select></div>
       <div class="field"></div>
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monit_aviso"><div class="hint" style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px">Riesgo de nivel 4: defina el sistema de monitoreo del control.</div></div>
-      <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_indicador"><label>Indicador</label><input id="ed_indicador" value="${(cur('Indicador')||'').replace(/"/g,'&quot;')}"></div>
+      <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_indicador"><label>Indicador</label><input id="ed_indicador" value="${(cur('Indicador')||'').replace(/"/g,'&quot;')}" oninput="actualizarRefIndicador()"></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_med"><label>Frecuencia de medición</label><select id="ed_frec_med">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de medición'))}</select></div>
-      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_formula"><label>Fórmula del indicador</label><textarea id="ed_formula">${cur('Fórmula del indicador')}</textarea></div>
+      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_formula"><label>Fórmula del indicador</label><textarea id="ed_formula" oninput="actualizarRefIndicador()">${cur('Fórmula del indicador')}</textarea></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_calc"><label>Frecuencia de cálculo</label><select id="ed_frec_calc">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de cálculo'))}</select></div>
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monitoreo"><div id="ed_monitoreo_cont"></div></div>
       <!-- Plan de monitoreo se movió al subformulario de metas -->
