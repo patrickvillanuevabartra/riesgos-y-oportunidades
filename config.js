@@ -22,6 +22,7 @@ const CONFIG = {
     REPORTES:     "czW791qCnmdj49WPxdRmoH", // Subtabla "Reporte de acciones"
     MONITOREO:    "aWFSovFfrlWOHejZmpWR9O", // Subtabla "Reporte de monitoreo del control"
     PROG_METAS:   "aXhCkeWPLcVyojDCoklSoL", // Subtabla "Programación de metas monitoreo riesgos"
+    USUARIOS:     "dcLqvXWRfbqRXbWRVdQSkh", // Tabla "Usuarios matriz de riesgos y oportunidades"
     // Tablas maestras (origen de los desplegables de relación)
     AMENAZAS:     "ddLmklpYHlqOGGWRauyf8c",
     OPORTUNIDADES:"cCn3pdNt9odOogW4euW5Xw",
@@ -139,6 +140,14 @@ const CONFIG = {
     valor_meta:    { id: "bkW5JdVIPpWRiacCorW4OZ", type: "float", col: "Valor meta" },
     plan_link:     { id: "bzfsRcTGXlW5XJWOhdLZSP", type: "url", col: "Plan de monitoreo para el cumplimiento de la meta" },
     observacion:   { id: "cdWPpcJ8jgAiobWORdILOf", type: "text", col: "Observación" }
+  },
+
+  // ---- Campos de la tabla "Usuarios matriz de riesgos y oportunidades" ----
+  USUARIOS_FIELDS: {
+    usuario:    { id: "cHe8k-oarcGOoZtCkHlCoo", type: "string", col: "Usuario" },
+    password:   { id: "aUq8kWddvlb4qlfqXgimkh", type: "string", col: "Contraseña" },
+    oficina:    { id: "cWWRJdQCnjaPPJW518W45E", type: "string", col: "Oficina asignada" },
+    activo:     { id: "a4WQJdKw9lWQxdPmkAlcjX", type: "select", col: "Activo", options: ["Sí","No"] }
   },
 
   // ---- Campos del INVENTARIO (para la cascada) ---------------------------
