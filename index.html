@@ -1005,19 +1005,27 @@ async function notificarWhatsApp(riesgoId){
   const d=_datosNotif(r);
   const tel=_telWa(d.celular);
   if(!tel){ toast('Este registro no tiene celular del responsable de proceso.', true); return; }
+  // Abrir la ventana YA (con el clic) para que el navegador no la bloquee
+  const win=window.open('about:blank','_blank');
   const av=await _avanceUltimoReporte(r); d.avance=av.avance; d.ultimo_estado=av.ultimo_estado;
   const p=await cargarPlantillas();
   const url='https://wa.me/'+tel+'?text='+encodeURIComponent(aplicarPlantilla(p.wa,d));
-  window.open(url,'_blank');
+  if(win){ win.location.href=url; } else { window.location.href=url; }
 }
 async function notificarCorreo(riesgoId){
   const r=STATE.matriz.find(x=>x.id===riesgoId); if(!r) return;
   const d=_datosNotif(r);
   if(!d.correo){ toast('Este registro no tiene correo del responsable de proceso.', true); return; }
+  // Abrir la ventana YA (con el clic) para que el navegador no la bloquee por "user gesture"
+  const win=window.open('about:blank','_blank');
   const av=await _avanceUltimoReporte(r); d.avance=av.avance; d.ultimo_estado=av.ultimo_estado;
   const p=await cargarPlantillas();
-  const url='mailto:'+encodeURIComponent(d.correo)+'?subject='+encodeURIComponent(aplicarPlantilla(p.asunto,d))+'&body='+encodeURIComponent(aplicarPlantilla(p.correo,d));
-  window.location.href=url;
+  const asunto=aplicarPlantilla(p.asunto,d);
+  const cuerpo=aplicarPlantilla(p.correo,d);
+  // Gmail web (funciona aunque no haya cliente de correo configurado)
+  const gmail='https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(d.correo)+'&su='+encodeURIComponent(asunto)+'&body='+encodeURIComponent(cuerpo);
+  if(win){ win.location.href=gmail; }
+  else { window.location.href='mailto:'+encodeURIComponent(d.correo)+'?subject='+encodeURIComponent(asunto)+'&body='+encodeURIComponent(cuerpo); }
 }
 window.notificarWhatsApp=notificarWhatsApp;
 window.notificarCorreo=notificarCorreo;
