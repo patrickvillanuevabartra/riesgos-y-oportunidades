@@ -421,7 +421,7 @@
           <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_formula"><label>Fórmula del indicador</label><textarea id="f_formula"></textarea></div>
           <div class="field ctrl-si ctrl-n4 hidden" id="f_wrap_frec_calc"><label>Frecuencia de cálculo</label><select id="f_frec_calc"><option value="">Seleccione…</option><option>Diaria</option><option>Semanal</option><option>Quincenal</option><option>Mensual</option><option>Trimestral</option><option>Semestral</option><option>Anual</option></select></div>
           <div class="field"></div>
-          <!-- Plan de monitoreo se movió al subformulario de metas -->
+          <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_aviso_metas"><div class="hint" style="background:var(--paper);border:1px dashed var(--brand);border-radius:8px;padding:10px;color:var(--brand)">💡 Guarda primero el riesgo. Luego, desde <strong>Editar</strong>, podrás programar las metas de monitoreo y registrar el cumplimiento real del control.</div></div>
           <!-- Responsable: siempre visible -->
           <div class="field"><label>Responsable</label><select id="f_responsable" onchange="autocompletarRespProceso('f_responsable','f_resp_proc','f_resp_cel','f_resp_cor')"></select></div>
           <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="f_resp_proc">—</div></div>
@@ -2252,24 +2252,75 @@ async function toggleHistorial(riesgoId){
         <button class="btn btn-primary" onclick="guardarReporte('${riesgoId}')" id="addbtn-${riesgoId}">Guardar reporte</button>
       </div>
     </details>
-    <div id="monitoreo-panel-${riesgoId}"></div>
   </div>`;
 
   if(subIds.length){
     try { document.getElementById('histlist-'+riesgoId).innerHTML = await renderHistorialHTML(subIds); }
     catch(e){ document.getElementById('histlist-'+riesgoId).innerHTML = '<p class="hint">Error: '+e.message+'</p>'; }
   }
-
-  // Si el riesgo es NIVEL 4 con control "Sí", mostrar panel de monitoreo del control
-  const esRiesgo = !esOportunidad(r);
-  const nivelInh = esRiesgo ? nivelInherenteDe(r).nivel : nivelOportInherenteDe(r).nivel;
-  const tieneControl = (function(){ const c=(r.values||{})['¿Existen controles?']; return c && String(c).trim()==='Sí'; })();
-  if(esRiesgo && nivelInh===4 && tieneControl){
-    try { await renderPanelMonitoreo(riesgoId, r); }
-    catch(e){ const p=document.getElementById('monitoreo-panel-'+riesgoId); if(p) p.innerHTML='<p class="hint">Error en panel de monitoreo: '+e.message+'</p>'; }
-  }
 }
 window.toggleHistorial = toggleHistorial;
+
+// Versión para el modal de EDICIÓN: llena #ed_monitoreo_cont
+async function renderPanelMonitoreoEdit(riesgoId, r){
+  const cont = document.getElementById('ed_monitoreo_cont');
+  if(!cont) return;
+  const F = CONFIG.MATRIZ_FIELDS;
+  const v = r.values||{};
+  const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+  const indicadorRiesgo = cur('Indicador');
+  const formulaRiesgo = cur('Fórmula del indicador');
+  const metaIds = (r.subform_values && r.subform_values[F.prog_metas.id]) || [];
+  const monIds  = (r.subform_values && r.subform_values[F.reporte_monitoreo.id]) || [];
+
+  cont.innerHTML = `
+    <div style="margin-top:8px;padding-top:14px;border-top:2px solid var(--brand)">
+      <div class="hist-head" style="color:var(--brand)">Monitoreo del control</div>
+      <p class="hint" style="margin-bottom:6px">Indicador: <strong>${indicadorRiesgo||'(define el indicador arriba y guarda)'}</strong>${formulaRiesgo?(' · Fórmula: '+formulaRiesgo):''}</p>
+
+      <div class="hist-head" style="font-size:14px;margin-top:12px">📅 Programación de metas <span class="grupo-count" style="color:var(--mist)">${metaIds.length}</span></div>
+      <div id="metaslist-${riesgoId}">${metaIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin metas programadas.</p>'}</div>
+      <details class="add-rep"><summary>+ Añadir meta</summary>
+        <div class="grid" style="margin-top:14px">
+          <div class="field"><label>Fecha de programación</label><input type="date" id="meta_fecha_${riesgoId}"></div>
+          <div class="field"><label>Valor de referencia</label><input type="number" step="any" id="meta_ref_${riesgoId}"></div>
+          <div class="field"><label>Valor meta</label><input type="number" step="any" id="meta_meta_${riesgoId}"></div>
+          <div class="field full"><label>Plan de monitoreo (link a Excel/MS Project)</label><input id="meta_plan_${riesgoId}" placeholder="https://…"></div>
+          <div class="field full"><label>Observación</label><textarea id="meta_obs_${riesgoId}"></textarea></div>
+        </div>
+        <p class="hint" style="margin-top:6px">El indicador y la fórmula se copian automáticamente del riesgo.</p>
+        <div style="text-align:right;margin-top:12px">
+          <button type="button" class="btn btn-primary" onclick="guardarMeta('${riesgoId}')" id="metabtn-${riesgoId}">Guardar meta</button>
+        </div>
+      </details>
+
+      <div class="hist-head" style="font-size:14px;margin-top:16px">📊 Reportes de monitoreo (medición real) <span class="grupo-count" style="color:var(--mist)">${monIds.length}</span></div>
+      <div id="monlist-${riesgoId}">${monIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes de monitoreo.</p>'}</div>
+      <details class="add-rep"><summary>+ Añadir reporte de monitoreo</summary>
+        <div class="grid" style="margin-top:14px">
+          <div class="field"><label>Fecha de evaluación</label><input type="date" id="mon_fecha_${riesgoId}"></div>
+          <div class="field"><label>Valor de referencia</label><input type="number" step="any" id="mon_ref_${riesgoId}"></div>
+          <div class="field"><label>Valor meta</label><input type="number" step="any" id="mon_meta_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
+          <div class="field"><label>Valor real obtenido</label><input type="number" step="any" id="mon_real_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
+          <div class="field"><label>% avance obtenido</label><div class="readonly-pill" id="mon_pct_${riesgoId}">—</div></div>
+          <div class="field full"><label>Evidencia (link)</label><input id="mon_evid_${riesgoId}" placeholder="https://…"></div>
+          <div class="field full"><label>Plan de remediación (link, de ser el caso)</label><input id="mon_plan_${riesgoId}" placeholder="https://…"></div>
+        </div>
+        <p class="hint" style="margin-top:6px">El % avance = (valor real / valor meta) × 100.</p>
+        <div style="text-align:right;margin-top:12px">
+          <button type="button" class="btn btn-primary" onclick="guardarMonitoreo('${riesgoId}')" id="monbtn-${riesgoId}">Guardar reporte de monitoreo</button>
+        </div>
+      </details>
+    </div>`;
+
+  if(metaIds.length){
+    try { document.getElementById('metaslist-'+riesgoId).innerHTML = await renderMetasHTML(metaIds); }catch(e){}
+  }
+  if(monIds.length){
+    try { document.getElementById('monlist-'+riesgoId).innerHTML = await renderMonitoreoHTML(monIds); }catch(e){}
+  }
+}
+window.renderPanelMonitoreoEdit = renderPanelMonitoreoEdit;
 
 // === Panel de monitoreo del control (metas programadas + reportes reales) ===
 // Solo para riesgos nivel 4 con control. Se inserta dentro del panel de seguimiento.
@@ -2424,8 +2475,9 @@ async function guardarMeta(riesgoId){
     subforms[F.prog_metas.id][newId] = vals;
     await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', { json_subforms_values: JSON.stringify(subforms) });
     toast('Meta agregada.');
-    STATE.matriz=[]; await loadMatriz(true); await renderSeguimiento();
-    setTimeout(()=>toggleHistorial(riesgoId), 100);
+    STATE.matriz=[]; await loadMatriz(true);
+    const rr = STATE.matriz.find(x=>x.id===riesgoId);
+    if(rr && document.getElementById('ed_monitoreo_cont')) renderPanelMonitoreoEdit(riesgoId, rr);
   }catch(err){ toast('Error al guardar la meta: '+err.message, true); btn.disabled=false; btn.textContent='Guardar meta'; }
 }
 window.guardarMeta = guardarMeta;
@@ -2458,8 +2510,9 @@ async function guardarMonitoreo(riesgoId){
     subforms[F.reporte_monitoreo.id][newId] = vals;
     await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', { json_subforms_values: JSON.stringify(subforms) });
     toast('Reporte de monitoreo agregado.');
-    STATE.matriz=[]; await loadMatriz(true); await renderSeguimiento();
-    setTimeout(()=>toggleHistorial(riesgoId), 100);
+    STATE.matriz=[]; await loadMatriz(true);
+    const rr = STATE.matriz.find(x=>x.id===riesgoId);
+    if(rr && document.getElementById('ed_monitoreo_cont')) renderPanelMonitoreoEdit(riesgoId, rr);
   }catch(err){ toast('Error al guardar: '+err.message, true); btn.disabled=false; btn.textContent='Guardar reporte de monitoreo'; }
 }
 window.guardarMonitoreo = guardarMonitoreo;
@@ -2852,25 +2905,26 @@ function editarRiesgo(riesgoId){
       <div class="field full ctrl-no hidden" id="ed_wrap_medida"><label>Medida(s) de respuesta</label><textarea id="ed_medida">${cur('Medida(s) de respuesta')}</textarea></div>
       <!-- SÍ existen controles: Control (+ monitoreo si nivel 4) -->
       <div class="field full ctrl-si hidden" id="ed_wrap_control"><label>Control establecido</label><textarea id="ed_control">${cur('Control establecido')}</textarea></div>
+      <div class="field ctrl-si hidden" id="ed_wrap_cert"><label>Certificación del control</label><select id="ed_cert">${opt(['No Implementado','Implementado sin validar','Certificado/Operativo'],cur('Certificación de Implementación del Control'))}</select></div>
+      <div class="field"></div>
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monit_aviso"><div class="hint" style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px">Riesgo de nivel 4: defina el sistema de monitoreo del control.</div></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_indicador"><label>Indicador</label><input id="ed_indicador" value="${(cur('Indicador')||'').replace(/"/g,'&quot;')}"></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_med"><label>Frecuencia de medición</label><select id="ed_frec_med">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de medición'))}</select></div>
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_formula"><label>Fórmula del indicador</label><textarea id="ed_formula">${cur('Fórmula del indicador')}</textarea></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_calc"><label>Frecuencia de cálculo</label><select id="ed_frec_calc">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de cálculo'))}</select></div>
-      <div class="field"></div>
-      <div class="field"></div>
+      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monitoreo"><div id="ed_monitoreo_cont"></div></div>
       <!-- Plan de monitoreo se movió al subformulario de metas -->
       <!-- Responsable: siempre -->
       <div class="field full"><label>Responsable (oficina)</label><select id="ed_responsable" onchange="autocompletarRespProceso('ed_responsable','ed_resp_proc','ed_resp_cel','ed_resp_cor')"></select></div>
       <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="ed_resp_proc">—</div></div>
       <div class="field"><label>Celular responsable</label><div class="readonly-pill" id="ed_resp_cel">—</div></div>
       <div class="field full"><label>Correo responsable</label><div class="readonly-pill" id="ed_resp_cor">—</div></div>
-      <!-- Certificación: siempre visible en sección 4 -->
-      <div class="field"><label>Certificación del control</label><select id="ed_cert">${opt(['No Implementado','Implementado sin validar','Certificado/Operativo'],cur('Certificación de Implementación del Control'))}</select></div>
     </div></div>`;
 
   document.getElementById('editModal').classList.remove('hidden');
   toggleControles('ed'); // aplicar visibilidad condicional según controles y nivel
+  // Cargar panel de metas y monitoreo (solo nivel 4 con control)
+  renderPanelMonitoreoEdit(riesgoId, r);
   // Asegurar que el botón Guardar esté activo (por si quedó deshabilitado de un guardado anterior)
   const _bg=document.getElementById('editGuardar'); if(_bg){ _bg.disabled=false; _bg.textContent='Guardar cambios'; }
 
