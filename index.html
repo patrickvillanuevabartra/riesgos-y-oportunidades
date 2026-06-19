@@ -266,6 +266,30 @@
 </head>
 <body>
 
+<!-- ===================== LOGIN ===================== -->
+<div id="loginOverlay" style="position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#0f8f5e,#0b5e3f);display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);padding:38px 34px;width:100%;max-width:400px">
+    <div style="text-align:center;margin-bottom:22px">
+      <div style="width:54px;height:54px;border-radius:12px;background:#0f8f5e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;margin:0 auto 14px">R</div>
+      <h2 style="margin:0;font-size:19px;color:#1a2b22">Matriz de Riesgos y Oportunidades</h2>
+      <p style="margin:6px 0 0;font-size:13px;color:#6b7d74">Facultad de Ingeniería · URP</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label style="display:block;font-size:13px;font-weight:600;color:#1a2b22;margin-bottom:5px">Usuario</label>
+        <input id="login_user" type="text" autocomplete="username" style="width:100%;padding:11px 13px;border:1px solid #d4ddd7;border-radius:9px;font-size:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter')document.getElementById('login_pass').focus()">
+      </div>
+      <div>
+        <label style="display:block;font-size:13px;font-weight:600;color:#1a2b22;margin-bottom:5px">Contraseña</label>
+        <input id="login_pass" type="password" autocomplete="current-password" style="width:100%;padding:11px 13px;border:1px solid #d4ddd7;border-radius:9px;font-size:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter')hacerLogin()">
+      </div>
+      <div id="login_error" style="display:none;font-size:13px;color:#c0392b;background:#fdecea;border-radius:8px;padding:9px 11px"></div>
+      <button onclick="hacerLogin()" id="login_btn" style="margin-top:6px;padding:12px;background:#0f8f5e;color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:600;cursor:pointer">Iniciar sesión</button>
+    </div>
+    <p style="margin:18px 0 0;font-size:11px;color:#9aa8a0;text-align:center">Acceso restringido. Cada usuario solo puede ver los registros de su unidad.</p>
+  </div>
+</div>
+
 <header>
   <div class="bar">
     <div class="logo">
@@ -713,6 +737,98 @@ document.querySelectorAll('nav button').forEach(b => {
 const STATE = { matriz: [], maestras: {}, inventario: [], relNames: {} };
 // relNames: diccionario global { idDeRegistro : nombreLegible } para traducir
 // los IDs que QuintaDB devuelve en los campos de relación a su texto.
+
+/* ============================================================
+   LOGIN Y CONTROL DE ACCESO
+   - admin (clave maestra): acceso total (ver, crear, editar, eliminar)
+   - usuario de oficina: solo ve y edita registros de SU oficina; no crea ni elimina
+   ============================================================ */
+const ADMIN_USER = 'admin';
+const ADMIN_PASS = 'estudio14.';
+// SESION: { rol:'admin'|'editor', usuario, oficina }
+let SESION = null;
+
+async function hacerLogin(){
+  const u = (document.getElementById('login_user').value||'').trim();
+  const p = (document.getElementById('login_pass').value||'').trim();
+  const err = document.getElementById('login_error');
+  const btn = document.getElementById('login_btn');
+  const mostrarError = (msg)=>{ err.textContent=msg; err.style.display='block'; };
+  err.style.display='none';
+  if(!u || !p){ mostrarError('Ingresa usuario y contraseña.'); return; }
+  btn.disabled=true; btn.textContent='Verificando…';
+  try{
+    // 1) ¿Es el administrador?
+    if(u===ADMIN_USER && p===ADMIN_PASS){
+      SESION = { rol:'admin', usuario:u, oficina:null };
+      entrarApp();
+      return;
+    }
+    // 2) Buscar en la tabla de usuarios
+    const data = await API.records(CONFIG.ENTITIES.USUARIOS);
+    const recs = data.records||[];
+    const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
+    const encontrado = recs.find(r=>{
+      const v=r.values||{};
+      return limpio(v['Usuario'])===u && limpio(v['Contraseña'])===p;
+    });
+    if(!encontrado){ mostrarError('Usuario o contraseña incorrectos.'); btn.disabled=false; btn.textContent='Iniciar sesión'; return; }
+    const v = encontrado.values||{};
+    if(limpio(v['Activo'])!=='Sí'){ mostrarError('Este usuario está desactivado. Contacta al administrador.'); btn.disabled=false; btn.textContent='Iniciar sesión'; return; }
+    SESION = { rol:'editor', usuario:limpio(v['Usuario']), oficina:limpio(v['Oficina asignada']) };
+    entrarApp();
+  }catch(e){
+    mostrarError('Error al verificar: '+e.message);
+    btn.disabled=false; btn.textContent='Iniciar sesión';
+  }
+}
+window.hacerLogin = hacerLogin;
+
+function entrarApp(){
+  document.getElementById('loginOverlay').style.display='none';
+  aplicarPermisos();
+  mostrarBarraSesion();
+  // Cargar y mostrar los datos (ya con la sesión activa, para filtrar por oficina)
+  STATE.matriz=[];
+  if(typeof renderDashboard==='function'){ renderDashboard(); }
+}
+
+// Ajusta la interfaz según el rol
+function aplicarPermisos(){
+  const esAdmin = SESION && SESION.rol==='admin';
+  // El editor no puede registrar: ocultar el botón "Registrar" de la navegación
+  const btnReg = document.querySelector('nav button[data-view="registrar"]');
+  if(btnReg) btnReg.style.display = esAdmin ? '' : 'none';
+}
+
+function mostrarBarraSesion(){
+  // Insertar indicador de sesión en el header (una sola vez)
+  if(document.getElementById('sesionInfo')) return;
+  const nav = document.querySelector('header nav');
+  if(!nav) return;
+  const cont = document.createElement('div');
+  cont.id='sesionInfo';
+  cont.style.cssText='display:flex;align-items:center;gap:10px;margin-left:14px;font-size:12px;color:rgba(255,255,255,.9)';
+  const quien = SESION.rol==='admin' ? 'Administrador' : SESION.oficina;
+  cont.innerHTML = `<span title="${SESION.usuario}">👤 ${quien}</span><button onclick="cerrarSesion()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">Salir</button>`;
+  nav.appendChild(cont);
+}
+
+function cerrarSesion(){
+  SESION = null;
+  location.reload();
+}
+window.cerrarSesion = cerrarSesion;
+
+// ¿El registro pertenece a la oficina del usuario en sesión?
+function _registroVisible(r){
+  if(!SESION) return false;
+  if(SESION.rol==='admin') return true;
+  const oficinaReg = oficinaDe(r);
+  const norm = s => String(s||'').replace(/\s+/g,' ').trim().toLowerCase();
+  return norm(oficinaReg)===norm(SESION.oficina);
+}
+window._registroVisible = _registroVisible;
 
 function toast(msg, isErr) {
   const t = document.getElementById('toast');
@@ -1329,6 +1445,7 @@ async function initCascada() {
    ============================================================ */
 document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   e.preventDefault();
+  if(!SESION || SESION.rol!=='admin'){ toast('Solo el administrador puede crear nuevos registros.', true); return; }
   const btn = document.getElementById('btnGuardar');
   const F = CONFIG.MATRIZ_FIELDS;
   const v = id => document.getElementById(id).value;
@@ -1443,7 +1560,12 @@ function nivelDe(idx){ if(!idx)return 0; if(idx>12)return 4; if(idx>9)return 3; 
 async function loadMatriz(forzar) {
   if (!forzar && STATE.matriz.length) return STATE.matriz;
   const data = await API.records(CONFIG.ENTITIES.MATRIZ);
-  STATE.matriz = data.records || [];
+  let recs = data.records || [];
+  // Control de acceso: el editor solo ve los registros de su oficina
+  if(SESION && SESION.rol!=='admin'){
+    recs = recs.filter(r=>_registroVisible(r));
+  }
+  STATE.matriz = recs;
   return STATE.matriz;
 }
 
@@ -2165,11 +2287,11 @@ async function renderSeguimiento() {
         <td class="cards-acciones" style="text-align:right;white-space:nowrap">
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
           <button class="icon-btn" title="Editar" onclick="editarRiesgo('${f.id}')">✏️</button>
-          <button class="icon-btn" title="Duplicar (crear una copia)" onclick="duplicarRiesgo('${f.id}')">📋</button>
+          ${(SESION&&SESION.rol==='admin')?`<button class="icon-btn" title="Duplicar (crear una copia)" onclick="duplicarRiesgo('${f.id}')">📋</button>`:''}
           <button class="icon-btn" title="Notificar por WhatsApp" onclick="notificarWhatsApp('${f.id}')">📱</button>
           <button class="icon-btn" title="Notificar por correo" onclick="notificarCorreo('${f.id}')">✉️</button>
-          <button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
-          <button class="icon-btn" title="Eliminar" onclick="eliminarRiesgo('${f.id}')">🗑️</button>
+          ${(SESION&&SESION.rol==='admin')?`<button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
+          <button class="icon-btn" title="Eliminar" onclick="eliminarRiesgo('${f.id}')">🗑️</button>`:''}
         </td>
       </tr>
       <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="9" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
@@ -3093,6 +3215,7 @@ window.duplicarRiesgo = duplicarRiesgo;
 
 // === Eliminar riesgo (con confirmación) ===
 async function eliminarRiesgo(riesgoId){
+  if(!SESION || SESION.rol!=='admin'){ toast('Solo el administrador puede eliminar registros.', true); return; }
   const r = STATE.matriz.find(x=>x.id===riesgoId);
   const F=CONFIG.MATRIZ_FIELDS;
   const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
@@ -3110,6 +3233,7 @@ window.eliminarRiesgo = eliminarRiesgo;
 // === Archivar / Desarchivar registro ===
 // Cambia "Estado del registro" entre Activo y Archivado (PUT, no borra nada).
 async function archivarRiesgo(riesgoId){
+  if(!SESION || SESION.rol!=='admin'){ toast('Solo el administrador puede archivar registros.', true); return; }
   const r = STATE.matriz.find(x=>x.id===riesgoId);
   if(!r) return;
   const F=CONFIG.MATRIZ_FIELDS;
@@ -3622,7 +3746,8 @@ function setConn(ok, msg) {
     await initCascada();
     await precargarMaestrasProceso(); // diccionario id→nombre para traducir relaciones
     setConn(true);
-    renderDashboard();
+    // El dashboard se renderiza al iniciar sesión (ver entrarApp), no antes.
+    if(SESION) renderDashboard();
   } catch(e){
     setConn(false, e.message);
   }
