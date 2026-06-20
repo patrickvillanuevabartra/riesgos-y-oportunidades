@@ -980,14 +980,27 @@ window.togglePassVista = togglePassVista;
 // Puebla el desplegable de oficinas con las oficinas reales
 async function poblarOficinasUsuario(){
   const sel = document.getElementById('us_oficina');
-  if(!sel || sel.options.length>1) return; // ya poblado
+  if(!sel) return;
+  // Repoblar siempre (limpiar primero), por si cambió la lista
   try{
     const oficinas = await loadMaestra('RESPONSABLES');
+    sel.innerHTML = '<option value="">Seleccione…</option>';
     (oficinas||[]).forEach(o=>{
-      const nombre = (typeof o==='string') ? o : (o.label||o.name||o.value||'');
-      if(nombre){ const op=document.createElement('option'); op.value=nombre; op.textContent=nombre; sel.appendChild(op); }
+      // Usamos el NOMBRE (label) tanto en value como en texto, porque la oficina se guarda como texto
+      const nombre = (typeof o==='string') ? o : (o.label || o.value || '');
+      if(nombre && !/^[a-zA-Z0-9_\-]{22}$/.test(nombre)){
+        const op=document.createElement('option');
+        op.value=nombre; op.textContent=nombre;
+        sel.appendChild(op);
+      }
     });
-  }catch(e){}
+    if(sel.options.length<=1){
+      console.warn('No se cargaron oficinas. Respuesta de loadMaestra:', oficinas);
+    }
+  }catch(e){
+    console.error('Error al poblar oficinas:', e);
+    toast('No se pudieron cargar las oficinas: '+e.message, true);
+  }
 }
 
 function toggleOficinaUsuario(){
