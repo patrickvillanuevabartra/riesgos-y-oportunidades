@@ -710,6 +710,25 @@
         <button class="btn btn-primary" id="us_guardar" onclick="guardarUsuario()">Guardar usuario</button>
       </div>
     </div>
+  <!-- Modal cambiar mi contraseña -->
+  <div id="modalCambiarPass" class="modal-overlay hidden">
+    <div class="modal" style="max-width:400px">
+      <div class="modal-head">
+        <h2 style="font-size:18px">Cambiar mi contraseña</h2>
+        <button class="modal-close" onclick="cerrarCambiarPass()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint" style="margin-top:0">Ingresa tu nueva contraseña. La usarás la próxima vez que inicies sesión.</p>
+        <div class="grid">
+          <div class="field full"><label>Nueva contraseña</label><input id="cp_nueva" type="text" placeholder="nueva clave"></div>
+          <div class="field full"><label>Repite la nueva contraseña</label><input id="cp_repetir" type="text" placeholder="repite la clave"></div>
+        </div>
+      </div>
+      <div class="modal-foot" style="display:flex;justify-content:flex-end;gap:10px;padding:14px 20px">
+        <button class="btn btn-ghost" onclick="cerrarCambiarPass()">Cancelar</button>
+        <button class="btn btn-primary" id="cp_guardar" onclick="guardarMiPassword()">Guardar contraseña</button>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -858,7 +877,7 @@ async function hacerLogin(){
     if(limpio(v['Activo'])!=='Sí'){ mostrarError('Este usuario está desactivado. Contacta al administrador.'); btn.disabled=false; btn.textContent='Iniciar sesión'; return; }
     let rol = limpio(v['Rol']) || 'Oficina'; // por defecto, el más restrictivo
     if(!['Administrador','Gestor','Oficina'].includes(rol)) rol='Oficina';
-    SESION = { rol, usuario:limpio(v['Usuario']), oficina:limpio(v['Oficina asignada']) };
+    SESION = { rol, usuario:limpio(v['Usuario']), oficina:limpio(v['Oficina asignada']), recordId: encontrado.id };
     entrarApp();
   }catch(e){
     mostrarError('Error al verificar: '+e.message);
@@ -899,7 +918,9 @@ function mostrarBarraSesion(){
   cont.id='sesionInfo';
   cont.style.cssText='display:flex;align-items:center;gap:10px;margin-left:14px;font-size:12px;color:rgba(255,255,255,.9)';
   const quien = puedeVerTodo() ? SESION.rol : (SESION.oficina||'Oficina');
-  cont.innerHTML = `<span title="${SESION.usuario} · ${SESION.rol}">👤 ${quien}</span><button onclick="cerrarSesion()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">Salir</button>`;
+  cont.innerHTML = `<span title="${SESION.usuario} · ${SESION.rol}">👤 ${quien}</span>`
+    + `<button onclick="abrirCambiarPass()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">🔑 Cambiar contraseña</button>`
+    + `<button onclick="cerrarSesion()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">Salir</button>`;
   nav.appendChild(cont);
 }
 
@@ -1098,6 +1119,35 @@ async function eliminarUsuario(id){
   }catch(e){ toast('Error al eliminar: '+e.message, true); }
 }
 window.eliminarUsuario = eliminarUsuario;
+
+// === Cambiar mi propia contraseña (cualquier usuario logueado) ===
+function abrirCambiarPass(){
+  if(!SESION || !SESION.recordId){ toast('No se pudo identificar tu usuario.', true); return; }
+  document.getElementById('cp_nueva').value='';
+  document.getElementById('cp_repetir').value='';
+  const bg=document.getElementById('cp_guardar'); if(bg){ bg.disabled=false; bg.textContent='Guardar contraseña'; }
+  document.getElementById('modalCambiarPass').classList.remove('hidden');
+}
+window.abrirCambiarPass = abrirCambiarPass;
+function cerrarCambiarPass(){ document.getElementById('modalCambiarPass').classList.add('hidden'); }
+window.cerrarCambiarPass = cerrarCambiarPass;
+
+async function guardarMiPassword(){
+  const nueva = document.getElementById('cp_nueva').value.trim();
+  const rep = document.getElementById('cp_repetir').value.trim();
+  if(!nueva){ toast('Ingresa la nueva contraseña.', true); return; }
+  if(nueva.length<4){ toast('La contraseña debe tener al menos 4 caracteres.', true); return; }
+  if(nueva!==rep){ toast('Las contraseñas no coinciden.', true); return; }
+  const U = CONFIG.USUARIOS_FIELDS;
+  const btn=document.getElementById('cp_guardar');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
+  try{
+    await API.saveForm(SESION.recordId, { [U.password.id]: nueva }, CONFIG.ENTITIES.USUARIOS);
+    toast('Contraseña actualizada. Úsala la próxima vez que inicies sesión.');
+    cerrarCambiarPass();
+  }catch(e){ toast('Error al cambiar la contraseña: '+e.message, true); btn.disabled=false; btn.textContent='Guardar contraseña'; }
+}
+window.guardarMiPassword = guardarMiPassword;
 
 function toast(msg, isErr) {
   const t = document.getElementById('toast');
