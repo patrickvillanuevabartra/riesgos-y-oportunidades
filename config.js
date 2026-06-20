@@ -147,7 +147,8 @@ const CONFIG = {
     usuario:    { id: "cHe8k-oarcGOoZtCkHlCoo", type: "string", col: "Usuario" },
     password:   { id: "aUq8kWddvlb4qlfqXgimkh", type: "string", col: "Contraseña" },
     oficina:    { id: "cWWRJdQCnjaPPJW518W45E", type: "string", col: "Oficina asignada" },
-    activo:     { id: "a4WQJdKw9lWQxdPmkAlcjX", type: "select", col: "Activo", options: ["Sí","No"] }
+    activo:     { id: "a4WQJdKw9lWQxdPmkAlcjX", type: "select", col: "Activo", options: ["Sí","No"] },
+    rol:        { id: "ddJMVdP8jaW446W67cSCkm", type: "select", col: "Rol", options: ["Administrador","Gestor","Oficina"] }
   },
 
   // ---- Campos del INVENTARIO (para la cascada) ---------------------------
