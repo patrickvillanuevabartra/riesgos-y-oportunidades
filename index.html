@@ -1021,6 +1021,8 @@ async function abrirFormUsuario(){
   await poblarOficinasUsuario();
   document.getElementById('us_oficina').value='';
   toggleOficinaUsuario();
+  // Restablecer el botón Guardar (por si quedó en "Guardando…" de un guardado anterior)
+  const bg=document.getElementById('us_guardar'); if(bg){ bg.disabled=false; bg.textContent='Guardar usuario'; }
   document.getElementById('modalUsuario').classList.remove('hidden');
 }
 window.abrirFormUsuario = abrirFormUsuario;
@@ -1041,6 +1043,7 @@ async function editarUsuario(id){
   await poblarOficinasUsuario();
   document.getElementById('us_oficina').value = limpio(v['Oficina asignada'])||'';
   toggleOficinaUsuario();
+  const bg=document.getElementById('us_guardar'); if(bg){ bg.disabled=false; bg.textContent='Guardar usuario'; }
   document.getElementById('modalUsuario').classList.remove('hidden');
 }
 window.editarUsuario = editarUsuario;
@@ -1062,6 +1065,7 @@ async function guardarUsuario(){
   try{
     if(_editandoUsuarioId){ await API.saveForm(_editandoUsuarioId, campos, CONFIG.ENTITIES.USUARIOS); toast('Usuario actualizado.'); }
     else { await API.saveForm(null, campos, CONFIG.ENTITIES.USUARIOS); toast('Usuario creado.'); }
+    btn.disabled=false; btn.textContent='Guardar usuario';
     cerrarFormUsuario();
     cargarUsuarios();
   }catch(e){ toast('Error al guardar: '+e.message, true); btn.disabled=false; btn.textContent='Guardar usuario'; }
