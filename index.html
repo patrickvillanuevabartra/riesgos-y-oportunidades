@@ -933,18 +933,24 @@ async function cargarUsuarios(){
     if(!_usuariosCache.length){ cont.innerHTML='<p class="hint">No hay usuarios. Crea el primero con "+ Crear usuario".</p>'; return; }
     let html = '<div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="background:var(--paper);text-align:left">'
       + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Usuario</th>'
+      + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Contraseña</th>'
       + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Rol</th>'
       + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Oficina</th>'
       + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand);text-align:center">Activo</th>'
       + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand);text-align:right">Acciones</th></tr></thead><tbody>';
     _usuariosCache.forEach(r=>{
       const v=r.values||{};
-      const usuario=limpio(v['Usuario']), rol=limpio(v['Rol'])||'Oficina', oficina=limpio(v['Oficina asignada'])||'—', activo=limpio(v['Activo']);
+      const usuario=limpio(v['Usuario']), pass=limpio(v['Contraseña']), rol=limpio(v['Rol'])||'Oficina', oficina=limpio(v['Oficina asignada'])||'—', activo=limpio(v['Activo']);
       const activoBadge = activo==='Sí'
         ? '<span style="color:#0f8f5e;font-weight:600">● Sí</span>'
         : '<span style="color:#c0392b;font-weight:600">● No</span>';
+      const passEsc = (pass||'').replace(/"/g,'&quot;').replace(/'/g,"\\'");
       html += `<tr style="border-bottom:1px solid var(--line)">
         <td style="padding:10px 12px"><strong>${usuario}</strong></td>
+        <td style="padding:10px 12px;white-space:nowrap">
+          <span id="pw-${r.id}" data-pw="${passEsc}" data-shown="0" style="font-family:monospace">••••••</span>
+          <button class="icon-btn" title="Mostrar/ocultar contraseña" onclick="togglePassVista('${r.id}')" style="margin-left:4px">👁️</button>
+        </td>
         <td style="padding:10px 12px">${rol}</td>
         <td style="padding:10px 12px">${rol==='Oficina'?oficina:'<span style=\"color:var(--mist)\">(ve todo)</span>'}</td>
         <td style="padding:10px 12px;text-align:center">${activoBadge}</td>
@@ -960,6 +966,16 @@ async function cargarUsuarios(){
   }catch(e){ cont.innerHTML = '<p class="hint">Error al cargar usuarios: '+e.message+'</p>'; }
 }
 window.cargarUsuarios = cargarUsuarios;
+
+// Mostrar/ocultar la contraseña de un usuario en la lista
+function togglePassVista(id){
+  const el = document.getElementById('pw-'+id);
+  if(!el) return;
+  const shown = el.getAttribute('data-shown')==='1';
+  if(shown){ el.textContent='••••••'; el.setAttribute('data-shown','0'); }
+  else { el.textContent = el.getAttribute('data-pw')||'(vacía)'; el.setAttribute('data-shown','1'); }
+}
+window.togglePassVista = togglePassVista;
 
 // Puebla el desplegable de oficinas con las oficinas reales
 async function poblarOficinasUsuario(){
