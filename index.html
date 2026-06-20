@@ -301,6 +301,7 @@
       <button data-view="registrar">Registrar</button>
       <button data-view="seguimiento">Seguimiento</button>
       <button data-view="reevaluar">Reevaluación</button>
+      <button data-view="administracion" id="navAdmin" style="display:none">Administración</button>
     </nav>
   </div>
 </header>
@@ -623,6 +624,93 @@
       <tbody id="tablaReeval"><tr><td colspan="6" class="empty"><h3>Cargando…</h3></td></tr></tbody>
     </table></div></div>
   </section>
+
+  <!-- ===================== ADMINISTRACIÓN (solo admin) ===================== -->
+  <section class="view" id="view-administracion">
+    <div class="page-head">
+      <div class="eyebrow">Gestión de accesos</div>
+      <h1>Administración</h1>
+      <p>Referencia de los roles del sistema y sus permisos. Los usuarios se crean y editan en la tabla <strong>"Usuarios matriz de riesgos y oportunidades"</strong> de QuintaDB.</p>
+    </div>
+    <div class="card" style="padding:22px">
+      <h3 style="margin:0 0 4px;font-size:16px;color:var(--slate)">Roles y permisos</h3>
+      <p style="margin:0 0 16px;font-size:13px;color:var(--mist)">Cada usuario tiene un rol asignado en el campo <strong>Rol</strong> de la tabla de usuarios.</p>
+      <div class="tabla-wrap">
+        <table style="width:100%;border-collapse:collapse;font-size:14px">
+          <thead>
+            <tr style="background:var(--paper);text-align:left">
+              <th style="padding:11px 13px;border-bottom:2px solid var(--brand)">Rol</th>
+              <th style="padding:11px 13px;border-bottom:2px solid var(--brand);text-align:center">Ver registros</th>
+              <th style="padding:11px 13px;border-bottom:2px solid var(--brand);text-align:center">Crear</th>
+              <th style="padding:11px 13px;border-bottom:2px solid var(--brand);text-align:center">Editar</th>
+              <th style="padding:11px 13px;border-bottom:2px solid var(--brand);text-align:center">Eliminar / Archivar</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:11px 13px"><strong>Administrador</strong><br><span style="font-size:12px;color:var(--mist)">Control total del sistema</span></td>
+              <td style="padding:11px 13px;text-align:center">Todos</td>
+              <td style="padding:11px 13px;text-align:center;color:#0f8f5e;font-weight:700">✓</td>
+              <td style="padding:11px 13px;text-align:center;color:#0f8f5e;font-weight:700">✓</td>
+              <td style="padding:11px 13px;text-align:center;color:#0f8f5e;font-weight:700">✓</td>
+            </tr>
+            <tr style="border-bottom:1px solid var(--line)">
+              <td style="padding:11px 13px"><strong>Gestor</strong><br><span style="font-size:12px;color:var(--mist)">Ve y edita todo, sin crear ni eliminar</span></td>
+              <td style="padding:11px 13px;text-align:center">Todos</td>
+              <td style="padding:11px 13px;text-align:center;color:#c0392b;font-weight:700">✗</td>
+              <td style="padding:11px 13px;text-align:center;color:#0f8f5e;font-weight:700">✓</td>
+              <td style="padding:11px 13px;text-align:center;color:#c0392b;font-weight:700">✗</td>
+            </tr>
+            <tr>
+              <td style="padding:11px 13px"><strong>Oficina</strong><br><span style="font-size:12px;color:var(--mist)">Solo los registros de su unidad u oficina</span></td>
+              <td style="padding:11px 13px;text-align:center">Solo su oficina</td>
+              <td style="padding:11px 13px;text-align:center;color:#c0392b;font-weight:700">✗</td>
+              <td style="padding:11px 13px;text-align:center">Solo su oficina</td>
+              <td style="padding:11px 13px;text-align:center;color:#c0392b;font-weight:700">✗</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:18px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px;font-size:13px;color:var(--slate)">
+        <strong>📌 Cómo crear o modificar usuarios</strong>
+        <p style="margin:8px 0 0;color:var(--mist)">Puedes gestionar los usuarios directamente aquí abajo, o desde QuintaDB. La oficina debe coincidir con el "Responsable (oficina)" de los registros (por eso se elige de una lista).</p>
+      </div>
+    </div>
+
+    <div class="card" style="padding:22px;margin-top:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div>
+          <h3 style="margin:0;font-size:16px;color:var(--slate)">Usuarios del sistema</h3>
+          <p style="margin:4px 0 0;font-size:13px;color:var(--mist)">Crea, edita, activa/desactiva o elimina usuarios.</p>
+        </div>
+        <button class="btn btn-primary" onclick="abrirFormUsuario()">+ Crear usuario</button>
+      </div>
+      <div id="usuariosLista"><p class="hint">Cargando usuarios…</p></div>
+    </div>
+  </section>
+
+  <!-- Modal crear/editar usuario -->
+  <div id="modalUsuario" class="modal-overlay hidden">
+    <div class="modal" style="max-width:460px">
+      <div class="modal-head">
+        <h2 style="font-size:18px" id="modalUsuarioTitulo">Crear usuario</h2>
+        <button class="modal-close" onclick="cerrarFormUsuario()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="grid">
+          <div class="field full"><label>Usuario</label><input id="us_usuario" placeholder="ej. ind.industrial"></div>
+          <div class="field full"><label>Contraseña</label><input id="us_password" placeholder="clave de acceso"></div>
+          <div class="field full"><label>Rol</label><select id="us_rol" onchange="toggleOficinaUsuario()"><option value="">Seleccione…</option><option>Administrador</option><option>Gestor</option><option>Oficina</option></select></div>
+          <div class="field full" id="us_wrap_oficina"><label>Oficina asignada</label><select id="us_oficina"><option value="">Seleccione…</option></select></div>
+          <div class="field full"><label>Activo</label><select id="us_activo"><option>Sí</option><option>No</option></select></div>
+        </div>
+      </div>
+      <div class="modal-foot" style="display:flex;justify-content:flex-end;gap:10px;padding:14px 20px">
+        <button class="btn btn-ghost" onclick="cerrarFormUsuario()">Cancelar</button>
+        <button class="btn btn-primary" id="us_guardar" onclick="guardarUsuario()">Guardar usuario</button>
+      </div>
+    </div>
+  </div>
 </main>
 
 <div class="toast" id="toast"></div>
@@ -728,6 +816,7 @@ document.querySelectorAll('nav button').forEach(b => {
     if (b.dataset.view === 'dashboard') renderDashboard();
     if (b.dataset.view === 'seguimiento') { renderFiltros(); renderSeguimiento(); }
     if (b.dataset.view === 'reevaluar') renderReeval();
+    if (b.dataset.view === 'administracion') cargarUsuarios();
   };
 });
 
@@ -739,13 +828,12 @@ const STATE = { matriz: [], maestras: {}, inventario: [], relNames: {} };
 // los IDs que QuintaDB devuelve en los campos de relación a su texto.
 
 /* ============================================================
-   LOGIN Y CONTROL DE ACCESO
-   - admin (clave maestra): acceso total (ver, crear, editar, eliminar)
-   - usuario de oficina: solo ve y edita registros de SU oficina; no crea ni elimina
+   LOGIN Y CONTROL DE ACCESO (3 roles, todos en la tabla)
+   - Administrador: ve todo, crea, edita, elimina, archiva
+   - Gestor: ve todo, edita; NO crea ni elimina
+   - Oficina: solo ve y edita los registros de su oficina
    ============================================================ */
-const ADMIN_USER = 'admin';
-const ADMIN_PASS = 'estudio14.';
-// SESION: { rol:'admin'|'editor', usuario, oficina }
+// SESION: { rol:'Administrador'|'Gestor'|'Oficina', usuario, oficina }
 let SESION = null;
 
 async function hacerLogin(){
@@ -758,13 +846,6 @@ async function hacerLogin(){
   if(!u || !p){ mostrarError('Ingresa usuario y contraseña.'); return; }
   btn.disabled=true; btn.textContent='Verificando…';
   try{
-    // 1) ¿Es el administrador?
-    if(u===ADMIN_USER && p===ADMIN_PASS){
-      SESION = { rol:'admin', usuario:u, oficina:null };
-      entrarApp();
-      return;
-    }
-    // 2) Buscar en la tabla de usuarios
     const data = await API.records(CONFIG.ENTITIES.USUARIOS);
     const recs = data.records||[];
     const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
@@ -775,7 +856,9 @@ async function hacerLogin(){
     if(!encontrado){ mostrarError('Usuario o contraseña incorrectos.'); btn.disabled=false; btn.textContent='Iniciar sesión'; return; }
     const v = encontrado.values||{};
     if(limpio(v['Activo'])!=='Sí'){ mostrarError('Este usuario está desactivado. Contacta al administrador.'); btn.disabled=false; btn.textContent='Iniciar sesión'; return; }
-    SESION = { rol:'editor', usuario:limpio(v['Usuario']), oficina:limpio(v['Oficina asignada']) };
+    let rol = limpio(v['Rol']) || 'Oficina'; // por defecto, el más restrictivo
+    if(!['Administrador','Gestor','Oficina'].includes(rol)) rol='Oficina';
+    SESION = { rol, usuario:limpio(v['Usuario']), oficina:limpio(v['Oficina asignada']) };
     entrarApp();
   }catch(e){
     mostrarError('Error al verificar: '+e.message);
@@ -788,47 +871,200 @@ function entrarApp(){
   document.getElementById('loginOverlay').style.display='none';
   aplicarPermisos();
   mostrarBarraSesion();
-  // Cargar y mostrar los datos (ya con la sesión activa, para filtrar por oficina)
   STATE.matriz=[];
   if(typeof renderDashboard==='function'){ renderDashboard(); }
 }
 
+// Helpers de permisos
+function esAdmin(){ return SESION && SESION.rol==='Administrador'; }
+function puedeCrear(){ return esAdmin(); }                  // solo Administrador crea
+function puedeEliminar(){ return esAdmin(); }               // solo Administrador elimina/archiva
+function puedeVerTodo(){ return SESION && (SESION.rol==='Administrador' || SESION.rol==='Gestor'); }
+
 // Ajusta la interfaz según el rol
 function aplicarPermisos(){
-  const esAdmin = SESION && SESION.rol==='admin';
-  // El editor no puede registrar: ocultar el botón "Registrar" de la navegación
+  // Solo Administrador puede registrar (crear): ocultar botón "Registrar"
   const btnReg = document.querySelector('nav button[data-view="registrar"]');
-  if(btnReg) btnReg.style.display = esAdmin ? '' : 'none';
+  if(btnReg) btnReg.style.display = puedeCrear() ? '' : 'none';
+  // Pestaña Administración: solo para el Administrador
+  const navAdmin = document.getElementById('navAdmin');
+  if(navAdmin) navAdmin.style.display = esAdmin() ? '' : 'none';
 }
 
 function mostrarBarraSesion(){
-  // Insertar indicador de sesión en el header (una sola vez)
   if(document.getElementById('sesionInfo')) return;
   const nav = document.querySelector('header nav');
   if(!nav) return;
   const cont = document.createElement('div');
   cont.id='sesionInfo';
   cont.style.cssText='display:flex;align-items:center;gap:10px;margin-left:14px;font-size:12px;color:rgba(255,255,255,.9)';
-  const quien = SESION.rol==='admin' ? 'Administrador' : SESION.oficina;
-  cont.innerHTML = `<span title="${SESION.usuario}">👤 ${quien}</span><button onclick="cerrarSesion()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">Salir</button>`;
+  const quien = puedeVerTodo() ? SESION.rol : (SESION.oficina||'Oficina');
+  cont.innerHTML = `<span title="${SESION.usuario} · ${SESION.rol}">👤 ${quien}</span><button onclick="cerrarSesion()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">Salir</button>`;
   nav.appendChild(cont);
 }
 
-function cerrarSesion(){
-  SESION = null;
-  location.reload();
-}
+function cerrarSesion(){ SESION = null; location.reload(); }
 window.cerrarSesion = cerrarSesion;
 
-// ¿El registro pertenece a la oficina del usuario en sesión?
+// ¿El registro pertenece a la oficina del usuario? (Administrador y Gestor ven todo)
 function _registroVisible(r){
   if(!SESION) return false;
-  if(SESION.rol==='admin') return true;
-  const oficinaReg = oficinaDe(r);
+  if(puedeVerTodo()) return true;
   const norm = s => String(s||'').replace(/\s+/g,' ').trim().toLowerCase();
-  return norm(oficinaReg)===norm(SESION.oficina);
+  return norm(oficinaDe(r))===norm(SESION.oficina);
 }
 window._registroVisible = _registroVisible;
+
+/* ============================================================
+   GESTIÓN DE USUARIOS (pestaña Administración, solo admin)
+   ============================================================ */
+let _usuariosCache = [];
+let _editandoUsuarioId = null;
+
+// Carga y muestra la lista de usuarios
+async function cargarUsuarios(){
+  const cont = document.getElementById('usuariosLista');
+  if(!cont) return;
+  cont.innerHTML = '<p class="hint">Cargando usuarios…</p>';
+  try{
+    const data = await API.records(CONFIG.ENTITIES.USUARIOS);
+    _usuariosCache = data.records||[];
+    const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
+    if(!_usuariosCache.length){ cont.innerHTML='<p class="hint">No hay usuarios. Crea el primero con "+ Crear usuario".</p>'; return; }
+    let html = '<div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="background:var(--paper);text-align:left">'
+      + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Usuario</th>'
+      + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Rol</th>'
+      + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Oficina</th>'
+      + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand);text-align:center">Activo</th>'
+      + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand);text-align:right">Acciones</th></tr></thead><tbody>';
+    _usuariosCache.forEach(r=>{
+      const v=r.values||{};
+      const usuario=limpio(v['Usuario']), rol=limpio(v['Rol'])||'Oficina', oficina=limpio(v['Oficina asignada'])||'—', activo=limpio(v['Activo']);
+      const activoBadge = activo==='Sí'
+        ? '<span style="color:#0f8f5e;font-weight:600">● Sí</span>'
+        : '<span style="color:#c0392b;font-weight:600">● No</span>';
+      html += `<tr style="border-bottom:1px solid var(--line)">
+        <td style="padding:10px 12px"><strong>${usuario}</strong></td>
+        <td style="padding:10px 12px">${rol}</td>
+        <td style="padding:10px 12px">${rol==='Oficina'?oficina:'<span style=\"color:var(--mist)\">(ve todo)</span>'}</td>
+        <td style="padding:10px 12px;text-align:center">${activoBadge}</td>
+        <td style="padding:10px 12px;text-align:right;white-space:nowrap">
+          <button class="icon-btn" title="Editar" onclick="editarUsuario('${r.id}')">✏️</button>
+          <button class="icon-btn" title="${activo==='Sí'?'Desactivar':'Activar'}" onclick="toggleActivoUsuario('${r.id}')">${activo==='Sí'?'🔒':'🔓'}</button>
+          <button class="icon-btn" title="Eliminar" onclick="eliminarUsuario('${r.id}')">🗑️</button>
+        </td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+    cont.innerHTML = html;
+  }catch(e){ cont.innerHTML = '<p class="hint">Error al cargar usuarios: '+e.message+'</p>'; }
+}
+window.cargarUsuarios = cargarUsuarios;
+
+// Puebla el desplegable de oficinas con las oficinas reales
+async function poblarOficinasUsuario(){
+  const sel = document.getElementById('us_oficina');
+  if(!sel || sel.options.length>1) return; // ya poblado
+  try{
+    const oficinas = await loadMaestra('RESPONSABLES');
+    (oficinas||[]).forEach(o=>{
+      const nombre = (typeof o==='string') ? o : (o.label||o.name||o.value||'');
+      if(nombre){ const op=document.createElement('option'); op.value=nombre; op.textContent=nombre; sel.appendChild(op); }
+    });
+  }catch(e){}
+}
+
+function toggleOficinaUsuario(){
+  const rol = document.getElementById('us_rol').value;
+  const wrap = document.getElementById('us_wrap_oficina');
+  // La oficina solo aplica al rol "Oficina"
+  if(wrap) wrap.style.display = (rol==='Oficina') ? '' : 'none';
+}
+window.toggleOficinaUsuario = toggleOficinaUsuario;
+
+async function abrirFormUsuario(){
+  _editandoUsuarioId = null;
+  document.getElementById('modalUsuarioTitulo').textContent = 'Crear usuario';
+  document.getElementById('us_usuario').value='';
+  document.getElementById('us_password').value='';
+  document.getElementById('us_rol').value='';
+  document.getElementById('us_activo').value='Sí';
+  await poblarOficinasUsuario();
+  document.getElementById('us_oficina').value='';
+  toggleOficinaUsuario();
+  document.getElementById('modalUsuario').classList.remove('hidden');
+}
+window.abrirFormUsuario = abrirFormUsuario;
+
+function cerrarFormUsuario(){ document.getElementById('modalUsuario').classList.add('hidden'); }
+window.cerrarFormUsuario = cerrarFormUsuario;
+
+async function editarUsuario(id){
+  const r = _usuariosCache.find(x=>x.id===id); if(!r) return;
+  const v=r.values||{};
+  const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
+  _editandoUsuarioId = id;
+  document.getElementById('modalUsuarioTitulo').textContent = 'Editar usuario';
+  document.getElementById('us_usuario').value = limpio(v['Usuario']);
+  document.getElementById('us_password').value = limpio(v['Contraseña']);
+  document.getElementById('us_rol').value = limpio(v['Rol'])||'';
+  document.getElementById('us_activo').value = limpio(v['Activo'])==='No'?'No':'Sí';
+  await poblarOficinasUsuario();
+  document.getElementById('us_oficina').value = limpio(v['Oficina asignada'])||'';
+  toggleOficinaUsuario();
+  document.getElementById('modalUsuario').classList.remove('hidden');
+}
+window.editarUsuario = editarUsuario;
+
+async function guardarUsuario(){
+  const U = CONFIG.USUARIOS_FIELDS;
+  const g = id => document.getElementById(id).value.trim();
+  const usuario=g('us_usuario'), pass=g('us_password'), rol=g('us_rol'), activo=g('us_activo');
+  let oficina = g('us_oficina');
+  if(!usuario || !pass){ toast('Usuario y contraseña son obligatorios.', true); return; }
+  if(!rol){ toast('Selecciona un rol.', true); return; }
+  if(rol==='Oficina' && !oficina){ toast('El rol Oficina requiere una oficina asignada.', true); return; }
+  if(rol!=='Oficina') oficina=''; // admin y gestor ven todo, no necesitan oficina
+  const btn=document.getElementById('us_guardar');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
+  const campos = {};
+  campos[U.usuario.id]=usuario; campos[U.password.id]=pass; campos[U.rol.id]=rol;
+  campos[U.oficina.id]=oficina; campos[U.activo.id]=activo;
+  try{
+    if(_editandoUsuarioId){ await API.saveForm(_editandoUsuarioId, campos, CONFIG.ENTITIES.USUARIOS); toast('Usuario actualizado.'); }
+    else { await API.saveForm(null, campos, CONFIG.ENTITIES.USUARIOS); toast('Usuario creado.'); }
+    cerrarFormUsuario();
+    cargarUsuarios();
+  }catch(e){ toast('Error al guardar: '+e.message, true); btn.disabled=false; btn.textContent='Guardar usuario'; }
+}
+window.guardarUsuario = guardarUsuario;
+
+async function toggleActivoUsuario(id){
+  const r = _usuariosCache.find(x=>x.id===id); if(!r) return;
+  const U = CONFIG.USUARIOS_FIELDS;
+  const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
+  const actual = limpio((r.values||{})['Activo']);
+  const nuevo = actual==='Sí' ? 'No' : 'Sí';
+  try{
+    await API.saveForm(id, { [U.activo.id]: nuevo }, CONFIG.ENTITIES.USUARIOS);
+    toast('Usuario '+(nuevo==='Sí'?'activado':'desactivado')+'.');
+    cargarUsuarios();
+  }catch(e){ toast('Error: '+e.message, true); }
+}
+window.toggleActivoUsuario = toggleActivoUsuario;
+
+async function eliminarUsuario(id){
+  const r = _usuariosCache.find(x=>x.id===id);
+  const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
+  const nombre = r ? limpio((r.values||{})['Usuario']) : 'este usuario';
+  if(!confirm('¿Eliminar al usuario "'+nombre+'"? Esta acción no se puede deshacer.')) return;
+  try{
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+id+'.json','DELETE',{});
+    toast('Usuario eliminado.');
+    cargarUsuarios();
+  }catch(e){ toast('Error al eliminar: '+e.message, true); }
+}
+window.eliminarUsuario = eliminarUsuario;
 
 function toast(msg, isErr) {
   const t = document.getElementById('toast');
@@ -1445,7 +1681,7 @@ async function initCascada() {
    ============================================================ */
 document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   e.preventDefault();
-  if(!SESION || SESION.rol!=='admin'){ toast('Solo el administrador puede crear nuevos registros.', true); return; }
+  if(!puedeCrear()){ toast('Solo el administrador puede crear nuevos registros.', true); return; }
   const btn = document.getElementById('btnGuardar');
   const F = CONFIG.MATRIZ_FIELDS;
   const v = id => document.getElementById(id).value;
@@ -1562,7 +1798,7 @@ async function loadMatriz(forzar) {
   const data = await API.records(CONFIG.ENTITIES.MATRIZ);
   let recs = data.records || [];
   // Control de acceso: el editor solo ve los registros de su oficina
-  if(SESION && SESION.rol!=='admin'){
+  if(SESION && !puedeVerTodo()){
     recs = recs.filter(r=>_registroVisible(r));
   }
   STATE.matriz = recs;
@@ -2287,10 +2523,10 @@ async function renderSeguimiento() {
         <td class="cards-acciones" style="text-align:right;white-space:nowrap">
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
           <button class="icon-btn" title="Editar" onclick="editarRiesgo('${f.id}')">✏️</button>
-          ${(SESION&&SESION.rol==='admin')?`<button class="icon-btn" title="Duplicar (crear una copia)" onclick="duplicarRiesgo('${f.id}')">📋</button>`:''}
+          ${puedeEliminar()?`<button class="icon-btn" title="Duplicar (crear una copia)" onclick="duplicarRiesgo('${f.id}')">📋</button>`:''}
           <button class="icon-btn" title="Notificar por WhatsApp" onclick="notificarWhatsApp('${f.id}')">📱</button>
           <button class="icon-btn" title="Notificar por correo" onclick="notificarCorreo('${f.id}')">✉️</button>
-          ${(SESION&&SESION.rol==='admin')?`<button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
+          ${puedeEliminar()?`<button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
           <button class="icon-btn" title="Eliminar" onclick="eliminarRiesgo('${f.id}')">🗑️</button>`:''}
         </td>
       </tr>
@@ -3215,7 +3451,7 @@ window.duplicarRiesgo = duplicarRiesgo;
 
 // === Eliminar riesgo (con confirmación) ===
 async function eliminarRiesgo(riesgoId){
-  if(!SESION || SESION.rol!=='admin'){ toast('Solo el administrador puede eliminar registros.', true); return; }
+  if(!puedeEliminar()){ toast('Solo el administrador puede eliminar registros.', true); return; }
   const r = STATE.matriz.find(x=>x.id===riesgoId);
   const F=CONFIG.MATRIZ_FIELDS;
   const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
@@ -3233,7 +3469,7 @@ window.eliminarRiesgo = eliminarRiesgo;
 // === Archivar / Desarchivar registro ===
 // Cambia "Estado del registro" entre Activo y Archivado (PUT, no borra nada).
 async function archivarRiesgo(riesgoId){
-  if(!SESION || SESION.rol!=='admin'){ toast('Solo el administrador puede archivar registros.', true); return; }
+  if(!puedeEliminar()){ toast('Solo el administrador puede archivar registros.', true); return; }
   const r = STATE.matriz.find(x=>x.id===riesgoId);
   if(!r) return;
   const F=CONFIG.MATRIZ_FIELDS;
