@@ -294,7 +294,7 @@
   <div class="bar">
     <div class="logo">
       <div class="logo-mark">R</div>
-      <div><b>Matriz de Riesgos y Oportunidades</b><span>Facultad de Ingeniería · URP — Sistema de Gestión ISO 21000</span></div>
+      <div><b>Matriz de Riesgos y Oportunidades</b><span>Facultad de Ingeniería · URP — Sistema de Gestión ISO 21001</span></div>
     </div>
     <nav>
       <button data-view="dashboard" class="active">Tablero</button>
@@ -1121,8 +1121,18 @@ async function eliminarUsuario(id){
 window.eliminarUsuario = eliminarUsuario;
 
 // === Cambiar mi propia contraseña (cualquier usuario logueado) ===
-function abrirCambiarPass(){
-  if(!SESION || !SESION.recordId){ toast('No se pudo identificar tu usuario.', true); return; }
+async function abrirCambiarPass(){
+  if(!SESION){ toast('Debes iniciar sesión.', true); return; }
+  // Si no tenemos el recordId (sesión antigua), lo buscamos por el nombre de usuario
+  if(!SESION.recordId){
+    try{
+      const data = await API.records(CONFIG.ENTITIES.USUARIOS);
+      const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
+      const yo = (data.records||[]).find(r=>limpio((r.values||{})['Usuario'])===SESION.usuario);
+      if(yo) SESION.recordId = yo.id;
+    }catch(e){}
+  }
+  if(!SESION.recordId){ toast('No se pudo identificar tu usuario. Cierra sesión y vuelve a entrar.', true); return; }
   document.getElementById('cp_nueva').value='';
   document.getElementById('cp_repetir').value='';
   const bg=document.getElementById('cp_guardar'); if(bg){ bg.disabled=false; bg.textContent='Guardar contraseña'; }
@@ -1456,9 +1466,9 @@ function aplicarPlantilla(txt, datos){
 }
 
 // Plantillas por defecto (si no hay nada configurado en QuintaDB)
-const PLANTILLA_WA_DEFECTO = 'Estimado/a {responsable},\n\nLe notificamos sobre el siguiente {tipo} bajo su responsabilidad:\n\n• Descripción: {descripcion}\n• Nivel: {nivel}\n• Proceso: {proceso}\n\nPor favor revisar y dar seguimiento.\n\n— Sistema de Gestión ISO 21000, Facultad de Ingeniería URP';
-const PLANTILLA_ASUNTO_DEFECTO = 'Notificación de {tipo} — Sistema de Gestión ISO 21000 URP';
-const PLANTILLA_CORREO_DEFECTO = 'Estimado/a {responsable},\n\nLe notificamos sobre el siguiente {tipo} bajo su responsabilidad:\n\n• Descripción: {descripcion}\n• Nivel: {nivel}\n• Proceso: {proceso}\n• Respuesta planificada: {respuesta}\n\nPor favor revisar y dar seguimiento.\n\nSaludos cordiales,\nSistema de Gestión ISO 21000 — Facultad de Ingeniería URP';
+const PLANTILLA_WA_DEFECTO = 'Estimado/a {responsable},\n\nLe notificamos sobre el siguiente {tipo} bajo su responsabilidad:\n\n• Descripción: {descripcion}\n• Nivel: {nivel}\n• Proceso: {proceso}\n\nPor favor revisar y dar seguimiento.\n\n— Sistema de Gestión ISO 21001, Facultad de Ingeniería URP';
+const PLANTILLA_ASUNTO_DEFECTO = 'Notificación de {tipo} — Sistema de Gestión ISO 21001 URP';
+const PLANTILLA_CORREO_DEFECTO = 'Estimado/a {responsable},\n\nLe notificamos sobre el siguiente {tipo} bajo su responsabilidad:\n\n• Descripción: {descripcion}\n• Nivel: {nivel}\n• Proceso: {proceso}\n• Respuesta planificada: {respuesta}\n\nPor favor revisar y dar seguimiento.\n\nSaludos cordiales,\nSistema de Gestión ISO 21001 — Facultad de Ingeniería URP';
 
 // Cache de plantillas cargadas desde QuintaDB
 let PLANTILLAS = null;       // {wa, asunto, correo}
