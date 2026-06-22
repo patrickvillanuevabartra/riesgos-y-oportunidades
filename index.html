@@ -3919,13 +3919,14 @@ async function guardarEdit(){
     }
   }
   set(F.certificacion_control, g('ed_cert')); // guardar siempre, permite volver a vacío (Seleccione…)
-  // Responsable → nombre de oficina en campo de texto
-  if(gtxt('ed_responsable')) set(F.responsable_txt, gtxt('ed_responsable'));
-  // Responsable de proceso, celular y correo (autocompletados desde la oficina)
+  // Responsable → nombre de oficina en campo de texto. Se guarda SIEMPRE (permite volver a "Seleccione…" = vacío)
+  set(F.responsable_txt, gtxt('ed_responsable'));
+  // Responsable de proceso, celular y correo (autocompletados desde la oficina). Se guardan siempre.
+  // Si no se eligió oficina, estos quedan vacíos también.
   const txtRPe = (id)=>{ const el=document.getElementById(id); const t=el?el.textContent.trim():''; return (t && t!=='—' && !t.startsWith('(sin '))?t:''; };
-  if(txtRPe('ed_resp_proc')) set(F.resp_proceso_txt, txtRPe('ed_resp_proc'));
-  if(txtRPe('ed_resp_cel'))  set(F.resp_celular, txtRPe('ed_resp_cel'));
-  if(txtRPe('ed_resp_cor'))  set(F.resp_correo, txtRPe('ed_resp_cor'));
+  set(F.resp_proceso_txt, txtRPe('ed_resp_proc'));
+  set(F.resp_celular, txtRPe('ed_resp_cel'));
+  set(F.resp_correo, txtRPe('ed_resp_cor'));
 
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
   try{
