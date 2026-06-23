@@ -128,7 +128,8 @@ const CONFIG = {
     valor_ref:       { id: "cbWOa0fajhqiobW7fjxYjk", type: "float", col: "Valor de referencia" },
     valor_meta:      { id: "a0zmk1bSnhW6uJqc7cTCkZ", type: "float", col: "Valor meta" },
     valor_real:      { id: "ddLCkrW4fcSAatsI3dQ0HI", type: "float", col: "Valor real obtenido" },
-    plan_remediacion:{ id: "dcPsRdVCjlzikIWReVnCkN", type: "url", col: "Plan de remediación" }
+    plan_remediacion:{ id: "dcPsRdVCjlzikIWReVnCkN", type: "url", col: "Plan de remediación" },
+    periodo:         { id: "cFDgfnaXvdGBBdLctdT8kX", type: "string", col: "Periodo" }
   },
 
   // ---- Campos del subformulario "Programación de metas monitoreo riesgos" ----
@@ -139,7 +140,8 @@ const CONFIG = {
     valor_ref:     { id: "bnW5VcGCjapRddRCkpvtLO", type: "float", col: "Valor de referencia" },
     valor_meta:    { id: "bkW5JdVIPpWRiacCorW4OZ", type: "float", col: "Valor meta" },
     plan_link:     { id: "bzfsRcTGXlW5XJWOhdLZSP", type: "url", col: "Plan de monitoreo para el cumplimiento de la meta" },
-    observacion:   { id: "cdWPpcJ8jgAiobWORdILOf", type: "text", col: "Observación" }
+    observacion:   { id: "cdWPpcJ8jgAiobWORdILOf", type: "text", col: "Observación" },
+    periodo:       { id: "dcJCorWQ1dKyScW7TpW4Ob", type: "string", col: "Periodo" }
   },
 
   // ---- Campos de la tabla "Usuarios matriz de riesgos y oportunidades" ----
