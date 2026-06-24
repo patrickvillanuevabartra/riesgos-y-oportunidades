@@ -281,7 +281,10 @@
       </div>
       <div>
         <label style="display:block;font-size:13px;font-weight:600;color:#1a2b22;margin-bottom:5px">Contraseña</label>
-        <input id="login_pass" type="password" autocomplete="current-password" style="width:100%;padding:11px 13px;border:1px solid #d4ddd7;border-radius:9px;font-size:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter')hacerLogin()">
+        <div style="position:relative">
+          <input id="login_pass" type="password" autocomplete="current-password" style="width:100%;padding:11px 42px 11px 13px;border:1px solid #d4ddd7;border-radius:9px;font-size:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter')hacerLogin()">
+          <button type="button" id="login_pass_toggle" onclick="toggleLoginPass()" title="Mostrar u ocultar la contraseña" aria-label="Mostrar u ocultar la contraseña" style="position:absolute;top:50%;right:8px;transform:translateY(-50%);background:none;border:0;cursor:pointer;font-size:17px;line-height:1;padding:4px;color:#6b7d74">👁️</button>
+        </div>
       </div>
       <div id="login_error" style="display:none;font-size:13px;color:#c0392b;background:#fdecea;border-radius:8px;padding:9px 11px"></div>
       <button onclick="hacerLogin()" id="login_btn" style="margin-top:6px;padding:12px;background:#0f8f5e;color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:600;cursor:pointer">Iniciar sesión</button>
@@ -855,6 +858,18 @@ const STATE = { matriz: [], maestras: {}, inventario: [], relNames: {} };
    ============================================================ */
 // SESION: { rol:'Administrador'|'Gestor'|'Oficina', usuario, oficina }
 let SESION = null;
+
+// Muestra u oculta la contraseña en el login (ojito)
+function toggleLoginPass(){
+  const inp = document.getElementById('login_pass');
+  const btn = document.getElementById('login_pass_toggle');
+  if(!inp) return;
+  const ver = inp.type === 'password';
+  inp.type = ver ? 'text' : 'password';
+  if(btn){ btn.textContent = ver ? '🙈' : '👁️'; btn.title = ver ? 'Ocultar la contraseña' : 'Mostrar la contraseña'; }
+  inp.focus();
+}
+window.toggleLoginPass = toggleLoginPass;
 
 async function hacerLogin(){
   const u = (document.getElementById('login_user').value||'').trim();
@@ -3540,8 +3555,8 @@ function verDetalle(riesgoId){
   // Botones de notificación (solo si hay celular o correo del responsable de proceso)
   const dN=_datosNotif(r);
   const btns=[];
-  if(dN.cel) btns.push(`<button class="btn btn-primary" style="padding:8px 14px;font-size:13px" onclick="notificarWhatsApp('${r.id}')">📱 Notificar por WhatsApp</button>`);
-  if(dN.cor) btns.push(`<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="notificarCorreo('${r.id}')">✉️ Notificar por correo</button>`);
+  if(dN.celular) btns.push(`<button class="btn btn-primary" style="padding:8px 14px;font-size:13px" onclick="notificarWhatsApp('${r.id}')">📱 Notificar por WhatsApp</button>`);
+  if(dN.correo) btns.push(`<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="notificarCorreo('${r.id}')">✉️ Notificar por correo</button>`);
   const notifHTML = btns.length
     ? `<div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);display:flex;gap:8px;flex-wrap:wrap">${btns.join('')}</div>`
     : '';
