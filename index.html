@@ -51,6 +51,21 @@
   .page-head h1{font-size:30px;color:var(--ink)}
   .page-head p{color:var(--mist);font-size:15px;margin-top:6px;max-width:60ch}
 
+  /* Nota plegable "¿Cómo funciona?" */
+  .ayuda{margin:0 0 20px;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:10px;box-shadow:var(--shadow)}
+  .ayuda>summary{cursor:pointer;list-style:none;padding:12px 16px;font-weight:600;font-size:14px;color:var(--brand);display:flex;align-items:center;gap:8px;user-select:none}
+  .ayuda>summary::-webkit-details-marker{display:none}
+  .ayuda>summary::after{content:"▸";margin-left:auto;color:var(--mist);transition:transform .15s}
+  .ayuda[open]>summary::after{transform:rotate(90deg)}
+  .ayuda .ayuda-body{padding:4px 18px 16px;font-size:13.5px;color:var(--slate);line-height:1.6}
+  .ayuda .ayuda-body ol{margin:8px 0 8px 4px;padding-left:18px}
+  .ayuda .ayuda-body li{margin-bottom:7px}
+  .ayuda .ayuda-body strong{color:var(--ink)}
+  .ayuda .flujo{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 12px;font-size:12.5px}
+  .ayuda .flujo .paso{background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:5px 10px;font-weight:600;color:var(--slate)}
+  .ayuda .flujo .arr{color:var(--brand-2);font-weight:700}
+  .ayuda .tip{background:var(--paper);border:1px dashed var(--line);border-radius:8px;padding:9px 12px;margin-top:8px;font-size:12.5px;color:var(--mist)}
+
   /* Cards / form */
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
   .section{padding:22px 24px;border-bottom:1px solid var(--line)}
@@ -361,6 +376,20 @@
       <h1>Registrar riesgo u oportunidad</h1>
       <p>El formulario se adapta a la fuente de identificación que elijas. Los campos de índice y nivel se calculan automáticamente al guardar.</p>
     </div>
+
+    <details class="ayuda">
+      <summary>💡 ¿Cómo funciona esta vista? (notas del proceso)</summary>
+      <div class="ayuda-body">
+        <p>Aquí identificas y evalúas el riesgo u oportunidad. Sigue este orden:</p>
+        <ol>
+          <li><strong>Identificación.</strong> Elige la <strong>fuente</strong> (Contexto, Partes interesadas o Proceso); el formulario muestra solo los campos que correspondan.</li>
+          <li><strong>Evaluación inherente.</strong> Califica <strong>probabilidad × impacto</strong> sin considerar controles. El sistema calcula el índice y el nivel (1 a 4). Es la foto del riesgo «en crudo».</li>
+          <li><strong>Controles y tratamiento.</strong> Si <strong>no</strong> existen controles, defines la <strong>respuesta</strong> (Eliminar/Mitigar/Trasladar/Asumir) y la <strong>medida</strong>. Si <strong>sí</strong> existen, describes el <strong>control establecido</strong>. En riesgos <strong>nivel 4</strong> con control, además defines el <strong>indicador, fórmula y frecuencias</strong> para su monitoreo.</li>
+        </ol>
+        <div class="tip">📌 Recordatorio: el nivel 1-4 surge de probabilidad × impacto. El riesgo nivel 4 (intolerable) es el único que exige indicador y plan de monitoreo del control. El avance de las medidas y el monitoreo se registran luego en la vista <strong>Seguimiento</strong>.</div>
+      </div>
+    </details>
+
     <form id="formRiesgo" class="card">
 
       <div class="section">
@@ -475,6 +504,26 @@
       <h1>Seguimiento</h1>
       <p>Registra el avance de las medidas de respuesta. Cada riesgo muestra cuántos reportes tiene; abre uno para ver su historial y añadir nuevos reportes.</p>
     </div>
+
+    <details class="ayuda">
+      <summary>💡 ¿Cómo funciona esta vista? (notas del proceso)</summary>
+      <div class="ayuda-body">
+        <p>El tratamiento de un riesgo sigue un orden lógico. Cada etapa habilita la siguiente:</p>
+        <div class="flujo">
+          <span class="paso">1. Medidas de respuesta 📋</span><span class="arr">→</span>
+          <span class="paso">2. Medidas al 100%</span><span class="arr">→</span>
+          <span class="paso">3. Monitoreo del control 🎯</span><span class="arr">→</span>
+          <span class="paso">4. Reevaluación (residual)</span>
+        </div>
+        <ol>
+          <li><strong>📋 Reporte de acciones a las medidas de respuesta.</strong> Registra cómo avanza lo que se comprometió a hacer para tratar el riesgo. El <strong>% completado</strong> de cada reporte alimenta la columna <strong>«% Avance medidas»</strong>.</li>
+          <li><strong>🎯 Metas, control y plan de monitoreo.</strong> Es la etapa <em>posterior</em>: solo se habilita cuando las medidas llegan al <strong>100%</strong>. Recién ahí tiene sentido medir el control con indicadores. Mientras tanto verás un candado 🔒 en la columna «% Cumpl. monitoreo». Aplica solo a riesgos de <strong>nivel 4 con control «Sí»</strong>.</li>
+          <li><strong>Reevaluación (riesgo residual).</strong> Procede cuando el control está <strong>Certificado/Operativo</strong> y al menos una acción está <strong>Culminada/Ejecutada</strong>. Se gestiona en la pestaña «Reevaluación».</li>
+        </ol>
+        <div class="tip">📌 Recordatorio: «% Avance medidas» mide cuánto se han ejecutado las acciones; «% Cumpl. monitoreo» mide qué tan bien funciona el control ya implementado. No son lo mismo y no conviven hasta completar las medidas.</div>
+      </div>
+    </details>
+
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <div class="conn" style="margin-bottom:0;flex:1;min-width:220px">
         <input id="segBuscar" placeholder="Buscar por descripción o proceso…" style="border:0;background:transparent;flex:1;padding:0" oninput="renderSeguimiento()">
@@ -658,6 +707,20 @@
       <h1>Reevaluación</h1>
       <p>Solo procede cuando el control está <strong>Certificado/Operativo</strong> y al menos una acción de respuesta está <strong>Culminada/Ejecutada</strong>. El resto permanece bloqueado hasta cumplir ambas condiciones.</p>
     </div>
+
+    <details class="ayuda">
+      <summary>💡 ¿Cómo funciona esta vista? (notas del proceso)</summary>
+      <div class="ayuda-body">
+        <p>La reevaluación mide el <strong>riesgo residual</strong>: cuánto riesgo queda <em>después</em> de aplicar el tratamiento. Es la última etapa del ciclo.</p>
+        <ol>
+          <li><strong>Se desbloquea</strong> cuando se cumplen <strong>ambas</strong> condiciones: el control está <strong>Certificado/Operativo</strong> y al menos una acción de respuesta está <strong>Culminada/Ejecutada</strong>.</li>
+          <li>Vuelves a calificar <strong>probabilidad × impacto</strong>, ahora considerando que el control ya opera. El sistema calcula el <strong>nivel residual</strong>.</li>
+          <li>Comparando <strong>nivel inherente vs. residual</strong> demuestras la eficacia del tratamiento: lo esperado es que el riesgo haya bajado de nivel.</li>
+        </ol>
+        <div class="tip">📌 Recordatorio: <strong>inherente</strong> = riesgo sin controles (al registrar). <strong>Residual</strong> = riesgo con el control ya funcionando (aquí). Si el residual no baja, conviene revisar la eficacia de las medidas.</div>
+      </div>
+    </details>
+
     <div class="card"><div class="tabla-wrap" style="padding:6px 4px"><table>
       <thead><tr><th>Riesgo</th><th>Proceso</th><th>Nivel inherente</th><th>¿Procede?</th><th>Nivel residual</th><th></th></tr></thead>
       <tbody id="tablaReeval"><tr><td colspan="6" class="empty"><h3>Cargando…</h3></td></tr></tbody>
@@ -2688,7 +2751,7 @@ async function renderSeguimiento() {
         <td data-label="Reportes"><strong>${f.nReportes}</strong></td>
         <td data-label="Último estado" id="estado-${f.id}" style="font-size:12px">${f.nReportes?'<span class="hint">…</span>':estadoPill('Pendiente')}</td>
         <td data-label="% Avance medidas" id="avance-${f.id}" style="min-width:110px">${f.nReportes?'<span class="hint">…</span>':'<span class="hint">—</span>'}</td>
-        <td data-label="% Cumpl. monitoreo" id="moncumpl-${f.id}" style="min-width:110px">${f.tieneMonitoreo?(f.nMon?'<span class="hint">…</span>':'<span class="hint">—</span>'):'<span class="hint" title="Solo aplica a riesgos nivel 4 con control">n/a</span>'}</td>
+        <td data-label="% Cumpl. monitoreo" id="moncumpl-${f.id}" style="min-width:110px">${f.tieneMonitoreo?'<span class="hint">…</span>':'<span class="hint" title="Solo aplica a riesgos nivel 4 con control">n/a</span>'}</td>
         <td data-label="¿Procede reev.?" title="${(f.procedeTexto||'').replace(/"/g,'&quot;')}">${
           f.procede
             ? '<span class="tag tag-proc">✓ Procede</span>'
@@ -2696,7 +2759,7 @@ async function renderSeguimiento() {
         }</td>
         <td class="cards-acciones" style="text-align:right;white-space:nowrap">
           <button class="icon-btn" title="Reporte de acciones a la(s) medida(s) de respuesta" onclick="abrirReporteAcciones('${f.id}')">📋</button>
-          ${f.tieneMonitoreo?`<button class="icon-btn" title="Metas, control y plan de monitoreo" onclick="abrirMetasMonitoreo('${f.id}')" style="border-color:var(--brand-2)">🎯</button>`:''}
+          ${f.tieneMonitoreo?`<button class="icon-btn" id="btnmon-${f.id}" title="Metas, control y plan de monitoreo (se habilita cuando las medidas estén al 100%)" onclick="abrirMetasMonitoreo('${f.id}')" style="border-color:var(--brand-2);display:none">🎯</button>`:''}
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
           <button class="icon-btn" title="Editar" onclick="editarRiesgo('${f.id}')">✏️</button>
           <button class="icon-btn" title="Notificar por WhatsApp" onclick="notificarWhatsApp('${f.id}')">📱</button>
@@ -2719,10 +2782,16 @@ async function renderSeguimiento() {
 
     setConn(true);
 
-    // Cargar "último estado" + "% avance" de forma diferida (solo con reportes)
+    // Cargar "último estado" + "% avance" de forma diferida (solo con reportes).
+    // Esta función decide además si habilita el monitoreo (cuando medidas = 100%).
     cargarUltimosEstados(filas.filter(f=>f.subIds.length));
-    // Cargar "% cumplimiento monitoreo" de forma diferida (solo nivel 4 con control y con reportes de monitoreo)
-    cargarCumplimientoMonitoreo(filas.filter(f=>f.tieneMonitoreo && f.nMon));
+    // Riesgos nivel 4 con control pero SIN reportes de acciones aún: medidas = 0% → monitoreo bloqueado.
+    filas.filter(f=>f.tieneMonitoreo && !f.subIds.length).forEach(f=>{
+      const btnMon=document.getElementById('btnmon-'+f.id);
+      if(btnMon) btnMon.style.display='none';
+      const celMon=document.getElementById('moncumpl-'+f.id);
+      if(celMon) celMon.innerHTML='<span class="hint" title="Disponible cuando las medidas de respuesta estén al 100%">🔒 medidas &lt;100%</span>';
+    });
   } catch(e){ setConn(false,e.message);
     tb.innerHTML=`<tr><td colspan="10"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
 }
@@ -2754,12 +2823,31 @@ async function cargarUltimosEstados(filasConReportes) {
       // % avance = % completado del reporte más reciente
       const pctRaw = v[RF.pct_completado.col];
       const cav = document.getElementById('avance-'+f.id);
+      let pctMedidas = NaN;
       if (cav) {
         if (pctRaw !== '' && pctRaw != null) {
-          const pct = Math.max(0, Math.min(100, parseInt(pctRaw)||0));
-          cav.innerHTML = barraAvance(pct);
+          pctMedidas = Math.max(0, Math.min(100, parseInt(pctRaw)||0));
+          cav.innerHTML = barraAvance(pctMedidas);
         } else {
           cav.innerHTML = '<span class="hint">—</span>';
+        }
+      } else if (pctRaw !== '' && pctRaw != null) {
+        pctMedidas = Math.max(0, Math.min(100, parseInt(pctRaw)||0));
+      }
+      // Habilitación del MONITOREO: solo si las medidas están al 100%.
+      if (f.tieneMonitoreo) {
+        const completo = (pctMedidas === 100);
+        const btnMon = document.getElementById('btnmon-'+f.id);
+        const celMon = document.getElementById('moncumpl-'+f.id);
+        if (completo) {
+          if (btnMon) btnMon.style.display = '';                 // revelar botón 🎯
+          if (celMon) {                                          // cargar el % de monitoreo
+            if (f.nMon) { celMon.innerHTML='<span class="hint">…</span>'; cargarCumplimientoMonitoreo([f]); }
+            else celMon.innerHTML = '<span class="hint">—</span>';
+          }
+        } else {
+          if (btnMon) btnMon.style.display = 'none';             // mantener oculto
+          if (celMon) celMon.innerHTML = '<span class="hint" title="Disponible cuando las medidas de respuesta estén al 100%">🔒 medidas &lt;100%</span>';
         }
       }
     } catch(_) {
@@ -3088,9 +3176,39 @@ function setMonTab(t){
 }
 window.setMonTab = setMonTab;
 
+// ¿El último reporte de acciones del riesgo está al 100% completado?
+// Determina si el control puede pasar a la etapa de monitoreo.
+async function medidasAl100(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  if(!r) return false;
+  const subIds = subIdsDe(r, SUBFORM_FIELD_ID);
+  if(!subIds.length) return false;
+  const RF = CONFIG.REPORTE_FIELDS;
+  const fechaComparable = s => { const m=String(s||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/); return m?new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+m[6]).getTime():0; };
+  try{
+    let mejor=null, mejorFecha=-1;
+    for(const rid of subIds){
+      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','GET',{name_value:1});
+      const rec=d.record||{}; const ts=fechaComparable(rec.created_at);
+      if(ts>=mejorFecha){ mejorFecha=ts; mejor=rec; }
+    }
+    const v=(mejor&&mejor.values)?mejor.values:{};
+    const pct=parseInt(v[RF.pct_completado.col]);
+    return pct===100;
+  }catch(_){ return false; }
+}
+window.medidasAl100 = medidasAl100;
+
 async function abrirMetasMonitoreo(riesgoId){
   let r = STATE.matriz.find(x=>x.id===riesgoId);
   if(!r) return;
+  // Guarda: el monitoreo del control solo se habilita cuando las medidas de
+  // respuesta están al 100% (último reporte de acciones = 100%).
+  const okMedidas = await medidasAl100(riesgoId);
+  if(!okMedidas){
+    toast('El monitoreo del control se habilita cuando las medidas de respuesta llegan al 100%.', true);
+    return;
+  }
   MON_RIESGO_ACTUAL = riesgoId;
   const F = CONFIG.MATRIZ_FIELDS;
   document.getElementById('modalMon').classList.remove('hidden');
