@@ -508,8 +508,8 @@
 
     <div id="segTotales" style="margin-bottom:12px"></div>
     <div class="card"><div class="tabla-wrap" style="padding:6px 4px"><table class="tabla-cards">
-      <thead><tr><th style="width:38px;text-align:center">#</th><th id="thSegPrimera">Riesgo</th><th>Proceso</th><th style="white-space:nowrap">Nivel inh.</th><th>Reportes</th><th>Último estado</th><th>% avance</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
-      <tbody id="tablaSeguimiento"><tr><td colspan="9" class="empty"><h3>Cargando…</h3></td></tr></tbody>
+      <thead><tr><th style="width:38px;text-align:center">#</th><th id="thSegPrimera">Riesgo</th><th>Proceso</th><th style="white-space:nowrap">Nivel inh.</th><th>Reportes</th><th>Último estado</th><th title="% Avance de cumplimiento de medidas de respuesta" style="cursor:help">% Avance medidas</th><th title="% cumplimiento del plan de monitoreo (último reporte de monitoreo del control)" style="cursor:help">% Cumpl. monitoreo</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
+      <tbody id="tablaSeguimiento"><tr><td colspan="10" class="empty"><h3>Cargando…</h3></td></tr></tbody>
     </table></div></div>
   </section>
 
@@ -569,6 +569,42 @@
           <button class="btn btn-ghost" onclick="cerrarEditorPlantillas()">Cancelar</button>
           <button class="btn btn-primary" id="btnGuardarPlantillas" onclick="guardarPlantillas()">Guardar plantillas</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Modal: Reporte de acciones a la(s) medida(s) de respuesta ===== -->
+  <div id="modalAcciones" class="modal-overlay hidden">
+    <div class="modal" style="max-width:760px">
+      <div class="modal-head">
+        <div>
+          <div class="eyebrow">Seguimiento de la respuesta</div>
+          <h2 id="acc_titulo" style="font-size:18px">Reporte de acciones a la(s) medida(s) de respuesta</h2>
+        </div>
+        <button class="modal-close" onclick="cerrarModalSimple('modalAcciones')">&times;</button>
+      </div>
+      <div class="modal-body"><div id="acc_cont"></div></div>
+    </div>
+  </div>
+
+  <!-- ===== Modal: Metas, control y plan de monitoreo (2 pestañas) ===== -->
+  <div id="modalMon" class="modal-overlay hidden">
+    <div class="modal" style="max-width:900px">
+      <div class="modal-head">
+        <div>
+          <div class="eyebrow">Metas, control y plan de monitoreo</div>
+          <h2 id="mon_titulo" style="font-size:18px">Riesgo nivel 4</h2>
+        </div>
+        <button class="modal-close" onclick="cerrarModalSimple('modalMon')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="hint" id="mon_ref_indicador" style="margin-top:0;margin-bottom:12px"></p>
+        <div style="display:flex;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:16px;width:fit-content">
+          <button class="mon-tab active" data-t="metas" onclick="setMonTab('metas')" style="border:0;background:var(--brand);color:#fff;font-family:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:7px;cursor:pointer">📅 Programación de metas</button>
+          <button class="mon-tab" data-t="rep" onclick="setMonTab('rep')" style="border:0;background:transparent;color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:7px;cursor:pointer">📊 Reporte de monitoreo del control</button>
+        </div>
+        <div id="mon_pane_metas"></div>
+        <div id="mon_pane_rep" class="hidden"></div>
       </div>
     </div>
   </div>
@@ -2575,7 +2611,12 @@ async function renderSeguimiento() {
       const ni = op ? nivelOportInherenteDe(r) : nivelInherenteDe(r);
       const desact=segmentoDesactualizado(r);
       const arch=esArchivado(r);
-      return {id:r.id, op, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch};
+      // ¿Es nivel 4 con controles "Sí"? → habilita el módulo de metas/monitoreo
+      const vR=r.values||{};
+      const existeCtrl=(vR['¿Existen controles?']&&vR['¿Existen controles?']!=='¿Existen controles?')?String(vR['¿Existen controles?']).trim():'';
+      const tieneMonitoreo = (ni.nivel===4 && existeCtrl==='Sí');
+      const monIds = (r.subform_values && r.subform_values[CONFIG.MATRIZ_FIELDS.reporte_monitoreo.id]) || [];
+      return {id:r.id, op, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch, tieneMonitoreo, monIds, nMon:monIds.length};
     })
     // Filtro por el selector Todos/Riesgos/Oportunidades
     .filter(f => SEG_TIPO==='todos' || (SEG_TIPO==='oportunidades'?f.op:!f.op))
@@ -2623,40 +2664,44 @@ async function renderSeguimiento() {
         <td data-label="Nivel inh.">${nivelBadge(f.nivel)}</td>
         <td data-label="Reportes"><strong>${f.nReportes}</strong></td>
         <td data-label="Último estado" id="estado-${f.id}" style="font-size:12px">${f.nReportes?'<span class="hint">…</span>':estadoPill('Pendiente')}</td>
-        <td data-label="% avance" id="avance-${f.id}" style="min-width:110px">${f.nReportes?'<span class="hint">…</span>':'<span class="hint">—</span>'}</td>
+        <td data-label="% Avance medidas" id="avance-${f.id}" style="min-width:110px">${f.nReportes?'<span class="hint">…</span>':'<span class="hint">—</span>'}</td>
+        <td data-label="% Cumpl. monitoreo" id="moncumpl-${f.id}" style="min-width:110px">${f.tieneMonitoreo?(f.nMon?'<span class="hint">…</span>':'<span class="hint">—</span>'):'<span class="hint" title="Solo aplica a riesgos nivel 4 con control">n/a</span>'}</td>
         <td data-label="¿Procede reev.?" title="${(f.procedeTexto||'').replace(/"/g,'&quot;')}">${
           f.procede
             ? '<span class="tag tag-proc">✓ Procede</span>'
             : '<span class="tag tag-noproc">No procede</span>'
         }</td>
         <td class="cards-acciones" style="text-align:right;white-space:nowrap">
+          <button class="icon-btn" title="Reporte de acciones a la(s) medida(s) de respuesta" onclick="abrirReporteAcciones('${f.id}')">📋</button>
+          ${f.tieneMonitoreo?`<button class="icon-btn" title="Metas, control y plan de monitoreo" onclick="abrirMetasMonitoreo('${f.id}')" style="border-color:var(--brand-2)">🎯</button>`:''}
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
           <button class="icon-btn" title="Editar" onclick="editarRiesgo('${f.id}')">✏️</button>
-          ${puedeEliminar()?`<button class="icon-btn" title="Duplicar (crear una copia)" onclick="duplicarRiesgo('${f.id}')">📋</button>`:''}
           <button class="icon-btn" title="Notificar por WhatsApp" onclick="notificarWhatsApp('${f.id}')">📱</button>
           <button class="icon-btn" title="Notificar por correo" onclick="notificarCorreo('${f.id}')">✉️</button>
           ${puedeEliminar()?`<button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
           <button class="icon-btn" title="Eliminar" onclick="eliminarRiesgo('${f.id}')">🗑️</button>`:''}
         </td>
       </tr>
-      <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="9" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
+      <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="10" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
 
     const palabra = SEG_TIPO==='oportunidades' ? 'oportunidad' : (SEG_TIPO==='riesgos' ? 'riesgo' : 'registro');
     let _n = 0; // contador continuo a lo largo de todos los grupos
     tb.innerHTML = oficinasOrdenadas.length ? oficinasOrdenadas.map(of => `
-      <tr class="grupo-row"><td colspan="9">
+      <tr class="grupo-row"><td colspan="10">
         <span class="grupo-nombre">${of}</span>
         <span class="grupo-count">${grupos[of].length} ${palabra}${grupos[of].length!==1?'s':''}</span>
       </td></tr>
       ${grupos[of].map(f => filaHTML(f, ++_n)).join('')}
-    `).join('') : '<tr><td colspan="9"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
+    `).join('') : '<tr><td colspan="10"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
 
     setConn(true);
 
-    // Cargar "último estado" de forma diferida (solo riesgos con reportes)
+    // Cargar "último estado" + "% avance" de forma diferida (solo con reportes)
     cargarUltimosEstados(filas.filter(f=>f.subIds.length));
+    // Cargar "% cumplimiento monitoreo" de forma diferida (solo nivel 4 con control y con reportes de monitoreo)
+    cargarCumplimientoMonitoreo(filas.filter(f=>f.tieneMonitoreo && f.nMon));
   } catch(e){ setConn(false,e.message);
-    tb.innerHTML=`<tr><td colspan="9"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
+    tb.innerHTML=`<tr><td colspan="10"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
 }
 
 // Lee el último reporte de cada riesgo con reportes y muestra su estado en la columna.
@@ -2702,6 +2747,42 @@ async function cargarUltimosEstados(filasConReportes) {
     }
   }
 }
+
+// Lee el último reporte de monitoreo de cada riesgo nivel 4 con control y muestra
+// su "% cumplimiento" en la columna correspondiente de la tabla de seguimiento.
+async function cargarCumplimientoMonitoreo(filasConMonitoreo){
+  const MF = CONFIG.MONITOREO_FIELDS;
+  const fechaComparable = s => {
+    const m = String(s||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/);
+    if(!m) return 0;
+    return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]).getTime();
+  };
+  const numOf = x => { if(x===''||x==null) return NaN; const n=parseFloat(String(x).replace('%','').replace(',','.').trim()); return isNaN(n)?NaN:n; };
+  for(const f of filasConMonitoreo){
+    try{
+      let mejor=null, mejorFecha=-1;
+      for(const rid of f.monIds){
+        const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','GET',{name_value:1});
+        const rec = d.record||{};
+        const ts = fechaComparable(rec.created_at);
+        if(ts>=mejorFecha){ mejorFecha=ts; mejor=rec; }
+      }
+      const v=(mejor&&mejor.values)?mejor.values:{};
+      // % cumplimiento es campo fórmula en QuintaDB; si viniera vacío, lo recalculamos real/meta
+      let pct = numOf(v['% cumplimiento']);
+      if(isNaN(pct)){
+        const real=numOf(v['Valor real obtenido']), meta=numOf(v['Valor meta']);
+        if(!isNaN(real)&&!isNaN(meta)&&meta!==0) pct=Math.round((real/meta)*1000)/10;
+      } else { pct=Math.round(pct*10)/10; }
+      const cel=document.getElementById('moncumpl-'+f.id);
+      if(cel) cel.innerHTML = !isNaN(pct) ? barraAvance(Math.max(0,Math.min(100,Math.round(pct)))) : '<span class="hint">—</span>';
+    }catch(_){
+      const cel=document.getElementById('moncumpl-'+f.id);
+      if(cel) cel.innerHTML='<span class="hint">—</span>';
+    }
+  }
+}
+window.cargarCumplimientoMonitoreo = cargarCumplimientoMonitoreo;
 
 // Barra de avance compacta con porcentaje
 function barraAvance(pct){
@@ -2897,6 +2978,182 @@ async function renderPanelMonitoreoEdit(riesgoId, r){
   }
 }
 window.renderPanelMonitoreoEdit = renderPanelMonitoreoEdit;
+
+/* ============================================================
+   MODALES NUEVOS EN SEGUIMIENTO
+   1) Reporte de acciones a la(s) medida(s) de respuesta
+   2) Metas, control y plan de monitoreo (2 pestañas)
+   Reutilizan las funciones ya existentes de guardado/edición.
+   ============================================================ */
+function cerrarModalSimple(id){ const m=document.getElementById(id); if(m) m.classList.add('hidden'); }
+window.cerrarModalSimple = cerrarModalSimple;
+
+// ---- (1) Reporte de acciones: mismo contenido que el acordeón, en modal ----
+async function abrirReporteAcciones(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  if(!r) return;
+  const F = CONFIG.MATRIZ_FIELDS;
+  const subIds = (r.subform_values && r.subform_values[SUBFORM_FIELD_ID]) || [];
+  SEG_RIESGO_ACTUAL = { id: riesgoId, subIds };
+  const desc = descripcionDe(r);
+  document.getElementById('acc_titulo').textContent = (desc.length>70?desc.slice(0,70)+'…':desc) || 'Reporte de acciones';
+  const cont = document.getElementById('acc_cont');
+  cont.innerHTML = `<div class="hist-panel" style="padding:4px 0">
+    <div class="hist-head">Reportes de avance <span class="grupo-count" style="color:var(--mist)">${subIds.length} reporte${subIds.length!==1?'s':''}</span></div>
+    <div id="histlist-${riesgoId}">${subIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes aún.</p>'}</div>
+    <details class="add-rep" open><summary>+ Añadir reporte de acciones</summary>
+      <div class="grid" style="margin-top:14px">
+        <div class="field"><label>Fecha de reporte</label><input type="date" id="add_fecha_${riesgoId}"></div>
+        <div class="field"><label>Estado</label><select id="add_estado_${riesgoId}"><option value="">Seleccione…</option><option>Pendiente</option><option>En Proceso</option><option>Culminado/Ejecutado</option></select></div>
+        <div class="field"><label>% completado</label><div class="pct-input"><input type="number" min="0" max="100" step="1" id="add_pct_${riesgoId}" placeholder="0"><span>%</span></div></div>
+        <div class="field full"><label>Acción desarrollada</label><textarea id="add_accion_${riesgoId}"></textarea></div>
+        <div class="field full"><label>Observación</label><textarea id="add_obs_${riesgoId}"></textarea></div>
+        <div class="field full"><label>Evidencia (enlace)</label><input id="add_evid_${riesgoId}" placeholder="https://…"></div>
+      </div>
+      <p class="hint" style="margin-top:6px">El <strong>% completado</strong> alimenta la columna «% Avance medidas» de la tabla de seguimiento.</p>
+      <div style="text-align:right;margin-top:12px">
+        <button class="btn btn-primary" onclick="guardarReporte('${riesgoId}')" id="addbtn-${riesgoId}">Guardar reporte</button>
+      </div>
+    </details>
+  </div>`;
+  document.getElementById('modalAcciones').classList.remove('hidden');
+  if(subIds.length){
+    try { document.getElementById('histlist-'+riesgoId).innerHTML = await renderHistorialHTML(subIds); }
+    catch(e){ document.getElementById('histlist-'+riesgoId).innerHTML = '<p class="hint">Error: '+e.message+'</p>'; }
+  }
+}
+window.abrirReporteAcciones = abrirReporteAcciones;
+
+// ---- (2) Metas / control / plan de monitoreo (2 pestañas) ----
+let MON_RIESGO_ACTUAL = null;
+function setMonTab(t){
+  document.querySelectorAll('.mon-tab').forEach(b=>{ const on=b.dataset.t===t; b.style.background=on?'var(--brand)':'transparent'; b.style.color=on?'#fff':'var(--slate)'; });
+  document.getElementById('mon_pane_metas').classList.toggle('hidden', t!=='metas');
+  document.getElementById('mon_pane_rep').classList.toggle('hidden', t!=='rep');
+}
+window.setMonTab = setMonTab;
+
+async function abrirMetasMonitoreo(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  if(!r) return;
+  MON_RIESGO_ACTUAL = riesgoId;
+  const F = CONFIG.MATRIZ_FIELDS;
+  const v = r.values||{};
+  const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+  const indicador = cur('Indicador');
+  const formula = cur('Fórmula del indicador');
+  const frec = cur('Frecuencia de medición');
+  const desc = descripcionDe(r);
+  document.getElementById('mon_titulo').textContent = (desc.length>60?desc.slice(0,60)+'…':desc) || 'Riesgo nivel 4';
+  document.getElementById('mon_ref_indicador').innerHTML =
+    `Indicador: <strong>${indicador||'(no definido en el riesgo)'}</strong>`
+    + (formula?` · Fórmula: ${formula}`:'')
+    + (frec?` · Frecuencia: <strong>${frec}</strong>`:'');
+  setMonTab('metas');
+  document.getElementById('modalMon').classList.remove('hidden');
+  await renderMonPaneMetas(riesgoId, r);
+  await renderMonPaneRep(riesgoId, r);
+}
+window.abrirMetasMonitoreo = abrirMetasMonitoreo;
+
+// Refresca ambas pestañas tras guardar (relee el riesgo)
+async function refrescarMon(riesgoId){
+  STATE.matriz=[]; await loadMatriz(true);
+  const rr = STATE.matriz.find(x=>x.id===riesgoId);
+  if(rr && document.getElementById('modalMon') && !document.getElementById('modalMon').classList.contains('hidden')){
+    await renderMonPaneMetas(riesgoId, rr);
+    await renderMonPaneRep(riesgoId, rr);
+  }
+}
+window.refrescarMon = refrescarMon;
+
+// Pestaña METAS: formulario + lista agrupada por periodo
+async function renderMonPaneMetas(riesgoId, r){
+  const cont = document.getElementById('mon_pane_metas');
+  if(!cont) return;
+  const F = CONFIG.MATRIZ_FIELDS;
+  const metaIds = (r.subform_values && r.subform_values[F.prog_metas.id]) || [];
+  cont.innerHTML = `
+    <div style="background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:16px 18px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:var(--slate);margin-bottom:12px">Nueva programación de meta</div>
+      <div class="grid">
+        <div class="field"><label>Fecha de programación</label><input type="date" id="meta_fecha_${riesgoId}" onchange="sugerirPeriodoMeta('${riesgoId}')"></div>
+        <div class="field"><label>Periodo <span style="color:var(--mist);font-weight:400">(se sugiere; ajustable)</span></label><input id="meta_periodo_${riesgoId}" placeholder="Ej. Enero 2026, 2026-T1" oninput="this.dataset.touched='1'"></div>
+        <div class="field"><label>Valor meta</label><input type="number" step="any" id="meta_meta_${riesgoId}"></div>
+        <div class="field"></div>
+        <div class="field full"><label>Plan de monitoreo (link a Excel/MS Project)</label><input id="meta_plan_${riesgoId}" placeholder="https://…"></div>
+        <div class="field full"><label>Observación</label><textarea id="meta_obs_${riesgoId}"></textarea></div>
+      </div>
+      <p class="hint" style="margin-top:6px">El indicador y la fórmula se copian automáticamente del riesgo. El periodo se sugiere según la frecuencia de medición.</p>
+      <div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-primary" onclick="guardarMeta('${riesgoId}')" id="metabtn-${riesgoId}">+ Guardar meta</button></div>
+    </div>
+    <div id="metaslist-${riesgoId}">${metaIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin metas programadas aún.</p>'}</div>`;
+  if(metaIds.length){
+    try {
+      const metasData = await cargarMetasData(metaIds);
+      document.getElementById('metaslist-'+riesgoId).innerHTML = renderMetasDataHTML(metasData, riesgoId);
+      window['_metas_'+riesgoId] = metasData;
+    }catch(e){}
+  }
+}
+window.renderMonPaneMetas = renderMonPaneMetas;
+
+// Pestaña REPORTE DE MONITOREO: formulario + lista agrupada por periodo
+async function renderMonPaneRep(riesgoId, r){
+  const cont = document.getElementById('mon_pane_rep');
+  if(!cont) return;
+  const F = CONFIG.MATRIZ_FIELDS;
+  const metaIds = (r.subform_values && r.subform_values[F.prog_metas.id]) || [];
+  const monIds  = (r.subform_values && r.subform_values[F.reporte_monitoreo.id]) || [];
+  cont.innerHTML = `
+    <div style="background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:16px 18px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:var(--slate);margin-bottom:12px">Nuevo reporte de monitoreo del control</div>
+      <div class="grid">
+        <div class="field full"><label>Meta que estás monitoreando</label><select id="mon_metasel_${riesgoId}" onchange="jalarMeta('${riesgoId}')"><option value="">Seleccione la meta…</option></select></div>
+        <div class="field"><label>Periodo evaluado <span style="color:var(--mist);font-weight:400">(heredado de la meta)</span></label><input id="mon_periodo_${riesgoId}" readonly style="background:var(--paper)" placeholder="— elige la meta —"></div>
+        <div class="field"><label>Fecha de evaluación</label><input type="date" id="mon_fecha_${riesgoId}"></div>
+        <div class="field"><label>Valor meta</label><input type="number" step="any" id="mon_meta_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
+        <div class="field"><label>Valor real obtenido</label><input type="number" step="any" id="mon_real_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
+        <div class="field"><label>% cumplimiento (calculado)</label><div class="readonly-pill" id="mon_pct_${riesgoId}">—</div></div>
+        <div class="field full"><label>Evidencia (link)</label><input id="mon_evid_${riesgoId}" placeholder="https://…"></div>
+        <div class="field full hidden" id="mon_wrap_plan_${riesgoId}"><label>Plan de remediación (link)</label><input id="mon_plan_${riesgoId}" placeholder="https://…"></div>
+      </div>
+      <p class="hint" style="margin-top:6px">El % cumplimiento = (valor real / valor meta) × 100, lo calcula QuintaDB. El plan de remediación aparece si el avance es menor a 100%.</p>
+      <div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-primary" onclick="guardarMonitoreo('${riesgoId}')" id="monbtn-${riesgoId}">+ Guardar reporte de monitoreo</button></div>
+    </div>
+    <div id="monlist-${riesgoId}">${monIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes de monitoreo aún.</p>'}</div>`;
+  // Poblar desplegable de metas
+  if(metaIds.length){
+    try {
+      const metasData = await cargarMetasData(metaIds);
+      window['_metas_'+riesgoId] = metasData;
+      const sel = document.getElementById('mon_metasel_'+riesgoId);
+      if(sel){ metasData.forEach((m,i)=>{ const op=document.createElement('option'); op.value=i; op.textContent=(m.periodo?m.periodo+' · ':'')+(fmtFecha(m.fecha)||'(sin fecha)')+' · meta '+(m.meta||'—'); sel.appendChild(op); }); }
+    }catch(e){}
+  }
+  if(monIds.length){
+    try { document.getElementById('monlist-'+riesgoId).innerHTML = await renderMonitoreoHTML(monIds, riesgoId); }catch(e){}
+  }
+}
+window.renderMonPaneRep = renderMonPaneRep;
+
+// Refresca el panel correcto tras guardar/editar una meta o reporte de monitoreo,
+// según qué interfaz esté abierta (el modal nuevo de 2 pestañas o, si existiera,
+// el panel antiguo dentro de Editar).
+function refrescarPanelTrasGuardar(riesgoId, rr){
+  if(!rr) return;
+  const modalMon = document.getElementById('modalMon');
+  if(modalMon && !modalMon.classList.contains('hidden')){
+    try{ renderMonPaneMetas(riesgoId, rr); renderMonPaneRep(riesgoId, rr); }catch(_){}
+    return;
+  }
+  if(document.getElementById('ed_monitoreo_cont')){
+    try{ renderPanelMonitoreoEdit(riesgoId, rr); }catch(_){}
+  }
+}
+window.refrescarPanelTrasGuardar = refrescarPanelTrasGuardar;
+
+
 
 // Carga los datos de las metas (fecha, ref, meta) para el desplegable
 async function cargarMetasData(ids){
@@ -3177,7 +3434,7 @@ async function guardarMeta(riesgoId){
     toast('Meta agregada.');
     STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
-    if(rr && document.getElementById('ed_monitoreo_cont')) renderPanelMonitoreoEdit(riesgoId, rr);
+    refrescarPanelTrasGuardar(riesgoId, rr);
   }catch(err){ toast('Error al guardar la meta: '+err.message, true); btn.disabled=false; btn.textContent='Guardar meta'; }
 }
 window.guardarMeta = guardarMeta;
@@ -3220,7 +3477,7 @@ async function guardarMonitoreo(riesgoId){
     toast('Reporte de monitoreo agregado.');
     STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
-    if(rr && document.getElementById('ed_monitoreo_cont')) renderPanelMonitoreoEdit(riesgoId, rr);
+    refrescarPanelTrasGuardar(riesgoId, rr);
   }catch(err){ toast('Error al guardar: '+err.message, true); btn.disabled=false; btn.textContent='Guardar reporte de monitoreo'; }
 }
 window.guardarMonitoreo = guardarMonitoreo;
@@ -3234,7 +3491,7 @@ async function eliminarSubregistro(riesgoId, subId, tipo){
     toast('Registro eliminado.');
     STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
-    if(rr && document.getElementById('ed_monitoreo_cont')) renderPanelMonitoreoEdit(riesgoId, rr);
+    refrescarPanelTrasGuardar(riesgoId, rr);
   }catch(err){ toast('Error al eliminar: '+err.message, true); }
 }
 window.eliminarSubregistro = eliminarSubregistro;
@@ -3245,9 +3502,10 @@ async function editarMeta(riesgoId, metaId){
     const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+metaId+'.json','GET',{name_value:1});
     const v = d.record.values||{};
     const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
-    // Abrir el acordeón de añadir meta
-    const det = document.querySelector('#ed_monitoreo_cont details'); // primer details = metas
-    if(det) det.open = true;
+    // Si el modal nuevo está abierto, asegurar la pestaña de metas; si no, abrir el acordeón (compat.)
+    const modalMon=document.getElementById('modalMon');
+    if(modalMon && !modalMon.classList.contains('hidden')){ setMonTab('metas'); }
+    else { const det = document.querySelector('#ed_monitoreo_cont details'); if(det) det.open = true; }
     const set=(id,val)=>{ const el=document.getElementById(id+'_'+riesgoId); if(el) el.value=val; };
     set('meta_fecha', fechaParaInput(g('Fecha de programación')));
     set('meta_meta', g('Valor meta'));
@@ -3284,7 +3542,7 @@ async function actualizarMeta(riesgoId, metaId){
     toast('Meta actualizada.');
     STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
-    if(rr && document.getElementById('ed_monitoreo_cont')) renderPanelMonitoreoEdit(riesgoId, rr);
+    refrescarPanelTrasGuardar(riesgoId, rr);
   }catch(err){ toast('Error al actualizar: '+err.message, true); btn.disabled=false; btn.textContent='Actualizar meta'; }
 }
 window.actualizarMeta = actualizarMeta;
@@ -3295,8 +3553,9 @@ async function editarMonitoreo(riesgoId, monId){
     const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+monId+'.json','GET',{name_value:1});
     const v = d.record.values||{};
     const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
-    const dets = document.querySelectorAll('#ed_monitoreo_cont details');
-    if(dets[1]) dets[1].open = true; // segundo details = monitoreo
+    const modalMon=document.getElementById('modalMon');
+    if(modalMon && !modalMon.classList.contains('hidden')){ setMonTab('rep'); }
+    else { const dets = document.querySelectorAll('#ed_monitoreo_cont details'); if(dets[1]) dets[1].open = true; }
     const set=(id,val)=>{ const el=document.getElementById(id+'_'+riesgoId); if(el) el.value=val; };
     set('mon_fecha', fechaParaInput(g('Fecha de monitoreo')));
     set('mon_meta', g('Valor meta'));
@@ -3334,7 +3593,7 @@ async function actualizarMonitoreo(riesgoId, monId){
     toast('Reporte actualizado.');
     STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
-    if(rr && document.getElementById('ed_monitoreo_cont')) renderPanelMonitoreoEdit(riesgoId, rr);
+    refrescarPanelTrasGuardar(riesgoId, rr);
   }catch(err){ toast('Error al actualizar: '+err.message, true); btn.disabled=false; btn.textContent='Actualizar reporte'; }
 }
 window.actualizarMonitoreo = actualizarMonitoreo;
@@ -3370,14 +3629,25 @@ async function guardarReporte(riesgoId){
     STATE.matriz=[];
     await loadMatriz(true);
     await renderSeguimiento();
-    // reabrir el historial del mismo riesgo
-    setTimeout(()=>toggleHistorial(riesgoId), 100);
+    reabrirReporteAcciones(riesgoId);
   }catch(err){
     toast('Error al guardar el reporte: '+err.message, true);
     btn.disabled=false; btn.textContent='Guardar reporte';
   }
 }
 window.guardarReporte = guardarReporte;
+
+// Tras guardar/editar/eliminar un reporte de acciones: si el modal de acciones
+// está abierto, lo recarga; si no, reabre el acordeón del historial (compatibilidad).
+function reabrirReporteAcciones(riesgoId){
+  const modalAcc = document.getElementById('modalAcciones');
+  if(modalAcc && !modalAcc.classList.contains('hidden')){
+    setTimeout(()=>abrirReporteAcciones(riesgoId), 100);
+  } else {
+    setTimeout(()=>toggleHistorial(riesgoId), 100);
+  }
+}
+window.reabrirReporteAcciones = reabrirReporteAcciones;
 
 // === Editar un reporte de avance (registro propio en la entidad REPORTES) ===
 function editarReporte(repId){
@@ -3443,7 +3713,7 @@ async function guardarEdicionReporte(repId){
     await loadMatriz(true);
     await renderSeguimiento();
     const rid = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
-    if(rid) setTimeout(()=>toggleHistorial(rid), 100);
+    if(rid) reabrirReporteAcciones(rid);
   }catch(err){
     toast('Error al actualizar el reporte: '+err.message, true);
     btn.disabled=false; btn.textContent='Guardar cambios';
@@ -3463,7 +3733,7 @@ async function eliminarReporte(repId){
     await loadMatriz(true);
     await renderSeguimiento();
     const rid = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
-    if(rid) setTimeout(()=>toggleHistorial(rid), 100);
+    if(rid) reabrirReporteAcciones(rid);
   }catch(err){
     toast('Error al eliminar el reporte: '+err.message, true);
   }
@@ -3749,7 +4019,7 @@ function editarRiesgo(riesgoId){
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_med"><label>Frecuencia de medición</label><select id="ed_frec_med">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de medición'))}</select></div>
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_formula"><label>Fórmula del indicador</label><textarea id="ed_formula" oninput="actualizarRefIndicador()">${cur('Fórmula del indicador')}</textarea></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_calc"><label>Frecuencia de cálculo</label><select id="ed_frec_calc">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de cálculo'))}</select></div>
-      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monitoreo"><div id="ed_monitoreo_cont"></div></div>
+      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monitoreo"><div style="background:var(--paper);border:1px dashed var(--brand);border-radius:8px;padding:10px 12px;color:var(--brand);font-size:13px">🎯 Las <strong>metas, control y plan de monitoreo</strong> se gestionan desde el botón 🎯 de la fila, en la vista <strong>Seguimiento</strong> (programación de metas y reportes de monitoreo, en pestañas). Aquí defines el indicador, la fórmula y las frecuencias.</div></div>
       <!-- Plan de monitoreo se movió al subformulario de metas -->
       <!-- Responsable: siempre -->
       <div class="field full"><label>Responsable (oficina)</label><select id="ed_responsable" onchange="autocompletarRespProceso('ed_responsable','ed_resp_proc','ed_resp_cel','ed_resp_cor')"></select></div>
@@ -3761,8 +4031,7 @@ function editarRiesgo(riesgoId){
   document.getElementById('editModal').classList.remove('hidden');
   toggleControles('ed'); // aplicar visibilidad condicional según controles y nivel
   actualizarDescEvalEdit(); // mostrar descripciones de prob/impacto
-  // Cargar panel de metas y monitoreo (solo nivel 4 con control)
-  renderPanelMonitoreoEdit(riesgoId, r);
+  // El módulo de metas/monitoreo ya NO vive aquí: se gestiona desde el botón 🎯 de Seguimiento.
   // Asegurar que el botón Guardar esté activo (por si quedó deshabilitado de un guardado anterior)
   const _bg=document.getElementById('editGuardar'); if(_bg){ _bg.disabled=false; _bg.textContent='Guardar cambios'; }
 
