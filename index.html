@@ -1488,7 +1488,7 @@ const MARCADORES_NOTIF = ['responsable','descripcion','tipo','nivel','proceso','
 async function _avanceUltimoReporte(r){
   try{
     const F=CONFIG.MATRIZ_FIELDS; const RF=CONFIG.REPORTE_FIELDS;
-    const sub = (r.subform_values && r.subform_values[SUBFORM_FIELD_ID]) || [];
+    const sub = subIdsDe(r, SUBFORM_FIELD_ID);
     if(!sub || !sub.length) return {avance:'', ultimo_estado:''};
     const fechaComparable = s => {
       const m = String(s||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/);
@@ -2140,7 +2140,7 @@ async function cargarAvanceMedidas(){
 
     const cont = { 'Pendiente':0, 'En Proceso':0, 'Culminado/Ejecutado':0 };
     recs.forEach(r=>{
-      const subIds=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
+      const subIds=subIdsDe(r, SUBFORM_FIELD_ID);
       let estado='Pendiente';
       if(subIds.length){
         // estado del último reporte vinculado
@@ -2180,6 +2180,29 @@ function emptyCard(t,m){ return `<div class="empty" style="grid-column:1/-1"><h3
    SEGUIMIENTO — listado de riesgos + reportes de acción
    ============================================================ */
 const SUBFORM_FIELD_ID = CONFIG.MATRIZ_FIELDS.reporte_acciones.id; // bfyfu...
+
+// Lee de forma robusta el array de IDs de un subformulario del registro.
+// QuintaDB a veces devuelve subform_values bajo el field-id y a veces bajo el
+// nombre del subformulario. Prueba el field-id; si no, busca un array de IDs
+// (22 chars) que NO pertenezca a los OTROS subformularios conocidos del registro.
+function subIdsDe(r, fieldId){
+  const sv = r.subform_values || {};
+  if(Array.isArray(sv[fieldId])) return sv[fieldId];
+  // IDs de los otros dos subformularios, para no confundirlos
+  const otros = [
+    CONFIG.MATRIZ_FIELDS.reporte_acciones.id,
+    CONFIG.MATRIZ_FIELDS.prog_metas.id,
+    CONFIG.MATRIZ_FIELDS.reporte_monitoreo.id
+  ].filter(id=>id!==fieldId);
+  // Buscar por nombre/clave un array de IDs que no sea de los otros subformularios
+  for(const k in sv){
+    if(otros.includes(k)) continue;
+    const arr = sv[k];
+    if(Array.isArray(arr) && arr.length && /^[a-zA-Z0-9_\-]{22}$/.test(String(arr[0]))) return arr;
+  }
+  return [];
+}
+window.subIdsDe = subIdsDe;
 let SEG_RIESGO_ACTUAL = null; // {id, subIds:[]}
 let SEG_TIPO = 'todos'; // 'todos' | 'riesgos' | 'oportunidades'
 let SEG_VER_ARCHIVADOS = false; // false = solo activos; true = solo archivados
@@ -2605,7 +2628,7 @@ async function renderSeguimiento() {
       const desc = descripcionDe(r);
       const proc=rutaProcesoDe(r) || '—';
       const oficina=oficinaDe(r);
-      const sub=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
+      const sub=subIdsDe(r, SUBFORM_FIELD_ID);
       const pr=procedeReeval(r);
       // Nivel según tipo: riesgo usa su escala (1-4 impacto), oportunidad la suya (1-3 impacto).
       const ni = op ? nivelOportInherenteDe(r) : nivelInherenteDe(r);
@@ -2615,7 +2638,7 @@ async function renderSeguimiento() {
       const vR=r.values||{};
       const existeCtrl=(vR['¿Existen controles?']&&vR['¿Existen controles?']!=='¿Existen controles?')?String(vR['¿Existen controles?']).trim():'';
       const tieneMonitoreo = (ni.nivel===4 && existeCtrl==='Sí');
-      const monIds = (r.subform_values && r.subform_values[CONFIG.MATRIZ_FIELDS.reporte_monitoreo.id]) || [];
+      const monIds = subIdsDe(r, CONFIG.MATRIZ_FIELDS.reporte_monitoreo.id);
       return {id:r.id, op, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch, tieneMonitoreo, monIds, nMon:monIds.length};
     })
     // Filtro por el selector Todos/Riesgos/Oportunidades
@@ -2851,7 +2874,7 @@ async function toggleHistorial(riesgoId){
   SEG_RIESGO_ACTUAL = { id: riesgoId };
 
   const r = STATE.matriz.find(x=>x.id===riesgoId);
-  const subIds=(r.subform_values&&r.subform_values[SUBFORM_FIELD_ID])||[];
+  const subIds=subIdsDe(r, SUBFORM_FIELD_ID);
   SEG_RIESGO_ACTUAL.subIds = subIds;
 
   cont.innerHTML = `<div class="hist-panel">
@@ -2908,8 +2931,8 @@ async function renderPanelMonitoreoEdit(riesgoId, r){
   const formEd = document.getElementById('ed_formula');
   const indicadorRiesgo = (indEd && indEd.value.trim()) ? indEd.value.trim() : cur('Indicador');
   const formulaRiesgo = (formEd && formEd.value.trim()) ? formEd.value.trim() : cur('Fórmula del indicador');
-  const metaIds = (r.subform_values && r.subform_values[F.prog_metas.id]) || [];
-  const monIds  = (r.subform_values && r.subform_values[F.reporte_monitoreo.id]) || [];
+  const metaIds = subIdsDe(r, F.prog_metas.id);
+  const monIds  = subIdsDe(r, F.reporte_monitoreo.id);
 
   cont.innerHTML = `
     <div style="margin-top:8px;padding-top:14px;border-top:2px solid var(--brand)">
@@ -2990,10 +3013,23 @@ window.cerrarModalSimple = cerrarModalSimple;
 
 // ---- (1) Reporte de acciones: mismo contenido que el acordeón, en modal ----
 async function abrirReporteAcciones(riesgoId){
-  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  let r = STATE.matriz.find(x=>x.id===riesgoId);
   if(!r) return;
   const F = CONFIG.MATRIZ_FIELDS;
-  const subIds = (r.subform_values && r.subform_values[SUBFORM_FIELD_ID]) || [];
+  document.getElementById('modalAcciones').classList.remove('hidden');
+  const cont0 = document.getElementById('acc_cont');
+  if(cont0) cont0.innerHTML = '<p class="hint" style="padding:18px">Cargando reportes…</p>';
+  // Releer el registro FRESCO e individual: la carga masiva no siempre trae subform_values completos.
+  try{
+    const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','GET',{name_value:1});
+    if(d && d.record){
+      r = d.record;
+      // Refrescar también la copia en memoria para que el conteo y otras vistas queden al día
+      const idx = STATE.matriz.findIndex(x=>x.id===riesgoId);
+      if(idx>=0) STATE.matriz[idx] = r;
+    }
+  }catch(_){ /* si falla, seguimos con el registro en memoria */ }
+  const subIds = subIdsDe(r, SUBFORM_FIELD_ID);
   SEG_RIESGO_ACTUAL = { id: riesgoId, subIds };
   const desc = descripcionDe(r);
   document.getElementById('acc_titulo').textContent = (desc.length>70?desc.slice(0,70)+'…':desc) || 'Reporte de acciones';
@@ -3036,7 +3072,6 @@ async function abrirReporteAcciones(riesgoId){
       </div>
     </details>
   </div>`;
-  document.getElementById('modalAcciones').classList.remove('hidden');
   if(subIds.length){
     try { document.getElementById('histlist-'+riesgoId).innerHTML = await renderHistorialHTML(subIds); }
     catch(e){ document.getElementById('histlist-'+riesgoId).innerHTML = '<p class="hint">Error: '+e.message+'</p>'; }
@@ -3054,10 +3089,23 @@ function setMonTab(t){
 window.setMonTab = setMonTab;
 
 async function abrirMetasMonitoreo(riesgoId){
-  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  let r = STATE.matriz.find(x=>x.id===riesgoId);
   if(!r) return;
   MON_RIESGO_ACTUAL = riesgoId;
   const F = CONFIG.MATRIZ_FIELDS;
+  document.getElementById('modalMon').classList.remove('hidden');
+  const pm=document.getElementById('mon_pane_metas'), pr=document.getElementById('mon_pane_rep');
+  if(pm) pm.innerHTML='<p class="hint" style="padding:18px">Cargando…</p>';
+  if(pr) pr.innerHTML='';
+  // Releer el registro FRESCO e individual (subform_values completos de metas y monitoreo)
+  try{
+    const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','GET',{name_value:1});
+    if(d && d.record){
+      r = d.record;
+      const idx = STATE.matriz.findIndex(x=>x.id===riesgoId);
+      if(idx>=0) STATE.matriz[idx] = r;
+    }
+  }catch(_){ /* seguimos con memoria si falla */ }
   const v = r.values||{};
   const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
   const indicador = cur('Indicador');
@@ -3092,7 +3140,7 @@ async function renderMonPaneMetas(riesgoId, r){
   const cont = document.getElementById('mon_pane_metas');
   if(!cont) return;
   const F = CONFIG.MATRIZ_FIELDS;
-  const metaIds = (r.subform_values && r.subform_values[F.prog_metas.id]) || [];
+  const metaIds = subIdsDe(r, F.prog_metas.id);
   cont.innerHTML = `
     <div style="background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:16px 18px;margin-bottom:16px">
       <div style="font-size:13px;font-weight:600;color:var(--slate);margin-bottom:12px">Nueva programación de meta</div>
@@ -3123,8 +3171,8 @@ async function renderMonPaneRep(riesgoId, r){
   const cont = document.getElementById('mon_pane_rep');
   if(!cont) return;
   const F = CONFIG.MATRIZ_FIELDS;
-  const metaIds = (r.subform_values && r.subform_values[F.prog_metas.id]) || [];
-  const monIds  = (r.subform_values && r.subform_values[F.reporte_monitoreo.id]) || [];
+  const metaIds = subIdsDe(r, F.prog_metas.id);
+  const monIds  = subIdsDe(r, F.reporte_monitoreo.id);
   cont.innerHTML = `
     <div style="background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:16px 18px;margin-bottom:16px">
       <div style="font-size:13px;font-weight:600;color:var(--slate);margin-bottom:12px">Nuevo reporte de monitoreo del control</div>
@@ -3235,8 +3283,8 @@ async function renderPanelMonitoreo(riesgoId, r){
   const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
   const indicadorRiesgo = cur('Indicador');
   const formulaRiesgo = cur('Fórmula del indicador');
-  const metaIds = (r.subform_values && r.subform_values[F.prog_metas.id]) || [];
-  const monIds  = (r.subform_values && r.subform_values[F.reporte_monitoreo.id]) || [];
+  const metaIds = subIdsDe(r, F.prog_metas.id);
+  const monIds  = subIdsDe(r, F.reporte_monitoreo.id);
 
   cont.innerHTML = `
     <div style="margin-top:22px;padding-top:18px;border-top:2px solid var(--brand)">
@@ -3649,7 +3697,10 @@ async function guardarReporte(riesgoId){
     STATE.matriz=[];
     await loadMatriz(true);
     await renderSeguimiento();
-    reabrirReporteAcciones(riesgoId);
+    // Al GUARDAR un reporte nuevo: cerrar el modal (o reabrir el acordeón si esa fue la vía)
+    const modalAcc = document.getElementById('modalAcciones');
+    if(modalAcc && !modalAcc.classList.contains('hidden')) cerrarModalSimple('modalAcciones');
+    else setTimeout(()=>toggleHistorial(riesgoId), 100);
   }catch(err){
     toast('Error al guardar el reporte: '+err.message, true);
     btn.disabled=false; btn.textContent='Guardar reporte';
@@ -3657,8 +3708,8 @@ async function guardarReporte(riesgoId){
 }
 window.guardarReporte = guardarReporte;
 
-// Tras guardar/editar/eliminar un reporte de acciones: si el modal de acciones
-// está abierto, lo recarga; si no, reabre el acordeón del historial (compatibilidad).
+// Tras EDITAR o ELIMINAR un reporte: si el modal está abierto, lo recarga para
+// reflejar el cambio; si la vía era el acordeón, lo reabre.
 function reabrirReporteAcciones(riesgoId){
   const modalAcc = document.getElementById('modalAcciones');
   if(modalAcc && !modalAcc.classList.contains('hidden')){
