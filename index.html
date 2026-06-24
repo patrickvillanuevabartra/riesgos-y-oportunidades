@@ -66,6 +66,16 @@
   .ayuda .flujo .arr{color:var(--brand-2);font-weight:700}
   .ayuda .tip{background:var(--paper);border:1px dashed var(--line);border-radius:8px;padding:9px 12px;margin-top:8px;font-size:12.5px;color:var(--mist)}
 
+  /* Interruptor de pestañas "¿Existen controles?" (Sí / No) */
+  .ctrl-switch{display:inline-flex;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:4px}
+  .ctrl-switch button{border:0;background:transparent;color:var(--slate);font-family:inherit;font-size:13.5px;font-weight:600;padding:8px 18px;border-radius:7px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:7px}
+  .ctrl-switch button:hover{color:var(--brand)}
+  .ctrl-switch button.on-si{background:var(--brand);color:#fff}
+  .ctrl-switch button.on-no{background:var(--n3);color:#fff}
+  .ctrl-nota{border-radius:8px;padding:10px 13px;font-size:12.5px;line-height:1.5;margin-top:2px}
+  .ctrl-nota.si{background:#e8f3ec;border:1px solid var(--brand-2);color:var(--brand)}
+  .ctrl-nota.no{background:#fdf0e6;border:1px solid var(--n3);color:#9a5a18}
+
   /* Cards / form */
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
   .section{padding:22px 24px;border-bottom:1px solid var(--line)}
@@ -467,11 +477,23 @@
 
       <div class="section">
         <div class="section-title"><span class="section-num">4</span>Controles y tratamiento</div>
+        <div class="section-desc">Indica si el riesgo ya cuenta con un control o si requiere definir medidas de respuesta.</div>
+        <!-- Interruptor de pestañas: ¿Existen controles? -->
+        <div class="field" style="margin-bottom:14px">
+          <label style="margin-bottom:6px">¿Existen controles?</label>
+          <div class="ctrl-switch" id="f_ctrl_switch">
+            <button type="button" data-v="No" onclick="setExisteCtrl('f','No')">🛠️ No · requiere medidas</button>
+            <button type="button" data-v="Sí" onclick="setExisteCtrl('f','Sí')">🛡️ Sí · ya hay control</button>
+          </div>
+          <input type="hidden" id="f_existe_ctrl" value="">
+        </div>
+        <!-- Nota contextual según la elección -->
+        <div class="ctrl-nota no hidden" id="f_nota_no" style="margin-bottom:14px">🛠️ <strong>Sin control aún.</strong> Define la respuesta y la(s) medida(s). El <strong>avance de esas medidas</strong> se registra después con el botón 📋 «Reporte de acciones» en la vista <strong>Seguimiento</strong>.</div>
+        <div class="ctrl-nota si hidden" id="f_nota_si" style="margin-bottom:14px">🛡️ <strong>Control existente.</strong> Descríbelo abajo. Si el riesgo es <strong>nivel 4</strong>, define además su indicador, fórmula y frecuencias; el <strong>monitoreo del control</strong> (metas y mediciones) se gestiona luego con el botón 🎯 en Seguimiento.</div>
         <div class="grid">
-          <div class="field"><label>¿Existen controles?</label><select id="f_existe_ctrl" onchange="toggleControles('f')"><option value="">Seleccione…</option><option>Sí</option><option>No</option></select></div>
-          <div class="field"></div>
           <!-- Si NO existen controles: Respuesta + Medida -->
           <div class="field ctrl-no hidden" id="f_wrap_respuesta"><label>Respuesta</label><select id="f_respuesta"><option value="">Seleccione…</option><option>Eliminar</option><option>Mitigar</option><option>Trasladar</option><option>Asumir</option></select></div>
+          <div class="field" id="f_wrap_spacer_no" class="ctrl-no hidden"></div>
           <div class="field full ctrl-no hidden" id="f_wrap_medida"><label>Medida(s) de respuesta</label><textarea id="f_medida"></textarea></div>
           <!-- Si SÍ existen controles: Control establecido (+ monitoreo si nivel 4) -->
           <div class="field full ctrl-si hidden" id="f_wrap_control"><label>Control establecido</label><textarea id="f_control"></textarea></div>
@@ -481,7 +503,7 @@
           <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_formula"><label>Fórmula del indicador</label><textarea id="f_formula"></textarea></div>
           <div class="field ctrl-si ctrl-n4 hidden" id="f_wrap_frec_calc"><label>Frecuencia de cálculo</label><select id="f_frec_calc"><option value="">Seleccione…</option><option>Diaria</option><option>Semanal</option><option>Quincenal</option><option>Mensual</option><option>Trimestral</option><option>Semestral</option><option>Anual</option></select></div>
           <div class="field"></div>
-          <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_aviso_metas"><div class="hint" style="background:var(--paper);border:1px dashed var(--brand);border-radius:8px;padding:10px;color:var(--brand)">💡 Guarda primero el riesgo. Luego, desde <strong>Editar</strong>, podrás programar las metas de monitoreo y registrar el cumplimiento real del control.</div></div>
+          <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_aviso_metas"><div class="hint" style="background:var(--paper);border:1px dashed var(--brand);border-radius:8px;padding:10px;color:var(--brand)">💡 Guarda primero el riesgo. Luego, desde la vista <strong>Seguimiento</strong> (botón 🎯), podrás programar las metas de monitoreo y registrar el cumplimiento real del control.</div></div>
           <!-- Responsable: siempre visible -->
           <div class="field"><label>Responsable (oficina)</label><select id="f_responsable" onchange="autocompletarRespProceso('f_responsable','f_resp_proc','f_resp_cel','f_resp_cor')"></select></div>
           <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="f_resp_proc">—</div></div>
@@ -1386,6 +1408,40 @@ function nivelInherenteForm(){
   if(idx>12) return 4; if(idx>9) return 3; if(idx>4) return 2; return 1;
 }
 
+// Interruptor de pestañas "¿Existen controles?" en Registrar (pref 'f').
+// Actualiza el hidden, resalta el botón activo, muestra la nota y recalcula campos.
+function setExisteCtrl(pref, val){
+  if(pref!=='f') return;
+  const hid = document.getElementById('f_existe_ctrl');
+  if(hid) hid.value = val;
+  // Resaltar botón activo
+  document.querySelectorAll('#f_ctrl_switch button').forEach(b=>{
+    b.classList.remove('on-si','on-no');
+    if(b.dataset.v===val) b.classList.add(val==='Sí'?'on-si':'on-no');
+  });
+  // Notas contextuales
+  const notaNo=document.getElementById('f_nota_no'), notaSi=document.getElementById('f_nota_si');
+  if(notaNo) notaNo.classList.toggle('hidden', val!=='No');
+  if(notaSi) notaSi.classList.toggle('hidden', val!=='Sí');
+  toggleControles('f');
+}
+window.setExisteCtrl = setExisteCtrl;
+
+// Interruptor "¿Existen controles?" en Editar (hidden ed_ctrl + botones + notas).
+function setExisteCtrlEd(val){
+  const hid = document.getElementById('ed_ctrl');
+  if(hid) hid.value = val;
+  document.querySelectorAll('#ed_ctrl_switch button').forEach(b=>{
+    b.classList.remove('on-si','on-no');
+    if(b.dataset.v===val) b.classList.add(val==='Sí'?'on-si':'on-no');
+  });
+  const notaNo=document.getElementById('ed_nota_no'), notaSi=document.getElementById('ed_nota_si');
+  if(notaNo) notaNo.classList.toggle('hidden', val!=='No');
+  if(notaSi) notaSi.classList.toggle('hidden', val!=='Sí');
+  toggleControles('ed');
+}
+window.setExisteCtrlEd = setExisteCtrlEd;
+
 // Muestra/oculta campos según "¿Existen controles?" y el nivel inherente.
 // prefijo 'f' = Registrar, 'ed' = Editar.
 function toggleControles(pref){
@@ -1975,6 +2031,7 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
     toast('Registro guardado correctamente.');
     document.getElementById('formRiesgo').reset();
     limpiarMultiselects();
+    limpiarInterruptorCtrl();
     showOrigin(''); showEval(''); calcIndice(); toggleControles('f');
     STATE.matriz = []; // invalidar caché
   } catch(err) {
@@ -1991,8 +2048,16 @@ function limpiarMultiselects(){
     c.classList.remove('open');
   });
 }
+// Reinicia el interruptor "¿Existen controles?" de Registrar (sin selección)
+function limpiarInterruptorCtrl(){
+  const hid=document.getElementById('f_existe_ctrl'); if(hid) hid.value='';
+  document.querySelectorAll('#f_ctrl_switch button').forEach(b=>b.classList.remove('on-si','on-no'));
+  const nNo=document.getElementById('f_nota_no'), nSi=document.getElementById('f_nota_si');
+  if(nNo) nNo.classList.add('hidden'); if(nSi) nSi.classList.add('hidden');
+}
+window.limpiarInterruptorCtrl = limpiarInterruptorCtrl;
 document.getElementById('btnReset').onclick = () => {
-  document.getElementById('formRiesgo').reset(); limpiarMultiselects(); showOrigin(''); showEval(''); calcIndice(); toggleControles('f');
+  document.getElementById('formRiesgo').reset(); limpiarMultiselects(); limpiarInterruptorCtrl(); showOrigin(''); showEval(''); calcIndice(); toggleControles('f');
 };
 
 /* ============================================================
@@ -4062,7 +4127,7 @@ function duplicarRiesgo(riesgoId){
     set('f_prob_o_inh', cur('Probabilidad oportunidad inherente'));
     set('f_imp_o_inh', cur('Impacto oportunidad inherente'));
     // Controles / respuesta / responsable
-    set('f_existe_ctrl', cur('¿Existen controles?'));
+    const _ec = cur('¿Existen controles?'); if(_ec) setExisteCtrl('f', _ec);
     set('f_control', cur('Control establecido'));
     set('f_respuesta', cur('Respuesta al riesgo u oportunidad'));
     set('f_medida', cur('Medida(s) de respuesta'));
@@ -4193,23 +4258,34 @@ function editarRiesgo(riesgoId){
     </div></div>
 
     <div class="edit-sec"><div class="edit-sec-tit">4 · Controles y tratamiento</div>
+    <div class="field" style="margin-bottom:12px">
+      <label style="margin-bottom:6px">¿Existen controles?</label>
+      <div class="ctrl-switch" id="ed_ctrl_switch">
+        <button type="button" data-v="No" onclick="setExisteCtrlEd('No')">🛠️ No · requiere medidas</button>
+        <button type="button" data-v="Sí" onclick="setExisteCtrlEd('Sí')">🛡️ Sí · ya hay control</button>
+      </div>
+      <input type="hidden" id="ed_ctrl" value="${cur('¿Existen controles?')||''}">
+    </div>
+    <div class="ctrl-nota no hidden" id="ed_nota_no" style="margin-bottom:12px">🛠️ <strong>Sin control aún.</strong> Define la respuesta y la(s) medida(s). El <strong>avance de esas medidas</strong> se registra con el botón 📋 «Reporte de acciones» en la vista <strong>Seguimiento</strong>.</div>
+    <div class="ctrl-nota si hidden" id="ed_nota_si" style="margin-bottom:12px">🛡️ <strong>Control existente.</strong> Descríbelo abajo. Si el riesgo es <strong>nivel 4</strong>, define su indicador, fórmula y frecuencias; el <strong>monitoreo</strong> (metas y mediciones) se gestiona con el botón 🎯 en Seguimiento. La <strong>certificación</strong> va al final, cuando el control ya opera.</div>
     <div class="grid">
-      <div class="field"><label>¿Existen controles?</label><select id="ed_ctrl" onchange="toggleControles('ed')">${opt(['Sí','No'],cur('¿Existen controles?'))}</select></div>
-      <div class="field"></div>
       <!-- NO existen controles: Respuesta + Medida -->
       <div class="field ctrl-no hidden" id="ed_wrap_respuesta"><label>Respuesta</label><select id="ed_resp">${opt(['Eliminar','Mitigar','Trasladar','Asumir'],cur('Respuesta al riesgo u oportunidad'))}</select></div>
+      <div class="field ctrl-no hidden"></div>
       <div class="field full ctrl-no hidden" id="ed_wrap_medida"><label>Medida(s) de respuesta</label><textarea id="ed_medida">${cur('Medida(s) de respuesta')}</textarea></div>
-      <!-- SÍ existen controles: Control (+ monitoreo si nivel 4) -->
+      <!-- SÍ existen controles: Control establecido -->
       <div class="field full ctrl-si hidden" id="ed_wrap_control"><label>Control establecido</label><textarea id="ed_control">${cur('Control establecido')}</textarea></div>
-      <div class="field ctrl-si hidden" id="ed_wrap_cert"><label>Certificación del control</label><select id="ed_cert">${opt(['No Implementado','Implementado sin validar','Certificado/Operativo'],cur('Certificación de Implementación del Control'))}</select></div>
-      <div class="field"></div>
-      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monit_aviso"><div class="hint" style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px">Riesgo de nivel 4: defina el sistema de monitoreo del control.</div></div>
+      <!-- SÍ + nivel 4: indicador, fórmula y frecuencias -->
+      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monit_aviso"><div class="hint" style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px">Riesgo de nivel 4: defina el sistema de monitoreo del control (indicador, fórmula y frecuencias).</div></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_indicador"><label>Indicador</label><input id="ed_indicador" value="${(cur('Indicador')||'').replace(/"/g,'&quot;')}" oninput="actualizarRefIndicador()"></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_med"><label>Frecuencia de medición</label><select id="ed_frec_med">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de medición'))}</select></div>
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_formula"><label>Fórmula del indicador</label><textarea id="ed_formula" oninput="actualizarRefIndicador()">${cur('Fórmula del indicador')}</textarea></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_calc"><label>Frecuencia de cálculo</label><select id="ed_frec_calc">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de cálculo'))}</select></div>
-      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monitoreo"><div style="background:var(--paper);border:1px dashed var(--brand);border-radius:8px;padding:10px 12px;color:var(--brand);font-size:13px">🎯 Las <strong>metas, control y plan de monitoreo</strong> se gestionan desde el botón 🎯 de la fila, en la vista <strong>Seguimiento</strong> (programación de metas y reportes de monitoreo, en pestañas). Aquí defines el indicador, la fórmula y las frecuencias.</div></div>
-      <!-- Plan de monitoreo se movió al subformulario de metas -->
+      <div class="field ctrl-si ctrl-n4 hidden"></div>
+      <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monitoreo"><div style="background:var(--paper);border:1px dashed var(--brand);border-radius:8px;padding:10px 12px;color:var(--brand);font-size:13px">🎯 Las <strong>metas, control y plan de monitoreo</strong> se gestionan desde el botón 🎯 de la fila, en la vista <strong>Seguimiento</strong> (programación de metas y reportes de monitoreo, en pestañas). Aquí solo defines el indicador, la fórmula y las frecuencias.</div></div>
+      <!-- Certificación: AL FINAL del bloque de control (cuando el control ya opera) -->
+      <div class="field ctrl-si hidden" id="ed_wrap_cert"><label>Certificación del control <span style="color:var(--mist);font-weight:400">(estado de implementación)</span></label><select id="ed_cert">${opt(['No Implementado','Implementado sin validar','Certificado/Operativo'],cur('Certificación de Implementación del Control'))}</select></div>
+      <div class="field ctrl-si hidden"></div>
       <!-- Responsable: siempre -->
       <div class="field full"><label>Responsable (oficina)</label><select id="ed_responsable" onchange="autocompletarRespProceso('ed_responsable','ed_resp_proc','ed_resp_cel','ed_resp_cor')"></select></div>
       <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="ed_resp_proc">—</div></div>
@@ -4218,7 +4294,9 @@ function editarRiesgo(riesgoId){
     </div></div>`;
 
   document.getElementById('editModal').classList.remove('hidden');
-  toggleControles('ed'); // aplicar visibilidad condicional según controles y nivel
+  // Activar el interruptor "¿Existen controles?" según el valor guardado (ed_ctrl es hidden)
+  const _ecVal = (document.getElementById('ed_ctrl')||{}).value || '';
+  if(_ecVal) setExisteCtrlEd(_ecVal); else toggleControles('ed');
   actualizarDescEvalEdit(); // mostrar descripciones de prob/impacto
   // El módulo de metas/monitoreo ya NO vive aquí: se gestiona desde el botón 🎯 de Seguimiento.
   // Asegurar que el botón Guardar esté activo (por si quedó deshabilitado de un guardado anterior)
