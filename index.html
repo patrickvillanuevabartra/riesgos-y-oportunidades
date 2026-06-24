@@ -2997,8 +2997,28 @@ async function abrirReporteAcciones(riesgoId){
   SEG_RIESGO_ACTUAL = { id: riesgoId, subIds };
   const desc = descripcionDe(r);
   document.getElementById('acc_titulo').textContent = (desc.length>70?desc.slice(0,70)+'…':desc) || 'Reporte de acciones';
+  // Datos comprometidos del riesgo: respuesta + medida(s) o control establecido
+  const v = r.values||{};
+  const cur = (col)=>{ const x=v[col]; return (x && x!==col && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x)))?String(x):''; };
+  const limpiarSel = x => { const s=String(x||''); return (s==='Seleccione'||s==='Seleccione…')?'':s; };
+  const respuesta = limpiarSel(cur('Respuesta al riesgo u oportunidad'));
+  const medida = cur('Medida(s) de respuesta');
+  const control = cur('Control establecido');
+  const existeCtrl = cur('¿Existen controles?');
+  const esc = s => String(s||'').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+  const filasCtx = [];
+  if(respuesta) filasCtx.push(`<div style="margin-bottom:6px"><span style="font-size:11px;font-weight:600;color:var(--mist);text-transform:uppercase;letter-spacing:.04em">Respuesta planificada</span><br><span style="color:var(--ink)">${esc(respuesta)}</span></div>`);
+  if(medida) filasCtx.push(`<div style="margin-bottom:6px"><span style="font-size:11px;font-weight:600;color:var(--mist);text-transform:uppercase;letter-spacing:.04em">Medida(s) de respuesta comprometida(s)</span><br><span style="color:var(--ink)">${esc(medida)}</span></div>`);
+  if(control) filasCtx.push(`<div style="margin-bottom:6px"><span style="font-size:11px;font-weight:600;color:var(--mist);text-transform:uppercase;letter-spacing:.04em">Control establecido</span><br><span style="color:var(--ink)">${esc(control)}</span></div>`);
+  const ctxHTML = filasCtx.length
+    ? `<div style="background:var(--card);border:1px solid var(--brand-2);border-left:4px solid var(--brand);border-radius:10px;padding:14px 16px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:var(--brand);margin-bottom:10px">📌 Lo que se comprometió a realizar</div>
+        ${filasCtx.join('')}
+       </div>`
+    : `<div style="background:var(--paper);border:1px dashed var(--line);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--mist)">Este registro no tiene medida(s) de respuesta ni control establecido documentados. Puedes definirlos desde <strong>Editar</strong> el riesgo.</div>`;
   const cont = document.getElementById('acc_cont');
   cont.innerHTML = `<div class="hist-panel" style="padding:4px 0">
+    ${ctxHTML}
     <div class="hist-head">Reportes de avance <span class="grupo-count" style="color:var(--mist)">${subIds.length} reporte${subIds.length!==1?'s':''}</span></div>
     <div id="histlist-${riesgoId}">${subIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes aún.</p>'}</div>
     <details class="add-rep" open><summary>+ Añadir reporte de acciones</summary>
