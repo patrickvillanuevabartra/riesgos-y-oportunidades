@@ -611,7 +611,7 @@
         <button class="modal-close" onclick="cerrarEditorPlantillas()">&times;</button>
       </div>
       <div class="modal-body">
-        <p class="hint" style="margin-bottom:10px">Escribe el mensaje e inserta campos con los botones. Al notificar, cada campo se reemplaza por el dato real del registro.</p>
+        <p class="hint" style="margin-bottom:10px">Escribe el mensaje e inserta cualquier campo del sistema con los botones de abajo (clic para insertarlo en el último cuadro donde escribiste). Al notificar, cada campo se reemplaza por el dato real del registro; si un campo está vacío, simplemente no aparece.</p>
         <div style="margin-bottom:10px">
           <div style="font-size:12px;font-weight:600;color:var(--mist);margin-bottom:5px">Campos disponibles (clic para insertar en el último cuadro enfocado):</div>
           <div id="paletaMarcadores" style="display:flex;flex-wrap:wrap;gap:5px"></div>
@@ -1578,30 +1578,82 @@ function _datosNotif(r){
   const op=esOportunidad(r);
   const gv=(nombre,def)=>{ const x=v[nombre]; if(x && x!==nombre) return x; return def&&v[def.id]?v[def.id]:''; };
   const limpiarSel=x=>{ const s=String(x||''); return (s==='Seleccione'||s==='Seleccione…')?'':s; };
+  const niv = op?nivelOportInherenteDe(r):nivelInherenteDe(r);
+  const nivResVal = limpiarSel(gv('Nivel de riesgo residual',F.nivel_riesgo_res));
   return {
+    // — Identificación —
     descripcion: descripcionDe(r),
     tipo: op?'oportunidad':'riesgo',
-    nivel: (op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel||'—',
-    proceso: rutaProcesoDe(r)||'—',
     actividad: gv('Actividad específica',F.actividad),
-    fuente: gv('Fuente de identificación del riesgo u oportunidad',F.fuente),
+    fuente: limpiarSel(gv('Fuente de identificación del riesgo u oportunidad',F.fuente)),
+    amenaza: gv('Amenaza - string',F.amenaza_txt),
+    oportunidad_rel: gv('Oportunidad relacionada',F.oportunidad_txt),
+    parte_interesada: gv('Parte interesada ',F.parte_txt),
+    requisitos: gv('Requisitos - texto',F.requisitos_txt),
+    expectativas: gv('Expectativas - texto',F.expectativas_txt),
+    causas: gv('Causas',F.causas),
+    consecuencias: gv('Consecuencias',F.consecuencias),
+    // — Proceso / responsables —
+    proceso: rutaProcesoDe(r)||'—',
     oficina: (oficinaDe(r)==='Sin oficina asignada'?'':oficinaDe(r)),
     responsable: leerTexto(r,F.resp_proceso_txt,true)||'',
     celular: leerTexto(r,F.resp_celular,true)||'',
     correo: leerTexto(r,F.resp_correo,true)||'',
+    // — Evaluación inherente —
     probabilidad: limpiarSel(gv('Probabilidad riesgo inherente',F.prob_riesgo_inh)),
     impacto: limpiarSel(gv('Impacto riesgo inherente',F.imp_riesgo_inh)),
-    respuesta: limpiarSel(gv('Respuesta al riesgo u oportunidad',F.respuesta)),
+    indice: gv('Índice de riesgo inherente',F.indice_riesgo_inh),
+    nivel: niv.nivel||'—',
+    // — Controles y tratamiento —
+    existen_controles: limpiarSel(gv('¿Existen controles?',F.existen_controles)),
     control: gv('Control establecido',F.control_establecido),
+    respuesta: limpiarSel(gv('Respuesta al riesgo u oportunidad',F.respuesta)),
     medida: gv('Medida(s) de respuesta',F.medida_respuesta),
-    estado: limpiarSel(gv('Certificación de Implementación del Control',F.certificacion_control)),
-    fecha: fechaParaInput(gv('Fecha de evaluación',F.fecha_evaluacion))||'',
+    indicador: gv('Indicador',F.indicador),
+    formula: gv('Fórmula del indicador',F.formula_indicador),
+    frecuencia_medicion: limpiarSel(gv('Frecuencia de medición',F.frecuencia_medicion)),
+    frecuencia_calculo: limpiarSel(gv('Frecuencia de cálculo',F.frecuencia_calculo)),
     certificacion: limpiarSel(gv('Certificación de Implementación del Control',F.certificacion_control)),
-    procede_reev: (procedeReeval(r).procede?'Sí':'No')
+    estado: limpiarSel(gv('Certificación de Implementación del Control',F.certificacion_control)),
+    // — Reevaluación / residual —
+    procede_reev: (procedeReeval(r).procede?'Sí':'No'),
+    fecha_reevaluacion: fechaParaInput(gv('Fecha de reevaluación',F.fecha_reevaluacion))||'',
+    prob_residual: limpiarSel(gv('Probabilidad riesgo residual',F.prob_riesgo_res)),
+    imp_residual: limpiarSel(gv('Impacto riesgo residual',F.imp_riesgo_res)),
+    nivel_residual: nivResVal||'',
+    // — Fechas / generales —
+    fecha: fechaParaInput(gv('Fecha de evaluación',F.fecha_evaluacion))||'',
+    // avance y ultimo_estado se inyectan aparte (son async)
   };
 }
-// Lista de marcadores disponibles (para la paleta del editor)
-const MARCADORES_NOTIF = ['responsable','descripcion','tipo','nivel','proceso','oficina','actividad','fuente','celular','correo','probabilidad','impacto','respuesta','control','medida','avance','ultimo_estado','certificacion','procede_reev','fecha'];
+// Catálogo de marcadores agrupado, con etiqueta legible (para la paleta del editor)
+const CATALOGO_MARCADORES = [
+  { grupo:'Identificación', items:[
+    ['descripcion','Descripción'],['tipo','Tipo (riesgo/oportunidad)'],['actividad','Actividad'],
+    ['fuente','Fuente'],['amenaza','Amenaza'],['oportunidad_rel','Oportunidad relacionada'],
+    ['parte_interesada','Parte interesada'],['requisitos','Requisitos'],['expectativas','Expectativas'],
+    ['causas','Causas'],['consecuencias','Consecuencias'] ]},
+  { grupo:'Proceso y responsables', items:[
+    ['proceso','Proceso'],['oficina','Oficina'],['responsable','Responsable'],
+    ['celular','Celular'],['correo','Correo'] ]},
+  { grupo:'Evaluación inherente', items:[
+    ['probabilidad','Probabilidad'],['impacto','Impacto'],['indice','Índice'],['nivel','Nivel'] ]},
+  { grupo:'Controles y tratamiento', items:[
+    ['existen_controles','¿Existen controles?'],['control','Control establecido'],['respuesta','Respuesta'],
+    ['medida','Medida(s) de respuesta'],['indicador','Indicador'],['formula','Fórmula'],
+    ['frecuencia_medicion','Frec. de medición'],['frecuencia_calculo','Frec. de cálculo'],
+    ['certificacion','Certificación del control'] ]},
+  { grupo:'Seguimiento', items:[
+    ['avance','% Avance medidas'],['ultimo_estado','Último estado'] ]},
+  { grupo:'Reevaluación / residual', items:[
+    ['procede_reev','¿Procede reevaluación?'],['fecha_reevaluacion','Fecha reevaluación'],
+    ['prob_residual','Probabilidad residual'],['imp_residual','Impacto residual'],
+    ['nivel_residual','Nivel residual'] ]},
+  { grupo:'Fechas', items:[
+    ['fecha','Fecha de evaluación'] ]},
+];
+// Lista plana (compatibilidad)
+const MARCADORES_NOTIF = CATALOGO_MARCADORES.flatMap(g=>g.items.map(i=>i[0]));
 
 // Obtiene el % de avance y el estado del reporte MÁS RECIENTE de acciones del riesgo.
 async function _avanceUltimoReporte(r){
@@ -1706,9 +1758,15 @@ async function abrirEditorPlantillas(){
   document.getElementById('pl_asunto').value = p.asunto;
   document.getElementById('pl_correo').value = p.correo;
   window._plTarget = 'pl_wa';
-  // Construir la paleta de marcadores
+  // Construir la paleta de marcadores AGRUPADA por categoría, con etiqueta legible
   const pal = document.getElementById('paletaMarcadores');
-  if(pal) pal.innerHTML = MARCADORES_NOTIF.map(m=>`<button onclick="insertarMarcador(window._plTarget||'pl_wa','${m}')" style="border:1px solid var(--line);background:var(--card);color:var(--brand);font-family:inherit;font-size:12px;padding:4px 9px;border-radius:14px;cursor:pointer">{${m}}</button>`).join('');
+  if(pal) pal.innerHTML = CATALOGO_MARCADORES.map(g=>`
+    <div style="width:100%;margin-bottom:8px">
+      <div style="font-size:10.5px;font-weight:700;color:var(--mist);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">${g.grupo}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        ${g.items.map(([m,etq])=>`<button onclick="insertarMarcador(window._plTarget||'pl_wa','${m}')" title="Inserta {${m}}" style="border:1px solid var(--line);background:var(--card);color:var(--brand);font-family:inherit;font-size:12px;padding:4px 9px;border-radius:14px;cursor:pointer">${etq}</button>`).join('')}
+      </div>
+    </div>`).join('');
   modal.classList.remove('hidden');
   actualizarPreviewPlantilla();
 }
