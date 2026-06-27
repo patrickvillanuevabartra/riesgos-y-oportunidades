@@ -101,6 +101,7 @@ const CONFIG = {
     resp_correo:             { id: "cPWOD_W5bmWRpcMCk1W6zC", type: "email", col: "Correo responsable" },
     indicador:               { id: "dcVhXxWOHlDiddVudcR8oe", type: "string", col: "Indicador" },
     formula_indicador:       { id: "dcRCoXW6Tcwik-oCkAW6uz", type: "text", col: "Fórmula del indicador" },
+    tipo_indicador:          { id: "ddUbaJWPjdWOxdMSkICSo6", type: "select", col: "Tipo de indicador", options: ["Absoluto","Razón"] },
     frecuencia_medicion:     { id: "bCgxukowHep4ZdP8k0qCow", type: "select", col: "Frecuencia de medición", options: ["Diaria","Semanal","Quincenal","Mensual","Trimestral","Semestral","Anual"] },
     frecuencia_calculo:      { id: "cmWOT4WPPcQ68wWOelgSkj", type: "select", col: "Frecuencia de cálculo", options: ["Diaria","Semanal","Quincenal","Mensual","Trimestral","Semestral","Anual"] },
     plan_monitoreo:          { id: "cLibRcOSnfW4HEtSoCcZus", type: "text", col: "Plan de monitoreo" },
@@ -129,7 +130,10 @@ const CONFIG = {
     valor_meta:      { id: "a0zmk1bSnhW6uJqc7cTCkZ", type: "float", col: "Valor meta" },
     valor_real:      { id: "ddLCkrW4fcSAatsI3dQ0HI", type: "float", col: "Valor real obtenido" },
     plan_remediacion:{ id: "dcPsRdVCjlzikIWReVnCkN", type: "url", col: "Plan de remediación" },
-    periodo:         { id: "cFDgfnaXvdGBBdLctdT8kX", type: "string", col: "Periodo" }
+    periodo:         { id: "cFDgfnaXvdGBBdLctdT8kX", type: "string", col: "Periodo" },
+    // NUEVOS — pegar el field_id real de QuintaDB (subtabla Reporte de monitoreo del control)
+    numerador_real:  { id: "dcTmkIWOHpWQGyW6VcRmoZ", type: "float", col: "Numerador real" },
+    denominador_real:{ id: "aRW43dJWTdIikyW6_cMSoI", type: "float", col: "Denominador real" }
   },
 
   // ---- Campos del subformulario "Programación de metas monitoreo riesgos" ----
@@ -141,7 +145,10 @@ const CONFIG = {
     valor_meta:    { id: "bkW5JdVIPpWRiacCorW4OZ", type: "float", col: "Valor meta" },
     plan_link:     { id: "bzfsRcTGXlW5XJWOhdLZSP", type: "url", col: "Plan de monitoreo para el cumplimiento de la meta" },
     observacion:   { id: "cdWPpcJ8jgAiobWORdILOf", type: "text", col: "Observación" },
-    periodo:       { id: "dcJCorWQ1dKyScW7TpW4Ob", type: "string", col: "Periodo" }
+    periodo:       { id: "dcJCorWQ1dKyScW7TpW4Ob", type: "string", col: "Periodo" },
+    // NUEVOS — pegar el field_id real de QuintaDB (subtabla Programación de metas)
+    numerador_meta:  { id: "alp8oOwCnoW4OvWQGABSot", type: "float", col: "Numerador meta" },
+    denominador_meta:{ id: "dcT8ooW6bawy7cIwe1WP5m", type: "float", col: "Denominador meta" }
   },
 
   // ---- Campos de la tabla "Usuarios matriz de riesgos y oportunidades" ----
