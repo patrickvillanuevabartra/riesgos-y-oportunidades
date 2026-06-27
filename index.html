@@ -491,10 +491,10 @@
         <div class="ctrl-nota no solo-n4 hidden" id="f_nota_no" style="margin-bottom:14px">🛠️ <strong>Sin control aún.</strong> Define la respuesta y la(s) medida(s). El <strong>avance de esas medidas</strong> se registra después con el botón 📋 «Reporte de acciones» en Seguimiento.</div>
         <div class="ctrl-nota si solo-n4 hidden" id="f_nota_si" style="margin-bottom:14px">🛡️ <strong>Control existente.</strong> Aquí defines el control, su indicador, fórmula y frecuencias (la <em>planificación</em>). El <strong>monitoreo</strong> (metas, mediciones y certificación) se gestiona luego con el botón 🎯 «Control y Seguimiento» en Seguimiento, cuando las medidas estén al 100%.</div>
         <div class="grid">
-          <!-- Respuesta + Medida: SIEMPRE (nivel<4, o nivel4 con "No"/"Sí") -->
-          <div class="field" id="f_wrap_respuesta"><label>Respuesta</label><select id="f_respuesta"><option value="">Seleccione…</option><option>Eliminar</option><option>Mitigar</option><option>Trasladar</option><option>Asumir</option></select></div>
-          <div class="field"></div>
-          <div class="field full" id="f_wrap_medida"><label>Medida(s) de respuesta</label><textarea id="f_medida"></textarea></div>
+          <!-- Respuesta + Medida: visibles salvo cuando hay control "Sí" (nivel 4) -->
+          <div class="field oculta-si-control" id="f_wrap_respuesta"><label>Respuesta</label><select id="f_respuesta"><option value="">Seleccione…</option><option>Eliminar</option><option>Mitigar</option><option>Trasladar</option><option>Asumir</option></select></div>
+          <div class="field oculta-si-control"></div>
+          <div class="field full oculta-si-control" id="f_wrap_medida"><label>Medida(s) de respuesta</label><textarea id="f_medida"></textarea></div>
           <!-- Control e indicadores: SOLO nivel 4 con "Sí" -->
           <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_control"><label>Control establecido</label><textarea id="f_control"></textarea></div>
           <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_monit_aviso"><div class="hint" style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px">Riesgo de nivel 4: defina el sistema de monitoreo del control (indicador, fórmula y frecuencias).</div></div>
@@ -1471,6 +1471,15 @@ function toggleControles(pref){
     if(el.id===pref+'_nota_no') mostrar = esN4 && esNo;
     if(el.id===pref+'_nota_si') mostrar = esN4 && esSi;
     el.classList.toggle('hidden', !mostrar);
+  });
+  // Respuesta y Medida(s): ocultas cuando el riesgo es nivel 4 con control "Sí"
+  const ocultarTratam = (esN4 && esSi);
+  document.querySelectorAll('.'+'oculta-si-control').forEach(el=>{
+    // Solo afectar los del formulario correspondiente (por prefijo de sus ids o su contexto)
+    const idOk = !el.id || el.id.startsWith(pref+'_');
+    // Los spacers sin id: filtrarlos por pertenencia al form activo no es trivial; se ocultan junto al bloque
+    if(el.id && !idOk) return;
+    el.classList.toggle('hidden', ocultarTratam);
   });
   // En nivel<4 no aplica "¿Existen controles?": se limpia para no arrastrar valor
   if(!esN4 && pref==='f'){ const h=document.getElementById('f_existe_ctrl'); if(h) h.value=''; }
@@ -3442,9 +3451,8 @@ async function renderMonPaneRep(riesgoId, r){
         <div class="field"><label>Valor real obtenido</label><input type="number" step="any" id="mon_real_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
         <div class="field"><label>% cumplimiento (calculado)</label><div class="readonly-pill" id="mon_pct_${riesgoId}">—</div></div>
         <div class="field full"><label>Evidencia (link)</label><input id="mon_evid_${riesgoId}" placeholder="https://…"></div>
-        <div class="field full hidden" id="mon_wrap_plan_${riesgoId}"><label>Plan de remediación (link)</label><input id="mon_plan_${riesgoId}" placeholder="https://…"></div>
       </div>
-      <p class="hint" style="margin-top:6px">El % cumplimiento = (valor real / valor meta) × 100, lo calcula QuintaDB. El plan de remediación aparece si el avance es menor a 100%.</p>
+      <p class="hint" style="margin-top:6px">El % cumplimiento = (valor real / valor meta) × 100, lo calcula QuintaDB. Puedes registrar mediciones parciales en el tiempo hasta alcanzar el 100%.</p>
       <div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-primary" onclick="guardarMonitoreo('${riesgoId}')" id="monbtn-${riesgoId}">+ Guardar reporte de monitoreo</button></div>
     </div>
     <div id="monlist-${riesgoId}">${monIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes de monitoreo aún.</p>'}</div>`;
@@ -3692,17 +3700,9 @@ function calcAvanceMon(riesgoId){
   const real = parseFloat(document.getElementById('mon_real_'+riesgoId).value);
   const meta = parseFloat(document.getElementById('mon_meta_'+riesgoId).value);
   const el = document.getElementById('mon_pct_'+riesgoId);
-  let pct = null;
   if(!isNaN(real) && !isNaN(meta) && meta!==0){
-    pct = Math.round((real/meta)*1000)/10;
-    el.textContent = pct + '%';
+    el.textContent = (Math.round((real/meta)*1000)/10) + '%';
   } else { el.textContent = '—'; }
-  // Plan de remediación: visible solo si el avance es menor a 100%
-  const wrapPlan = document.getElementById('mon_wrap_plan_'+riesgoId);
-  if(wrapPlan){
-    const mostrar = (pct!==null && pct<100);
-    wrapPlan.classList.toggle('hidden', !mostrar);
-  }
 }
 window.calcAvanceMon = calcAvanceMon;
 
@@ -4003,7 +4003,7 @@ async function actualizarMonitoreo(riesgoId, monId){
   vals[MF.valor_meta.id] = g('mon_meta')!==''?parseFloat(g('mon_meta')):'';
   vals[MF.valor_real.id] = g('mon_real')!==''?parseFloat(g('mon_real')):'';
   vals[MF.evidencia.id] = g('mon_evid');
-  vals[MF.plan_remediacion.id] = g('mon_plan');
+  if(document.getElementById('mon_plan')) vals[MF.plan_remediacion.id] = g('mon_plan');
   if(MF.periodo) vals[MF.periodo.id] = g('mon_periodo');
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Actualizando…';
   try{
@@ -4437,10 +4437,10 @@ function editarRiesgo(riesgoId){
     <div class="ctrl-nota no solo-n4 hidden" id="ed_nota_no" style="margin-bottom:12px">🛠️ <strong>Sin control aún.</strong> Define la respuesta y la(s) medida(s). El <strong>avance</strong> se registra con el botón 📋 «Reporte de acciones» en Seguimiento.</div>
     <div class="ctrl-nota si solo-n4 hidden" id="ed_nota_si" style="margin-bottom:12px">🛡️ <strong>Control existente.</strong> Aquí defines el control, indicador, fórmula y frecuencias (la <em>planificación</em>). El <strong>monitoreo, metas y certificación</strong> se gestionan con el botón 🎯 «Control y Seguimiento» en Seguimiento, cuando las medidas estén al 100%.</div>
     <div class="grid">
-      <!-- Respuesta + Medida: SIEMPRE -->
-      <div class="field" id="ed_wrap_respuesta"><label>Respuesta</label><select id="ed_resp">${opt(['Eliminar','Mitigar','Trasladar','Asumir'],cur('Respuesta al riesgo u oportunidad'))}</select></div>
-      <div class="field"></div>
-      <div class="field full" id="ed_wrap_medida"><label>Medida(s) de respuesta</label><textarea id="ed_medida">${cur('Medida(s) de respuesta')}</textarea></div>
+      <!-- Respuesta + Medida: visibles salvo cuando hay control "Sí" -->
+      <div class="field oculta-si-control" id="ed_wrap_respuesta"><label>Respuesta</label><select id="ed_resp">${opt(['Eliminar','Mitigar','Trasladar','Asumir'],cur('Respuesta al riesgo u oportunidad'))}</select></div>
+      <div class="field oculta-si-control"></div>
+      <div class="field full oculta-si-control" id="ed_wrap_medida"><label>Medida(s) de respuesta</label><textarea id="ed_medida">${cur('Medida(s) de respuesta')}</textarea></div>
       <!-- Control e indicadores: SOLO nivel 4 con "Sí" -->
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_control"><label>Control establecido</label><textarea id="ed_control">${cur('Control establecido')}</textarea></div>
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monit_aviso"><div class="hint" style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px">Riesgo de nivel 4: defina el sistema de monitoreo del control (indicador, fórmula y frecuencias).</div></div>
