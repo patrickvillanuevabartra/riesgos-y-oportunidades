@@ -4770,6 +4770,7 @@ async function guardarEdit(){
     set(F.control_establecido, limpiar(g('ed_control')));
     if((window._edNivelInherente||0)===4){
       set(F.indicador, limpiar(g('ed_indicador')));
+      if(F.tipo_indicador && g('ed_tipo_ind')) set(F.tipo_indicador, g('ed_tipo_ind'));
       set(F.formula_indicador, limpiar(g('ed_formula')));
       if(g('ed_frec_med')) set(F.frecuencia_medicion, g('ed_frec_med'));
       if(g('ed_frec_calc')) set(F.frecuencia_calculo, g('ed_frec_calc'));
