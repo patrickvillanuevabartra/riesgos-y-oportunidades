@@ -499,6 +499,7 @@
           <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_control"><label>Control establecido</label><textarea id="f_control"></textarea></div>
           <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_monit_aviso"><div class="hint" style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px">Riesgo de nivel 4: defina el sistema de monitoreo del control (indicador, fórmula y frecuencias).</div></div>
           <div class="field ctrl-si ctrl-n4 hidden" id="f_wrap_indicador"><label>Indicador</label><input id="f_indicador"></div>
+          <div class="field ctrl-si ctrl-n4 hidden" id="f_wrap_tipo_ind"><label>Tipo de indicador</label><select id="f_tipo_ind"><option value="">Seleccione…</option><option>Absoluto</option><option>Razón</option></select><div class="hint" style="margin-top:4px;font-size:11.5px"><strong>Absoluto:</strong> un solo número (ej. N° de capacitaciones). <strong>Razón:</strong> numerador ÷ denominador × 100 (ej. % de cumplimiento).</div></div>
           <div class="field ctrl-si ctrl-n4 hidden" id="f_wrap_frec_med"><label>Frecuencia de medición</label><select id="f_frec_med"><option value="">Seleccione…</option><option>Diaria</option><option>Semanal</option><option>Quincenal</option><option>Mensual</option><option>Trimestral</option><option>Semestral</option><option>Anual</option></select></div>
           <div class="field full ctrl-si ctrl-n4 hidden" id="f_wrap_formula"><label>Fórmula del indicador</label><textarea id="f_formula"></textarea></div>
           <div class="field ctrl-si ctrl-n4 hidden" id="f_wrap_frec_calc"><label>Frecuencia de cálculo</label><select id="f_frec_calc"><option value="">Seleccione…</option><option>Diaria</option><option>Semanal</option><option>Quincenal</option><option>Mensual</option><option>Trimestral</option><option>Semestral</option><option>Anual</option></select></div>
@@ -2056,6 +2057,7 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
     put(F.control_establecido, v('f_control'));
     if(nivelInherenteForm()===4){
       put(F.indicador, v('f_indicador'));
+      if(F.tipo_indicador) put(F.tipo_indicador, v('f_tipo_ind'));
       put(F.formula_indicador, v('f_formula'));
       put(F.frecuencia_medicion, v('f_frec_med'));
       put(F.frecuencia_calculo, v('f_frec_calc'));
@@ -3148,6 +3150,7 @@ function _camposControlForm(){
   const cert = gtxt('ed_cert'); if(cert!==null) campos[F.certificacion_control.id] = cert;
   // Indicador, fórmula, frecuencias (campos de monitoreo nivel 4)
   if(document.getElementById('ed_indicador')) campos[F.indicador.id] = g('ed_indicador');
+  if(document.getElementById('ed_tipo_ind') && F.tipo_indicador){ const ti=gtxt('ed_tipo_ind'); if(ti!==null) campos[F.tipo_indicador.id] = ti; }
   if(document.getElementById('ed_formula')) campos[F.formula_indicador.id] = g('ed_formula');
   const fm = gtxt('ed_frec_med'); if(fm!==null) campos[F.frecuencia_medicion.id] = fm;
   const fc = gtxt('ed_frec_calc'); if(fc!==null) campos[F.frecuencia_calculo.id] = fc;
@@ -3408,18 +3411,22 @@ async function renderMonPaneMetas(riesgoId, r){
   if(!cont) return;
   const F = CONFIG.MATRIZ_FIELDS;
   const metaIds = subIdsDe(r, F.prog_metas.id);
+  const tipoMeta = tipoIndicadorDe(riesgoId);
+  const esRazonMeta = String(tipoMeta).toLowerCase().startsWith('raz');
   cont.innerHTML = `
     <div style="background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:16px 18px;margin-bottom:16px">
       <div style="font-size:13px;font-weight:600;color:var(--slate);margin-bottom:12px">Nueva programación de meta</div>
       <div class="grid">
         <div class="field"><label>Fecha de programación</label><input type="date" id="meta_fecha_${riesgoId}" onchange="sugerirPeriodoMeta('${riesgoId}')"></div>
         <div class="field"><label>Periodo <span style="color:var(--mist);font-weight:400">(se sugiere; ajustable)</span></label><input id="meta_periodo_${riesgoId}" placeholder="Ej. Enero 2026, 2026-T1" oninput="this.dataset.touched='1'"></div>
-        <div class="field"><label>Valor meta</label><input type="number" step="any" id="meta_meta_${riesgoId}"></div>
+        <div class="field"><label>${esRazonMeta?'Numerador meta':'Valor meta (absoluto)'}</label><input type="number" step="any" id="meta_num_${riesgoId}" oninput="calcValorMeta('${riesgoId}')"></div>
+        ${esRazonMeta?`<div class="field"><label>Denominador meta</label><input type="number" step="any" id="meta_den_${riesgoId}" oninput="calcValorMeta('${riesgoId}')"></div>`:'<div class="field"></div>'}
+        <div class="field"><label>Valor meta calculado ${esRazonMeta?'(%)':''}</label><div class="readonly-pill" id="meta_val_${riesgoId}">—</div><input type="hidden" id="meta_meta_${riesgoId}"></div>
         <div class="field"></div>
         <div class="field full"><label>Plan de monitoreo (link a Excel/MS Project)</label><input id="meta_plan_${riesgoId}" placeholder="https://…"></div>
         <div class="field full"><label>Observación</label><textarea id="meta_obs_${riesgoId}"></textarea></div>
       </div>
-      <p class="hint" style="margin-top:6px">El indicador y la fórmula se copian automáticamente del riesgo. El periodo se sugiere según la frecuencia de medición.</p>
+      <p class="hint" style="margin-top:6px">Indicador <strong>${tipoMeta}</strong>. ${esRazonMeta?'El valor meta = numerador ÷ denominador × 100.':'El valor meta es el número que ingreses.'} El indicador y la fórmula se copian del riesgo.</p>
       <div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-primary" onclick="guardarMeta('${riesgoId}')" id="metabtn-${riesgoId}">+ Guardar meta</button></div>
     </div>
     <div id="metaslist-${riesgoId}">${metaIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin metas programadas aún.</p>'}</div>`;
@@ -3440,6 +3447,8 @@ async function renderMonPaneRep(riesgoId, r){
   const F = CONFIG.MATRIZ_FIELDS;
   const metaIds = subIdsDe(r, F.prog_metas.id);
   const monIds  = subIdsDe(r, F.reporte_monitoreo.id);
+  const tipoMon = tipoIndicadorDe(riesgoId);
+  const esRazonMon = String(tipoMon).toLowerCase().startsWith('raz');
   cont.innerHTML = `
     <div style="background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:16px 18px;margin-bottom:16px">
       <div style="font-size:13px;font-weight:600;color:var(--slate);margin-bottom:12px">Nuevo reporte de monitoreo del control</div>
@@ -3447,12 +3456,15 @@ async function renderMonPaneRep(riesgoId, r){
         <div class="field full"><label>Meta que estás monitoreando</label><select id="mon_metasel_${riesgoId}" onchange="jalarMeta('${riesgoId}')"><option value="">Seleccione la meta…</option></select></div>
         <div class="field"><label>Periodo evaluado <span style="color:var(--mist);font-weight:400">(heredado de la meta)</span></label><input id="mon_periodo_${riesgoId}" readonly style="background:var(--paper)" placeholder="— elige la meta —"></div>
         <div class="field"><label>Fecha de evaluación</label><input type="date" id="mon_fecha_${riesgoId}"></div>
-        <div class="field"><label>Valor meta</label><input type="number" step="any" id="mon_meta_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
-        <div class="field"><label>Valor real obtenido</label><input type="number" step="any" id="mon_real_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
+        <div class="field"><label>Valor meta <span style="color:var(--mist);font-weight:400">(heredado de la meta)</span></label><input type="number" step="any" id="mon_meta_${riesgoId}" readonly style="background:var(--paper)" oninput="calcAvanceMon('${riesgoId}')"></div>
+        <div class="field"></div>
+        <div class="field"><label>${esRazonMon?'Numerador real':'Valor real (absoluto)'}</label><input type="number" step="any" id="mon_num_${riesgoId}" oninput="calcValorReal('${riesgoId}')"></div>
+        ${esRazonMon?`<div class="field"><label>Denominador real</label><input type="number" step="any" id="mon_den_${riesgoId}" oninput="calcValorReal('${riesgoId}')"></div>`:'<div class="field"></div>'}
+        <div class="field"><label>Valor real obtenido ${esRazonMon?'(%)':''}</label><div class="readonly-pill" id="mon_real_val_${riesgoId}">—</div><input type="hidden" id="mon_real_${riesgoId}"></div>
         <div class="field"><label>% cumplimiento (calculado)</label><div class="readonly-pill" id="mon_pct_${riesgoId}">—</div></div>
         <div class="field full"><label>Evidencia (link)</label><input id="mon_evid_${riesgoId}" placeholder="https://…"></div>
       </div>
-      <p class="hint" style="margin-top:6px">El % cumplimiento = (valor real / valor meta) × 100, lo calcula QuintaDB. Puedes registrar mediciones parciales en el tiempo hasta alcanzar el 100%.</p>
+      <p class="hint" style="margin-top:6px">Indicador <strong>${tipoMon}</strong>. ${esRazonMon?'El valor real = numerador ÷ denominador × 100.':'El valor real es el número que ingreses.'} El % cumplimiento = valor real ÷ valor meta × 100. Puedes registrar mediciones parciales hasta alcanzar el 100%.</p>
       <div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-primary" onclick="guardarMonitoreo('${riesgoId}')" id="monbtn-${riesgoId}">+ Guardar reporte de monitoreo</button></div>
     </div>
     <div id="monlist-${riesgoId}">${monIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes de monitoreo aún.</p>'}</div>`;
@@ -3696,6 +3708,62 @@ async function renderPanelMonitoreo(riesgoId, r){
 }
 
 // Cálculo en vivo del % avance del reporte de monitoreo
+// Calcula el valor de un indicador a partir de sus componentes y su tipo.
+//  • "Razón": numerador / denominador × 100 (porcentaje). Requiere denominador ≠ 0.
+//  • "Absoluto" (o sin denominador): el valor es el propio numerador.
+// Devuelve number o null si no se puede calcular.
+function calcularValorIndicador(num, den, tipo){
+  const n = parseFloat(num);
+  if(isNaN(n)) return null;
+  const esRazon = String(tipo||'').toLowerCase().startsWith('raz');
+  const d = parseFloat(den);
+  if(esRazon){
+    if(isNaN(d) || d===0) return null;
+    return Math.round((n/d)*100*100)/100; // 2 decimales
+  }
+  return n; // absoluto
+}
+window.calcularValorIndicador = calcularValorIndicador;
+
+// Devuelve el tipo de indicador del riesgo ("Absoluto"/"Razón"), default "Absoluto"
+function tipoIndicadorDe(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  if(!r) return 'Absoluto';
+  const v = r.values||{};
+  const t = v['Tipo de indicador'];
+  return (t && t!=='Tipo de indicador' && t!=='Seleccione…') ? t : 'Absoluto';
+}
+window.tipoIndicadorDe = tipoIndicadorDe;
+
+// Calcula el VALOR META a partir de numerador/denominador según el tipo de indicador
+function calcValorMeta(riesgoId){
+  const tipo = tipoIndicadorDe(riesgoId);
+  const num = (document.getElementById('meta_num_'+riesgoId)||{}).value;
+  const den = (document.getElementById('meta_den_'+riesgoId)||{}).value;
+  const val = calcularValorIndicador(num, den, tipo);
+  const pill = document.getElementById('meta_val_'+riesgoId);
+  const hid  = document.getElementById('meta_meta_'+riesgoId);
+  const esRazon = String(tipo).toLowerCase().startsWith('raz');
+  if(val!=null){ if(pill) pill.textContent = val + (esRazon?'%':''); if(hid) hid.value = val; }
+  else { if(pill) pill.textContent='—'; if(hid) hid.value=''; }
+}
+window.calcValorMeta = calcValorMeta;
+
+// Calcula el VALOR REAL a partir de numerador/denominador, y recalcula el % cumplimiento
+function calcValorReal(riesgoId){
+  const tipo = tipoIndicadorDe(riesgoId);
+  const num = (document.getElementById('mon_num_'+riesgoId)||{}).value;
+  const den = (document.getElementById('mon_den_'+riesgoId)||{}).value;
+  const val = calcularValorIndicador(num, den, tipo);
+  const pill = document.getElementById('mon_real_val_'+riesgoId);
+  const hid  = document.getElementById('mon_real_'+riesgoId);
+  const esRazon = String(tipo).toLowerCase().startsWith('raz');
+  if(val!=null){ if(pill) pill.textContent = val + (esRazon?'%':''); if(hid) hid.value = val; }
+  else { if(pill) pill.textContent='—'; if(hid) hid.value=''; }
+  calcAvanceMon(riesgoId); // recalcular % cumplimiento con el nuevo valor real
+}
+window.calcValorReal = calcValorReal;
+
 function calcAvanceMon(riesgoId){
   const real = parseFloat(document.getElementById('mon_real_'+riesgoId).value);
   const meta = parseFloat(document.getElementById('mon_meta_'+riesgoId).value);
@@ -3835,6 +3903,9 @@ async function guardarMeta(riesgoId){
   if(indicadorVivo) vals[MF.indicador.id] = indicadorVivo;
   if(formulaVivo) vals[MF.formula.id] = formulaVivo;
   if(g('meta_meta')!=='') vals[MF.valor_meta.id] = parseFloat(g('meta_meta'));
+  // Componentes del indicador (numerador / denominador)
+  if(MF.numerador_meta && g('meta_num')!=='') vals[MF.numerador_meta.id] = parseFloat(g('meta_num'));
+  if(MF.denominador_meta && g('meta_den')!=='') vals[MF.denominador_meta.id] = parseFloat(g('meta_den'));
   if(g('meta_plan')) vals[MF.plan_link.id] = g('meta_plan');
   if(g('meta_obs')) vals[MF.observacion.id] = g('meta_obs');
   if(MF.periodo && g('meta_periodo')) vals[MF.periodo.id] = g('meta_periodo');
@@ -3877,6 +3948,9 @@ async function guardarMonitoreo(riesgoId){
   if(formulaVivo2) vals[MF.formula.id] = formulaVivo2;
   if(g('mon_meta')!=='') vals[MF.valor_meta.id] = parseFloat(g('mon_meta'));
   if(g('mon_real')!=='') vals[MF.valor_real.id] = parseFloat(g('mon_real'));
+  // Componentes del valor real (numerador / denominador)
+  if(MF.numerador_real && g('mon_num')!=='') vals[MF.numerador_real.id] = parseFloat(g('mon_num'));
+  if(MF.denominador_real && g('mon_den')!=='') vals[MF.denominador_real.id] = parseFloat(g('mon_den'));
   if(g('mon_evid')) vals[MF.evidencia.id] = g('mon_evid');
   if(g('mon_plan')) vals[MF.plan_remediacion.id] = g('mon_plan');
   if(MF.periodo && g('mon_periodo')) vals[MF.periodo.id] = g('mon_periodo');
@@ -3927,9 +4001,12 @@ async function editarMeta(riesgoId, metaId){
     const set=(id,val)=>{ const el=document.getElementById(id+'_'+riesgoId); if(el) el.value=val; };
     set('meta_fecha', fechaParaInput(g('Fecha de programación')));
     set('meta_meta', g('Valor meta'));
+    set('meta_num', g('Numerador meta'));
+    set('meta_den', g('Denominador meta'));
     set('meta_plan', g('Plan de monitoreo para el cumplimiento de la meta'));
     set('meta_obs', g('Observación'));
     set('meta_periodo', g('Periodo'));
+    calcValorMeta(riesgoId); // refrescar el pill del valor calculado
     const elPer=document.getElementById('meta_periodo_'+riesgoId); if(elPer) elPer.dataset.touched='1';
     // Cambiar el botón a modo actualización
     const btn=document.getElementById('metabtn-'+riesgoId);
@@ -3951,6 +4028,8 @@ async function actualizarMeta(riesgoId, metaId){
   if(indEd) vals[MF.indicador.id]=indEd.value.trim();
   if(formEd) vals[MF.formula.id]=formEd.value.trim();
   vals[MF.valor_meta.id] = g('meta_meta')!==''?parseFloat(g('meta_meta')):'';
+  if(MF.numerador_meta) vals[MF.numerador_meta.id] = g('meta_num')!==''?parseFloat(g('meta_num')):'';
+  if(MF.denominador_meta) vals[MF.denominador_meta.id] = g('meta_den')!==''?parseFloat(g('meta_den')):'';
   vals[MF.plan_link.id] = g('meta_plan');
   vals[MF.observacion.id] = g('meta_obs');
   if(MF.periodo) vals[MF.periodo.id] = g('meta_periodo');
@@ -3978,10 +4057,11 @@ async function editarMonitoreo(riesgoId, monId){
     set('mon_fecha', fechaParaInput(g('Fecha de monitoreo')));
     set('mon_meta', g('Valor meta'));
     set('mon_real', g('Valor real obtenido'));
+    set('mon_num', g('Numerador real'));
+    set('mon_den', g('Denominador real'));
     set('mon_evid', g('Evidencia (link)'));
-    set('mon_plan', g('Plan de remediación'));
     set('mon_periodo', g('Periodo'));
-    calcAvanceMon(riesgoId);
+    calcValorReal(riesgoId); // refresca el valor real y el % cumplimiento
     const btn=document.getElementById('monbtn-'+riesgoId);
     btn.textContent='Actualizar reporte';
     btn.setAttribute('onclick',`actualizarMonitoreo('${riesgoId}','${monId}')`);
@@ -4002,6 +4082,8 @@ async function actualizarMonitoreo(riesgoId, monId){
   if(formEd) vals[MF.formula.id]=formEd.value.trim();
   vals[MF.valor_meta.id] = g('mon_meta')!==''?parseFloat(g('mon_meta')):'';
   vals[MF.valor_real.id] = g('mon_real')!==''?parseFloat(g('mon_real')):'';
+  if(MF.numerador_real) vals[MF.numerador_real.id] = g('mon_num')!==''?parseFloat(g('mon_num')):'';
+  if(MF.denominador_real) vals[MF.denominador_real.id] = g('mon_den')!==''?parseFloat(g('mon_den')):'';
   vals[MF.evidencia.id] = g('mon_evid');
   if(document.getElementById('mon_plan')) vals[MF.plan_remediacion.id] = g('mon_plan');
   if(MF.periodo) vals[MF.periodo.id] = g('mon_periodo');
@@ -4445,6 +4527,7 @@ function editarRiesgo(riesgoId){
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_control"><label>Control establecido</label><textarea id="ed_control">${cur('Control establecido')}</textarea></div>
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monit_aviso"><div class="hint" style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px">Riesgo de nivel 4: defina el sistema de monitoreo del control (indicador, fórmula y frecuencias).</div></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_indicador"><label>Indicador</label><input id="ed_indicador" value="${(cur('Indicador')||'').replace(/"/g,'&quot;')}" oninput="actualizarRefIndicador()"></div>
+      <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_tipo_ind"><label>Tipo de indicador</label><select id="ed_tipo_ind">${opt(['Absoluto','Razón'],cur('Tipo de indicador'))}</select><div class="hint" style="margin-top:4px;font-size:11.5px"><strong>Absoluto:</strong> un solo número. <strong>Razón:</strong> numerador ÷ denominador × 100.</div></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_med"><label>Frecuencia de medición</label><select id="ed_frec_med">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de medición'))}</select></div>
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_formula"><label>Fórmula del indicador</label><textarea id="ed_formula" oninput="actualizarRefIndicador()">${cur('Fórmula del indicador')}</textarea></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_frec_calc"><label>Frecuencia de cálculo</label><select id="ed_frec_calc">${opt(['Diaria','Semanal','Quincenal','Mensual','Trimestral','Semestral','Anual'],cur('Frecuencia de cálculo'))}</select></div>
