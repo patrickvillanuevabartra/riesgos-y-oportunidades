@@ -660,6 +660,17 @@
   </div>
 
   <!-- ===== Modal: Control y Seguimiento (3 pestañas: Metas / Monitoreo / Certificación) ===== -->
+  <!-- Modal de detalle de un subregistro (meta o monitoreo) -->
+  <div id="modalDetalleSub" class="modal-overlay hidden">
+    <div class="modal" style="max-width:560px">
+      <div class="modal-head">
+        <div><div class="eyebrow" id="detsub_eyebrow">Detalle</div><h2 id="detsub_titulo" style="font-size:17px">Detalle del registro</h2></div>
+        <button class="modal-close" onclick="cerrarModalSimple('modalDetalleSub')">&times;</button>
+      </div>
+      <div class="modal-body"><div id="detsub_cont"></div></div>
+    </div>
+  </div>
+
   <div id="modalMon" class="modal-overlay hidden">
     <div class="modal" style="max-width:900px">
       <div class="modal-head">
@@ -3427,7 +3438,7 @@ async function renderMonPaneMetas(riesgoId, r){
         <div class="field full"><label>Observación</label><textarea id="meta_obs_${riesgoId}"></textarea></div>
       </div>
       <p class="hint" style="margin-top:6px">Indicador <strong>${tipoMeta}</strong>. ${esRazonMeta?'El valor meta = numerador ÷ denominador × 100.':'El valor meta es el número que ingreses.'} El indicador y la fórmula se copian del riesgo.</p>
-      <div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-primary" onclick="guardarMeta('${riesgoId}')" id="metabtn-${riesgoId}">+ Guardar meta</button></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button type="button" class="btn btn-ghost" id="metacancel-${riesgoId}" onclick="cancelarEdicionMeta('${riesgoId}')" style="display:none">Cancelar</button><button type="button" class="btn btn-primary" onclick="guardarMeta('${riesgoId}')" id="metabtn-${riesgoId}">+ Guardar meta</button></div>
     </div>
     <div id="metaslist-${riesgoId}">${metaIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin metas programadas aún.</p>'}</div>`;
   if(metaIds.length){
@@ -3465,7 +3476,7 @@ async function renderMonPaneRep(riesgoId, r){
         <div class="field full"><label>Evidencia (link)</label><input id="mon_evid_${riesgoId}" placeholder="https://…"></div>
       </div>
       <p class="hint" style="margin-top:6px">Indicador <strong>${tipoMon}</strong>. ${esRazonMon?'El valor real = numerador ÷ denominador × 100.':'El valor real es el número que ingreses.'} El % cumplimiento = valor real ÷ valor meta × 100. Puedes registrar mediciones parciales hasta alcanzar el 100%.</p>
-      <div style="display:flex;justify-content:flex-end;margin-top:12px"><button type="button" class="btn btn-primary" onclick="guardarMonitoreo('${riesgoId}')" id="monbtn-${riesgoId}">+ Guardar reporte de monitoreo</button></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button type="button" class="btn btn-ghost" id="moncancel-${riesgoId}" onclick="cancelarEdicionMon('${riesgoId}')" style="display:none">Cancelar</button><button type="button" class="btn btn-primary" onclick="guardarMonitoreo('${riesgoId}')" id="monbtn-${riesgoId}">+ Guardar reporte de monitoreo</button></div>
     </div>
     <div id="monlist-${riesgoId}">${monIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes de monitoreo aún.</p>'}</div>`;
   // Poblar desplegable de metas
@@ -3621,7 +3632,8 @@ function renderMetasDataHTML(metas, riesgoId){
     ${m.obs?`<div class="hint">${m.obs}</div>`:''}
     <div style="display:flex;gap:12px;margin-top:3px;align-items:center">
       ${m.plan?`<a href="${m.plan}" target="_blank" class="riesgo-link">📎 Plan de monitoreo</a>`:''}
-      ${riesgoId?`<a class="riesgo-link" style="margin-left:auto;cursor:pointer" onclick="editarMeta('${riesgoId}','${m.id}')">✏️ Editar</a>
+      <a class="riesgo-link" style="margin-left:auto;cursor:pointer" onclick="verDetalleMeta('${riesgoId}','${m.id}')">👁 Detalle</a>
+      ${riesgoId?`<a class="riesgo-link" style="cursor:pointer" onclick="editarMeta('${riesgoId}','${m.id}')">✏️ Editar</a>
       <a class="riesgo-link" style="color:#c0392b;cursor:pointer" onclick="eliminarSubregistro('${riesgoId}','${m.id}','meta')">🗑️ Eliminar</a>`:''}
     </div>
   </div>`;
@@ -3883,7 +3895,8 @@ async function renderMonitoreoHTML(ids, riesgoId){
         <div>Real obtenido: <strong>${real||'—'}</strong>${compReal} · Avance: <strong style="color:var(--brand)">${pct!==''&&pct!=null?pct+'%':'—'}</strong></div>
         <div style="display:flex;gap:12px;margin-top:3px;align-items:center">
           ${evid?`<a href="${evid}" target="_blank" class="riesgo-link">📎 Evidencia</a>`:''}
-          ${riesgoId?`<a class="riesgo-link" style="margin-left:auto;cursor:pointer" onclick="editarMonitoreo('${riesgoId}','${id}')">✏️ Editar</a>
+          <a class="riesgo-link" style="margin-left:auto;cursor:pointer" onclick="verDetalleMon('${riesgoId}','${id}')">👁 Detalle</a>
+          ${riesgoId?`<a class="riesgo-link" style="cursor:pointer" onclick="editarMonitoreo('${riesgoId}','${id}')">✏️ Editar</a>
           <a class="riesgo-link" style="color:#c0392b;cursor:pointer" onclick="eliminarSubregistro('${riesgoId}','${id}','monitoreo')">🗑️ Eliminar</a>`:''}
         </div>
       </div>`;
@@ -4022,10 +4035,19 @@ async function editarMeta(riesgoId, metaId){
     const btn=document.getElementById('metabtn-'+riesgoId);
     btn.textContent='Actualizar meta';
     btn.setAttribute('onclick',`actualizarMeta('${riesgoId}','${metaId}')`);
+    const btnC=document.getElementById('metacancel-'+riesgoId); if(btnC) btnC.style.display='';
     btn.scrollIntoView({behavior:'smooth',block:'center'});
   }catch(err){ toast('Error al cargar la meta: '+err.message, true); }
 }
 window.editarMeta = editarMeta;
+
+// Cancela el modo edición de una meta: recarga el panel con el formulario limpio
+async function cancelarEdicionMeta(riesgoId){
+  STATE.matriz=[]; await loadMatriz(true);
+  const rr = STATE.matriz.find(x=>x.id===riesgoId);
+  if(rr){ await renderMonPaneMetas(riesgoId, rr); setMonTab('metas'); }
+}
+window.cancelarEdicionMeta = cancelarEdicionMeta;
 
 // Actualizar una meta existente (PUT al subregistro)
 async function actualizarMeta(riesgoId, metaId){
@@ -4075,10 +4097,82 @@ async function editarMonitoreo(riesgoId, monId){
     const btn=document.getElementById('monbtn-'+riesgoId);
     btn.textContent='Actualizar reporte';
     btn.setAttribute('onclick',`actualizarMonitoreo('${riesgoId}','${monId}')`);
+    const btnC=document.getElementById('moncancel-'+riesgoId); if(btnC) btnC.style.display='';
     btn.scrollIntoView({behavior:'smooth',block:'center'});
   }catch(err){ toast('Error al cargar el reporte: '+err.message, true); }
 }
 window.editarMonitoreo = editarMonitoreo;
+
+// Cancela el modo edición de un reporte de monitoreo: recarga el panel limpio
+async function cancelarEdicionMon(riesgoId){
+  STATE.matriz=[]; await loadMatriz(true);
+  const rr = STATE.matriz.find(x=>x.id===riesgoId);
+  if(rr){ await renderMonPaneRep(riesgoId, rr); setMonTab('rep'); }
+}
+window.cancelarEdicionMon = cancelarEdicionMon;
+
+// Construye una fila de detalle (etiqueta + valor) si el valor no está vacío
+function _filaDet(label, val){
+  if(val===''||val==null) return '';
+  const esLink = /^https?:\/\//i.test(String(val));
+  const v = esLink ? `<a href="${val}" target="_blank" class="riesgo-link">${val}</a>` : String(val).replace(/</g,'&lt;').replace(/\n/g,'<br>');
+  return `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+    <div style="flex:0 0 42%;font-size:12.5px;font-weight:600;color:var(--mist)">${label}</div>
+    <div style="flex:1;font-size:13.5px;color:var(--ink)">${v}</div></div>`;
+}
+
+// Detalle de una META programada
+function verDetalleMeta(riesgoId, metaId){
+  const metas = window['_metas_'+riesgoId]||[];
+  const m = metas.find(x=>x.id===metaId);
+  if(!m){ toast('No se encontró la meta.', true); return; }
+  document.getElementById('detsub_eyebrow').textContent='Programación de meta';
+  document.getElementById('detsub_titulo').textContent = m.periodo || fmtFecha(m.fecha) || 'Detalle de la meta';
+  const cont = document.getElementById('detsub_cont');
+  cont.innerHTML =
+    _filaDet('Periodo', m.periodo) +
+    _filaDet('Fecha de programación', fmtFecha(m.fecha)) +
+    _filaDet('Indicador', m.indicador) +
+    _filaDet('Fórmula', m.formula) +
+    _filaDet('Numerador meta', m.num) +
+    _filaDet('Denominador meta', m.den) +
+    _filaDet('Valor meta', m.meta) +
+    _filaDet('Plan de monitoreo', m.plan) +
+    _filaDet('Observación', m.obs) ||
+    '<p class="hint">Sin datos.</p>';
+  document.getElementById('modalDetalleSub').classList.remove('hidden');
+}
+window.verDetalleMeta = verDetalleMeta;
+
+// Detalle de un REPORTE de monitoreo (lee fresco desde QuintaDB)
+async function verDetalleMon(riesgoId, monId){
+  document.getElementById('detsub_eyebrow').textContent='Reporte de monitoreo del control';
+  document.getElementById('detsub_titulo').textContent='Detalle del reporte';
+  const cont = document.getElementById('detsub_cont');
+  cont.innerHTML = '<p class="hint">Cargando…</p>';
+  document.getElementById('modalDetalleSub').classList.remove('hidden');
+  try{
+    const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+monId+'.json','GET',{name_value:1});
+    const v = d.record.values||{};
+    const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
+    let pct = g('% cumplimiento');
+    if(pct!=='' && pct!=null) pct = (Math.round(parseFloat(pct)*10)/10)+'%';
+    document.getElementById('detsub_titulo').textContent = g('Periodo') || fmtFecha(g('Fecha de monitoreo')) || 'Detalle del reporte';
+    cont.innerHTML =
+      _filaDet('Periodo', g('Periodo')) +
+      _filaDet('Fecha de monitoreo', fmtFecha(g('Fecha de monitoreo'))) +
+      _filaDet('Indicador', g('Indicador')) +
+      _filaDet('Fórmula', g('Texto multilínea')||g('Fórmula')) +
+      _filaDet('Valor meta', g('Valor meta')) +
+      _filaDet('Numerador real', g('Numerador real')) +
+      _filaDet('Denominador real', g('Denominador real')) +
+      _filaDet('Valor real obtenido', g('Valor real obtenido')) +
+      _filaDet('% cumplimiento', pct) +
+      _filaDet('Evidencia', g('Evidencia (link)')) ||
+      '<p class="hint">Sin datos.</p>';
+  }catch(e){ cont.innerHTML='<p class="hint">Error al cargar: '+e.message+'</p>'; }
+}
+window.verDetalleMon = verDetalleMon;
 
 // Actualizar un reporte de monitoreo existente
 async function actualizarMonitoreo(riesgoId, monId){
