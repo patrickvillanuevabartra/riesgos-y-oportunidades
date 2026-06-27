@@ -3456,7 +3456,7 @@ async function renderMonPaneRep(riesgoId, r){
         <div class="field full"><label>Meta que estás monitoreando</label><select id="mon_metasel_${riesgoId}" onchange="jalarMeta('${riesgoId}')"><option value="">Seleccione la meta…</option></select></div>
         <div class="field"><label>Periodo evaluado <span style="color:var(--mist);font-weight:400">(heredado de la meta)</span></label><input id="mon_periodo_${riesgoId}" readonly style="background:var(--paper)" placeholder="— elige la meta —"></div>
         <div class="field"><label>Fecha de evaluación</label><input type="date" id="mon_fecha_${riesgoId}"></div>
-        <div class="field"><label>Valor meta <span style="color:var(--mist);font-weight:400">(heredado de la meta)</span></label><input type="number" step="any" id="mon_meta_${riesgoId}" readonly style="background:var(--paper)" oninput="calcAvanceMon('${riesgoId}')"></div>
+        <div class="field"><label>Valor meta <span style="color:var(--mist);font-weight:400">(heredado de la meta)</span></label><input type="number" step="any" id="mon_meta_${riesgoId}" readonly style="background:var(--paper)" oninput="calcAvanceMon('${riesgoId}')"><div class="hint" id="mon_meta_info_${riesgoId}" style="display:none;margin-top:4px;font-size:11.5px"></div></div>
         <div class="field"></div>
         <div class="field"><label>${esRazonMon?'Numerador real':'Valor real (absoluto)'}</label><input type="number" step="any" id="mon_num_${riesgoId}" oninput="calcValorReal('${riesgoId}')"></div>
         ${esRazonMon?`<div class="field"><label>Denominador real</label><input type="number" step="any" id="mon_den_${riesgoId}" oninput="calcValorReal('${riesgoId}')"></div>`:'<div class="field"></div>'}
@@ -3604,6 +3604,7 @@ async function cargarMetasData(ids){
       out.push({
         id, fecha:g('Fecha de programación'),
         ref:g('Valor de referencia'), meta:g('Valor meta'),
+        num:g('Numerador meta'), den:g('Denominador meta'),
         indicador:g('Indicador'), formula:g('Fórmula ')||g('Fórmula'),
         plan:g('Plan de monitoreo para el cumplimiento de la meta'),
         obs:g('Observación'), periodo:g('Periodo')
@@ -3616,7 +3617,7 @@ function renderMetasDataHTML(metas, riesgoId){
   if(!metas.length) return '<p class="hint">Sin metas.</p>';
   const itemHtml = m=>`<div class="rep-item">
     ${m.indicador?`<div class="hint">Indicador: <strong>${m.indicador}</strong>${m.formula?(' · Fórmula: '+m.formula):''}</div>`:''}
-    <div><strong>${fmtFecha(m.fecha)||'(sin fecha)'}</strong> · Meta: ${m.meta||'—'}</div>
+    <div><strong>${fmtFecha(m.fecha)||'(sin fecha)'}</strong> · Meta: ${m.meta||'—'}${(m.num!==''&&m.num!=null)?` <span class="hint">(${m.num}${(m.den!==''&&m.den!=null)?' ÷ '+m.den:''})</span>`:''}</div>
     ${m.obs?`<div class="hint">${m.obs}</div>`:''}
     <div style="display:flex;gap:12px;margin-top:3px;align-items:center">
       ${m.plan?`<a href="${m.plan}" target="_blank" class="riesgo-link">📎 Plan de monitoreo</a>`:''}
@@ -3635,6 +3636,14 @@ function jalarMeta(riesgoId){
   if(i===''||!metas[i]){ if(elPer) elPer.value=''; return; }
   const m = metas[i];
   if(m.meta!=='' && m.meta!=null) document.getElementById('mon_meta_'+riesgoId).value = m.meta;
+  // Mostrar los componentes de entrada del valor meta (numerador/denominador), si existen
+  const infoMeta = document.getElementById('mon_meta_info_'+riesgoId);
+  if(infoMeta){
+    if(m.num!=='' && m.num!=null){
+      infoMeta.innerHTML = `Valor meta calculado de: <strong>${m.num}${(m.den!==''&&m.den!=null)?' ÷ '+m.den:''}</strong>${(m.den!==''&&m.den!=null)?' × 100':''}`;
+      infoMeta.style.display='';
+    } else { infoMeta.style.display='none'; infoMeta.innerHTML=''; }
+  }
   // Heredar el periodo de la meta elegida (si la meta no tiene, sugerirlo desde su fecha)
   if(elPer){ elPer.value = m.periodo || generarPeriodoRiesgo(fechaParaInput(m.fecha), frecuenciaDelRiesgo(riesgoId)) || ''; }
   calcAvanceMon(riesgoId);
@@ -3858,6 +3867,7 @@ async function renderMonitoreoHTML(ids, riesgoId){
       const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
       const real = _fmtNum(g('Valor real obtenido'));
       const meta = _fmtNum(g('Valor meta'));
+      const numR = g('Numerador real'); const denR = g('Denominador real');
       const ind = g('Indicador');
       const form = g('Texto multilínea') || g('Fórmula');
       let pct = g('% cumplimiento');
@@ -3865,14 +3875,14 @@ async function renderMonitoreoHTML(ids, riesgoId){
         const rN=parseFloat(real), mN=parseFloat(meta);
         if(!isNaN(rN)&&!isNaN(mN)&&mN!==0) pct = Math.round((rN/mN)*1000)/10;
       } else { pct = Math.round(parseFloat(pct)*10)/10; }
-      const evid = g('Evidencia (link)'); const plan = g('Plan de remediación');
+      const evid = g('Evidencia (link)');
+      const compReal = (numR!==''&&numR!=null)?` <span class="hint">(${numR}${(denR!==''&&denR!=null)?' ÷ '+denR:''})</span>`:'';
       const html = `<div class="rep-item">
         ${ind?`<div class="hint">Indicador: <strong>${ind}</strong>${form?(' · Fórmula: '+form):''}</div>`:''}
         <div><strong>${fmtFecha(g('Fecha de monitoreo'))||'(sin fecha)'}</strong> · Meta monitoreada: ${meta||'—'}</div>
-        <div>Real obtenido: <strong>${real||'—'}</strong> · Avance: <strong style="color:var(--brand)">${pct!==''&&pct!=null?pct+'%':'—'}</strong></div>
+        <div>Real obtenido: <strong>${real||'—'}</strong>${compReal} · Avance: <strong style="color:var(--brand)">${pct!==''&&pct!=null?pct+'%':'—'}</strong></div>
         <div style="display:flex;gap:12px;margin-top:3px;align-items:center">
           ${evid?`<a href="${evid}" target="_blank" class="riesgo-link">📎 Evidencia</a>`:''}
-          ${plan?`<a href="${plan}" target="_blank" class="riesgo-link">🔧 Plan de remediación</a>`:''}
           ${riesgoId?`<a class="riesgo-link" style="margin-left:auto;cursor:pointer" onclick="editarMonitoreo('${riesgoId}','${id}')">✏️ Editar</a>
           <a class="riesgo-link" style="color:#c0392b;cursor:pointer" onclick="eliminarSubregistro('${riesgoId}','${id}','monitoreo')">🗑️ Eliminar</a>`:''}
         </div>
