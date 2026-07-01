@@ -2916,7 +2916,8 @@ async function renderSeguimiento() {
             ? '<span class="tag tag-proc">✓ Procede</span>'
             : '<span class="tag tag-noproc">No procede</span>'
         }</td>
-        <td class="cards-acciones" style="text-align:right;white-space:nowrap">
+        <td class="cards-acciones" style="text-align:right">
+          <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:150px;margin-left:auto">
           <button class="icon-btn" title="Reporte de acciones a la(s) medida(s) de respuesta" onclick="abrirReporteAcciones('${f.id}')">📋</button>
           ${f.tieneMonitoreo?`<button class="icon-btn" id="btnmon-${f.id}" title="Control y Seguimiento (se habilita cuando las medidas estén al 100%)" onclick="abrirMetasMonitoreo('${f.id}')" style="border-color:var(--brand-2);display:none">🎯</button>`:''}
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
@@ -2925,6 +2926,7 @@ async function renderSeguimiento() {
           <button class="icon-btn" title="Notificar por correo" onclick="notificarCorreo('${f.id}')">✉️</button>
           ${puedeEliminar()?`<button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
           <button class="icon-btn" title="Eliminar" onclick="eliminarRiesgo('${f.id}')">🗑️</button>`:''}
+          </div>
         </td>
       </tr>
       <tr class="hist-row" id="hist-${f.id}" style="display:none"><td colspan="10" id="hist-cont-${f.id}" style="background:var(--paper);padding:0"></td></tr>`;
@@ -3429,7 +3431,7 @@ async function renderMonPaneMetas(riesgoId, r){
       <div style="font-size:13px;font-weight:600;color:var(--slate);margin-bottom:12px">Nueva programación de meta</div>
       <div class="grid">
         <div class="field"><label>Fecha de programación</label><input type="date" id="meta_fecha_${riesgoId}" onchange="sugerirPeriodoMeta('${riesgoId}')"></div>
-        <div class="field"><label>Periodo <span style="color:var(--mist);font-weight:400">(se sugiere; ajustable)</span></label><input id="meta_periodo_${riesgoId}" placeholder="Ej. Enero 2026, 2026-T1" oninput="this.dataset.touched='1'"></div>
+        <div class="field"><label>Periodo <span style="color:var(--mist);font-weight:400">(elige o escribe)</span></label><select id="meta_periodo_sel_${riesgoId}" onchange="periodoSelChange('${riesgoId}')"></select><input id="meta_periodo_${riesgoId}" placeholder="Ej. Enero 2026, 2026-I" oninput="this.dataset.touched='1'" style="margin-top:6px;display:none"></div>
         <div class="field"><label>${esRazonMeta?'Numerador meta':'Valor meta (absoluto)'}</label><input type="number" step="any" id="meta_num_${riesgoId}" oninput="calcValorMeta('${riesgoId}')"></div>
         ${esRazonMeta?`<div class="field"><label>Denominador meta</label><input type="number" step="any" id="meta_den_${riesgoId}" oninput="calcValorMeta('${riesgoId}')"></div>`:'<div class="field"></div>'}
         <div class="field"><label>Valor meta calculado ${esRazonMeta?'(%)':''}</label><div class="readonly-pill" id="meta_val_${riesgoId}">—</div><input type="hidden" id="meta_meta_${riesgoId}"></div>
@@ -3448,6 +3450,7 @@ async function renderMonPaneMetas(riesgoId, r){
       window['_metas_'+riesgoId] = metasData;
     }catch(e){}
   }
+  llenarPeriodoSel(riesgoId, ''); // poblar el desplegable de periodos factibles
 }
 window.renderMonPaneMetas = renderMonPaneMetas;
 
@@ -3809,6 +3812,58 @@ window.actualizarRefIndicador = actualizarRefIndicador;
 // Genera el texto del periodo a partir de la fecha (aaaa-mm-dd) y la frecuencia de medición.
 //   Mensual → "Enero 2026" · Quincenal → "Enero 2026 (Q1/Q2)" · Trimestral → "2026-T3"
 //   Semestral → "2026-I/II" · Anual → "2026" · (Diaria/Semanal → mes, por practicidad)
+// Lista de periodos factibles: meses, trimestres, semestres Y años, intercalados
+// cronológicamente. Solo lo que resta del año actual + todo el próximo año.
+function _periodosFactiblesRiesgo(){
+  const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const hoy=new Date();
+  const anio=hoy.getFullYear();
+  const mes=hoy.getMonth()+1;
+  const qActual=Math.ceil(mes/3);
+  const semActual=mes<=6?1:2;
+  const lista=[];
+  // Meses: del actual hasta diciembre del próximo año
+  for(let m=mes;m<=12;m++)  lista.push({orden:anio*10000+m*100+1,     txt:MESES[m-1]+' '+anio});
+  for(let m=1;m<=12;m++)    lista.push({orden:(anio+1)*10000+m*100+1, txt:MESES[m-1]+' '+(anio+1)});
+  // Trimestres
+  for(let q=qActual;q<=4;q++) lista.push({orden:anio*10000+((q-1)*3+1)*100+2,     txt:'Q'+q+' '+anio});
+  for(let q=1;q<=4;q++)       lista.push({orden:(anio+1)*10000+((q-1)*3+1)*100+2, txt:'Q'+q+' '+(anio+1)});
+  // Semestres
+  for(let s=semActual;s<=2;s++) lista.push({orden:anio*10000+((s-1)*6+1)*100+3,     txt:anio+'-'+(s===1?'I':'II')});
+  for(let s=1;s<=2;s++)         lista.push({orden:(anio+1)*10000+((s-1)*6+1)*100+3, txt:(anio+1)+'-'+(s===1?'I':'II')});
+  // Años (anual): el actual y el próximo, ubicados al final de su año (+4)
+  lista.push({orden:anio*10000+1201+4,     txt:'Año '+anio});
+  lista.push({orden:(anio+1)*10000+1201+4, txt:'Año '+(anio+1)});
+  lista.sort((a,b)=>a.orden-b.orden);
+  return lista.map(x=>x.txt);
+}
+window._periodosFactiblesRiesgo=_periodosFactiblesRiesgo;
+
+// Llena el <select> de periodo del formulario de metas (sufijo por riesgoId)
+function llenarPeriodoSel(riesgoId, valorActual){
+  const sel=document.getElementById('meta_periodo_sel_'+riesgoId); if(!sel) return;
+  const opts=_periodosFactiblesRiesgo();
+  let extra='';
+  if(valorActual && !opts.includes(valorActual)) extra=`<option value="${String(valorActual).replace(/"/g,'&quot;')}">${String(valorActual).replace(/</g,'&lt;')} (actual)</option>`;
+  sel.innerHTML='<option value="">— elige periodo —</option>'+extra+opts.map(o=>`<option value="${o}">${o}</option>`).join('')+'<option value="__otro__">✏️ Otro (escribir)…</option>';
+  const inp=document.getElementById('meta_periodo_'+riesgoId);
+  if(valorActual && (opts.includes(valorActual) || extra)){ sel.value=valorActual; if(inp){ inp.style.display='none'; inp.value=valorActual; } }
+  else if(valorActual){ sel.value='__otro__'; if(inp){ inp.style.display=''; inp.value=valorActual; } }
+  else { sel.value=''; if(inp){ inp.style.display='none'; inp.value=''; } }
+}
+window.llenarPeriodoSel=llenarPeriodoSel;
+
+// Cambio del select de periodo: valor de lista → lo copia al input oculto; "Otro" → muestra input
+function periodoSelChange(riesgoId){
+  const sel=document.getElementById('meta_periodo_sel_'+riesgoId);
+  const inp=document.getElementById('meta_periodo_'+riesgoId);
+  if(!sel||!inp) return;
+  if(sel.value==='__otro__'){ inp.style.display=''; inp.value=''; inp.dataset.touched='1'; inp.focus(); }
+  else if(sel.value===''){ inp.style.display='none'; inp.value=''; }
+  else { inp.style.display='none'; inp.value=sel.value; inp.dataset.touched='1'; }
+}
+window.periodoSelChange=periodoSelChange;
+
 function generarPeriodoRiesgo(fecha, frec){
   if(!fecha) return '';
   const [a,m,d]=String(fecha).split('-').map(Number);
@@ -3834,7 +3889,9 @@ function sugerirPeriodoMeta(riesgoId){
   const elP=document.getElementById('meta_periodo_'+riesgoId);
   if(!elP || (elP.value && elP.dataset.touched==='1')) return;
   const fecha=(document.getElementById('meta_fecha_'+riesgoId)||{}).value||'';
-  elP.value=generarPeriodoRiesgo(fecha, frecuenciaDelRiesgo(riesgoId));
+  const sug=generarPeriodoRiesgo(fecha, frecuenciaDelRiesgo(riesgoId));
+  // Reflejar la sugerencia en el select (si coincide con una opción) o en el input
+  llenarPeriodoSel(riesgoId, sug);
 }
 window.sugerirPeriodoMeta = sugerirPeriodoMeta;
 // Agrupa una lista de subregistros {periodo, ...} bajo encabezados de periodo.
@@ -4031,6 +4088,7 @@ async function editarMeta(riesgoId, metaId){
     set('meta_periodo', g('Periodo'));
     calcValorMeta(riesgoId); // refrescar el pill del valor calculado
     const elPer=document.getElementById('meta_periodo_'+riesgoId); if(elPer) elPer.dataset.touched='1';
+    llenarPeriodoSel(riesgoId, g('Periodo')); // reflejar en el select (o "(actual)" si es antiguo)
     // Cambiar el botón a modo actualización
     const btn=document.getElementById('metabtn-'+riesgoId);
     btn.textContent='Actualizar meta';
