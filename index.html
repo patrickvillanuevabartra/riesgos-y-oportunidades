@@ -377,6 +377,7 @@
       <div class="panel"><h3>Registros por proceso (nivel 1)</h3><div id="porProceso"></div></div>
       <div class="panel"><h3>Registros por oficina responsable</h3><div id="porOficina"></div></div>
     </div>
+    <div class="panel" style="margin-top:16px"><h3>Avance de cumplimiento por rangos</h3><div id="avancePorRangos"><p class="hint">Cargando…</p></div></div>
   </section>
 
   <!-- ===================== REGISTRAR ===================== -->
@@ -1984,10 +1985,19 @@ const INV_COLS = {
 };
 
 async function loadInventario() {
-  if (STATE.inventario.length) return STATE.inventario;
-  const data = await API.records(CONFIG.ENTITIES.INVENTARIO);
-  STATE.inventario = data.records || [];
-  return STATE.inventario;
+  if (STATE.inventario && STATE.inventario.length) return STATE.inventario;
+  // Reintentar si viene vacío (timing/red al inicializar): NO cachear el cero.
+  let regs = [];
+  for(let intento=1; intento<=3; intento++){
+    try{
+      const data = await API.records(CONFIG.ENTITIES.INVENTARIO);
+      regs = data.records || [];
+      if(regs.length) break;
+    }catch(_){ /* reintentar */ }
+    await new Promise(r=>setTimeout(r, 300*intento));
+  }
+  if(regs.length) STATE.inventario = regs; // solo cachear si trajo datos
+  return regs;
 }
 
 // Opciones únicas y ordenadas de una columna del inventario, según filtros previos.
@@ -2011,7 +2021,17 @@ async function initCascada() {
 
   // El desplegable de Tipo se llena DESDE el inventario (no desde la tabla maestra),
   // para que sus etiquetas coincidan exactamente con el filtrado de la cascada.
-  fillSelect(fTipo, opcionesInv(inv, {}, C.tipo));
+  const opcionesTipo = opcionesInv(inv, {}, C.tipo);
+  if(!inv.length){
+    // El inventario no trajo datos: avisar en el propio desplegable en vez de dejarlo vacío
+    fTipo.innerHTML='<option value="">⚠️ Inventario no disponible — reintenta</option>';
+    console.warn('[initCascada] El inventario de procesos vino vacío. Verifica la tabla INVENTARIO en QuintaDB o la conexión.');
+  } else if(!opcionesTipo.length){
+    fTipo.innerHTML='<option value="">⚠️ Sin tipos de proceso en el inventario</option>';
+    console.warn('[initCascada] El inventario tiene', inv.length, 'registros pero la columna "'+C.tipo+'" vino vacía. Claves disponibles:', Object.keys((inv[0]||{}).values||{}));
+  } else {
+    fillSelect(fTipo, opcionesTipo);
+  }
 
   fTipo.onchange = () => {
     [n0,n1,n2,n3,pr].forEach(reset);
@@ -2344,6 +2364,10 @@ async function renderDashboard() {
     document.getElementById('estadoMedidas').innerHTML = '<p class="hint">Calculando avance de las medidas…</p>';
     cargarAvanceMedidas();
 
+    // Avance de cumplimiento por rangos (medidas de respuesta vs. monitoreo del control)
+    const contRangos=document.getElementById('avancePorRangos');
+    if(contRangos){ contRangos.innerHTML='<p class="hint">Calculando avances por rangos…</p>'; renderAvancePorRangos(recs); }
+
     setConn(true);
   } catch(e){ setConn(false, e.message); 
     document.getElementById('kpis').innerHTML = emptyCard('No se pudo cargar el tablero', e.message); }
@@ -2397,6 +2421,114 @@ async function cargarAvanceMedidas(){
 }
 function kpi(k,v,sub,color){ return `<div class="kpi"><div class="k">${k}</div><div class="v" style="${color?`color:${color}`:''}">${v}</div><div class="sub">${sub}</div></div>`; }
 function emptyCard(t,m){ return `<div class="empty" style="grid-column:1/-1"><h3>${t}</h3><p>${m}</p></div>`; }
+
+// Reporte "Avance de cumplimiento por rangos": clasifica cada riesgo en 4 bandas
+// (0-25 / 26-50 / 51-75 / 76-100) según DOS métricas distintas:
+//   1) % de avance de las MEDIDAS DE RESPUESTA (último reporte de acciones).
+//   2) % de cumplimiento del PLAN DE MONITOREO (último reporte de monitoreo, solo nivel 4 con control).
+async function renderAvancePorRangos(recs){
+  const cont=document.getElementById('avancePorRangos');
+  if(!cont) return;
+  const F=CONFIG.MATRIZ_FIELDS, RF=CONFIG.REPORTE_FIELDS;
+  const fechaComp = s => { const m=String(s||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/); return m?new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+m[6]).getTime():0; };
+  const numOf = x => { if(x===''||x==null) return NaN; const n=parseFloat(String(x).replace('%','').replace(',','.').trim()); return isNaN(n)?NaN:n; };
+  // Banda de un porcentaje (0..100) → 0:0-25, 1:26-50, 2:51-75, 3:76-100
+  const bandaDe = p => (p<=25?0:(p<=50?1:(p<=75?2:3)));
+
+  // Recolectar datos por riesgo (async: leer último reporte de acciones y de monitoreo)
+  const medidas=[[],[],[],[]];   // 4 bandas → lista de {desc,ofi,pct}
+  const monitoreo=[[],[],[],[]];
+  let sinMedidas=0, sinMon=0, totalMon=0;
+  for(const r of recs){
+    if(esOportunidad(r)) continue; // el avance aplica a riesgos
+    const desc=descripcionDe(r), ofi=(oficinaDe(r)==='Sin oficina asignada'?'—':oficinaDe(r));
+    // 1) Medidas de respuesta
+    const subIds=subIdsDe(r, SUBFORM_FIELD_ID);
+    if(subIds.length){
+      let mejor=null, mf=-1;
+      for(const rid of subIds){ try{ const d=await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','GET',{name_value:1}); const rec=d.record||{}; const ts=fechaComp(rec.created_at); if(ts>=mf){mf=ts;mejor=rec;} }catch(_){} }
+      const pv=(mejor&&mejor.values)?mejor.values:{};
+      const pct=numOf(pv[RF.pct_completado.col]);
+      if(!isNaN(pct)){ const p=Math.max(0,Math.min(100,pct)); medidas[bandaDe(p)].push({desc,ofi,pct:Math.round(p)}); }
+      else sinMedidas++;
+    } else sinMedidas++;
+    // 2) Monitoreo del control (solo nivel 4 con control)
+    const v=r.values||{};
+    const existeCtrl=(v['¿Existen controles?']&&v['¿Existen controles?']!=='¿Existen controles?')?String(v['¿Existen controles?']).trim():'';
+    const esN4=(nivelInherenteDe(r).nivel===4);
+    if(esN4 && existeCtrl==='Sí'){
+      totalMon++;
+      const pctM=await _cumplimientoMonitoreo(r);
+      if(pctM==null) sinMon++;
+      else { const p=Math.max(0,Math.min(100,pctM)); monitoreo[bandaDe(p)].push({desc,ofi,pct:Math.round(p)}); }
+    }
+  }
+
+  const BANDAS=[
+    {t:'0 – 25%', color:'#c0392b'},
+    {t:'26 – 50%', color:'#d97706'},
+    {t:'51 – 75%', color:'#b8860b'},
+    {t:'76 – 100%', color:'#1f7a3d'}
+  ];
+  const bloque=(titulo, subt, datos, sinDato, totalRef, prefijo)=>{
+    const totalClasif=datos.reduce((s,a)=>s+a.length,0);
+    let h=`<div style="margin-bottom:8px"><div style="font-weight:700;font-size:14px;color:var(--ink)">${titulo}</div><div style="font-size:12px;color:var(--mist);margin-bottom:10px">${subt}</div>`;
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px">';
+    BANDAS.forEach((b,i)=>{
+      const n=datos[i].length;
+      const anc=prefijo+'-b'+i;
+      h+=`<a href="#${anc}" style="text-decoration:none;display:block">
+        <div style="background:var(--card);border:1px solid var(--line);border-left:4px solid ${b.color};border-radius:10px;padding:12px 14px;transition:box-shadow .15s" onmouseover="this.style.boxShadow='0 2px 10px rgba(0,0,0,.08)'" onmouseout="this.style.boxShadow='none'">
+          <div style="font-size:11px;color:var(--mist);font-weight:600;text-transform:uppercase;letter-spacing:.03em">${b.t}</div>
+          <div style="font-size:26px;font-weight:800;color:${b.color};line-height:1.1;margin-top:4px">${n}</div>
+        </div></a>`;
+    });
+    h+='</div>';
+    h+=`<div style="font-size:12px;color:var(--mist);margin-bottom:12px">${totalClasif} clasificado(s)${sinDato?` · ${sinDato} sin dato aún`:''}${totalRef!=null?` · de ${totalRef} aplicable(s)`:''}</div>`;
+    // Listas por banda
+    BANDAS.forEach((b,i)=>{
+      const items=datos[i]; const anc=prefijo+'-b'+i;
+      h+=`<div id="${anc}" style="scroll-margin-top:90px;margin-bottom:10px">`;
+      if(items.length){
+        h+=`<div style="font-weight:600;font-size:12.5px;color:${b.color};margin-bottom:4px">${b.t} (${items.length})</div>`;
+        h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>';
+        items.sort((a,c)=>c.pct-a.pct).forEach(it=>{
+          h+=`<tr style="border-top:1px solid var(--line)">
+            <td style="padding:6px 8px;color:var(--slate)">${String(it.desc).replace(/</g,'&lt;').slice(0,90)}</td>
+            <td style="padding:6px 8px;color:var(--mist);white-space:nowrap">${String(it.ofi).replace(/</g,'&lt;')}</td>
+            <td style="padding:6px 8px;text-align:right;font-weight:700;color:${b.color};white-space:nowrap">${it.pct}%</td>
+          </tr>`;
+        });
+        h+='</tbody></table></div>';
+      }
+      h+='</div>';
+    });
+    h+='</div>';
+    return h;
+  };
+
+  let html='';
+  const totalMedClasif = medidas.reduce((s,a)=>s+a.length,0);
+  if(totalMedClasif===0){
+    html+=`<div><div style="font-weight:700;font-size:14px;color:var(--ink)">📋 % Avance de cumplimiento de medidas de respuesta</div>
+      <div style="font-size:12px;color:var(--mist);margin:6px 0 0">Aún no hay reportes de avance de medidas registrados en el filtro actual.</div></div>`;
+  } else {
+    html+=bloque('📋 % Avance de cumplimiento de medidas de respuesta',
+      'Según el último reporte de acciones de cada riesgo.',
+      medidas, sinMedidas, null, 'rng-med');
+  }
+  html+='<div style="border-top:1px dashed var(--line);margin:18px 0"></div>';
+  if(totalMon===0){
+    html+=`<div><div style="font-weight:700;font-size:14px;color:var(--ink)">🎯 % Cumplimiento del plan de monitoreo</div>
+      <div style="font-size:12px;color:var(--mist);margin:6px 0 0">No hay riesgos de nivel 4 con control que requieran monitoreo del plan en el filtro actual.</div></div>`;
+  } else {
+    html+=bloque('🎯 % Cumplimiento del plan de monitoreo',
+      'Según el último reporte de monitoreo del control. Solo riesgos nivel 4 con control.',
+      monitoreo, sinMon, totalMon, 'rng-mon');
+  }
+  cont.innerHTML=html;
+}
+window.renderAvancePorRangos=renderAvancePorRangos;
 
 /* ============================================================
    SEGUIMIENTO — listado de riesgos + reportes de acción
