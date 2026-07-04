@@ -2000,13 +2000,34 @@ async function loadInventario() {
   return regs;
 }
 
+// Nombres alternativos posibles para cada columna del inventario (por si QuintaDB
+// devuelve la relación bajo otra clave o con sufijo).
+const INV_COLS_ALT = {
+  'Tipo de proceso':  ['Tipo de proceso','Tipo de procesos','Tipo proceso','Tipo de proceso - string'],
+  'Proceso nivel 0':  ['Proceso nivel 0','Procesos nivel 0','Nivel 0','Proceso nivel 0 - string'],
+  'Procesos nivel 1': ['Procesos nivel 1','Proceso nivel 1','Nivel 1','Procesos nivel 1 - string'],
+  'Proceso nivel 2':  ['Proceso nivel 2','Procesos nivel 2','Nivel 2','Proceso nivel 2 - string'],
+  'Proceso nivel 3':  ['Proceso nivel 3','Procesos nivel 3','Nivel 3','Proceso nivel 3 - string'],
+  'Procedimiento':    ['Procedimiento','Procedimientos','Procedimiento - string']
+};
+// Lee el valor de una columna del inventario tolerando nombres alternativos y
+// descartando placeholders (el propio nombre de columna) o IDs de 22 chars.
+function _leerColInv(v, col){
+  const alts = INV_COLS_ALT[col] || [col];
+  for(const c of alts){
+    const x = v[c];
+    if(x!=null && x!=='' && x!==c && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) return x;
+  }
+  return '';
+}
+
 // Opciones únicas y ordenadas de una columna del inventario, según filtros previos.
 function opcionesInv(inv, filtros, columnaSiguiente) {
   const set = new Set();
   inv.forEach(r => {
     const v = r.values || {};
-    const ok = Object.entries(filtros).every(([col, val]) => !val || v[col] === val);
-    if (ok && v[columnaSiguiente]) set.add(v[columnaSiguiente]);
+    const ok = Object.entries(filtros).every(([col, val]) => !val || _leerColInv(v, col) === val);
+    if (ok){ const val=_leerColInv(v, columnaSiguiente); if(val) set.add(val); }
   });
   return [...set].sort().map(x => ({ value: x, label: x }));
 }
@@ -2028,7 +2049,9 @@ async function initCascada() {
     console.warn('[initCascada] El inventario de procesos vino vacío. Verifica la tabla INVENTARIO en QuintaDB o la conexión.');
   } else if(!opcionesTipo.length){
     fTipo.innerHTML='<option value="">⚠️ Sin tipos de proceso en el inventario</option>';
-    console.warn('[initCascada] El inventario tiene', inv.length, 'registros pero la columna "'+C.tipo+'" vino vacía. Claves disponibles:', Object.keys((inv[0]||{}).values||{}));
+    const claves = Object.keys((inv[0]||{}).values||{});
+    console.warn('[initCascada] El inventario tiene', inv.length, 'registros pero no se halló la columna de tipo. Claves disponibles:', claves);
+    console.warn('[initCascada] Ejemplo de valores del primer registro:', (inv[0]||{}).values);
   } else {
     fillSelect(fTipo, opcionesTipo);
   }
