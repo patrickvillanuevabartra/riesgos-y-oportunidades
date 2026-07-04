@@ -2026,10 +2026,15 @@ async function initCascada() {
     fTipo.innerHTML='<option value="">⚠️ Inventario vacío (0 registros)</option>';
     console.warn('[initCascada] API.records devolvió 0 registros para INVENTARIO='+CONFIG.ENTITIES.INVENTARIO);
   } else if(!opcionesTipo.length){
-    const claves = Object.keys((inv[0]||{}).values||{});
-    fTipo.innerHTML=`<option value="">⚠️ ${inv.length} filas, sin col. "${C.tipo}"</option>`;
-    console.warn('[initCascada] Inventario con', inv.length, 'filas. Claves de la 1ª fila:', claves);
-    console.warn('[initCascada] Valores 1ª fila:', (inv[0]||{}).values);
+    const v0 = (inv[0]||{}).values||{};
+    const claves = Object.keys(v0);
+    // Log como TEXTO PLANO copiable (no como objeto que hay que expandir)
+    console.warn('[initCascada] CLAVES ('+claves.length+'): '+claves.join(' || '));
+    // Muestra clave = valor de las que parezcan de proceso
+    const rel = claves.filter(k=>/tipo|proceso|nivel|procedi/i.test(k));
+    console.warn('[initCascada] COLUMNAS DE PROCESO Y SUS VALORES:');
+    rel.forEach(k=>console.warn('   ['+k+'] = '+JSON.stringify(v0[k])));
+    fTipo.innerHTML='<option value="">⚠️ Ver consola (F12) para columnas</option>';
   } else {
     fillSelect(fTipo, opcionesTipo);
   }
