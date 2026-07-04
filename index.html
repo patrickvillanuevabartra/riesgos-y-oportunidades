@@ -2000,15 +2000,41 @@ async function loadInventario() {
   return regs;
 }
 
-// Opciones únicas y ordenadas de una columna del inventario (idéntico a Indicadores 2).
+// La tabla de inventario tiene los campos relacionales en null; la jerarquía real
+// vive en la columna de texto "Ruta completa" (formato: "Tipo › Nivel0 › Nivel1 › …").
+// Extrae los segmentos de la ruta de una fila del inventario.
+const _RUTA_COL_ALTS = ['Ruta completa','Ruta del proceso','Ruta','Ruta completa - string'];
+function _segmentosRuta(r){
+  const v = r.values||{};
+  let ruta = '';
+  for(const c of _RUTA_COL_ALTS){ if(v[c] && v[c]!==c){ ruta=v[c]; break; } }
+  if(!ruta) return [];
+  return String(ruta).split(/\s*[›>]\s*/).map(s=>s.trim()).filter(Boolean);
+}
+// Índice de cada nivel dentro de los segmentos de la ruta:
+// 0=Tipo, 1=Nivel0, 2=Nivel1, 3=Nivel2, 4=Nivel3, 5=Procedimiento(Nivel4)
+const _NIVEL_IDX = { tipo:0, n0:1, n1:2, n2:3, n3:4, proc:5 };
+
+// Opciones únicas del nivel pedido, filtrando por los niveles superiores ya elegidos.
+// `filtros` usa las mismas claves de INV_COLS ('Tipo de proceso', etc.) → las mapeamos a índices.
+const _COL_A_KEY = { 'Tipo de proceso':'tipo','Proceso nivel 0':'n0','Procesos nivel 1':'n1','Proceso nivel 2':'n2','Proceso nivel 3':'n3','Procedimiento':'proc' };
 function opcionesInv(inv, filtros, columnaSiguiente) {
+  const keySig = _COL_A_KEY[columnaSiguiente];
+  const idxSig = _NIVEL_IDX[keySig];
+  if(idxSig==null) return [];
+  const filtrosIdx = Object.entries(filtros)
+    .filter(([col,val])=>val)
+    .map(([col,val])=>[_NIVEL_IDX[_COL_A_KEY[col]], val])
+    .filter(([i])=>i!=null);
   const set = new Set();
-  inv.forEach(r => {
-    const v = r.values || {};
-    const ok = Object.entries(filtros).every(([col, val]) => !val || v[col] === val);
-    if (ok && v[columnaSiguiente]) set.add(v[columnaSiguiente]);
+  inv.forEach(r=>{
+    const segs = _segmentosRuta(r);
+    if(!segs.length) return;
+    // Todos los filtros superiores deben coincidir
+    const ok = filtrosIdx.every(([i,val])=> segs[i]===val);
+    if(ok && segs[idxSig]) set.add(segs[idxSig]);
   });
-  return [...set].sort().map(x => ({ value: x, label: x }));
+  return [...set].sort().map(x=>({ value:x, label:x }));
 }
 
 async function initCascada() {
@@ -2019,24 +2045,18 @@ async function initCascada() {
   const C = INV_COLS;
   const reset = (el)=>{ el.innerHTML='<option value="">Seleccione…</option>'; el.disabled=true; };
 
-  // El desplegable de Tipo se llena DESDE el inventario (no desde la tabla maestra),
-  // para que sus etiquetas coincidan exactamente con el filtrado de la cascada.
+  // Los desplegables se llenan desde la columna "Ruta completa" del inventario,
+  // porque los campos relacionales (Tipo, Nivel 0…) vienen en null.
   const opcionesTipo = opcionesInv(inv, {}, C.tipo);
   if(!inv.length){
-    fTipo.innerHTML='<option value="">⚠️ Inventario vacío (0 registros)</option>';
-    console.warn('[initCascada] API.records devolvió 0 registros para INVENTARIO='+CONFIG.ENTITIES.INVENTARIO);
+    fTipo.innerHTML='<option value="">⚠️ Inventario no disponible — reintenta</option>';
   } else if(!opcionesTipo.length){
-    const v0 = (inv[0]||{}).values||{};
-    const claves = Object.keys(v0);
-    // Log como TEXTO PLANO copiable (no como objeto que hay que expandir)
-    console.warn('[initCascada] CLAVES ('+claves.length+'): '+claves.join(' || '));
-    // Muestra clave = valor de las que parezcan de proceso
-    const rel = claves.filter(k=>/tipo|proceso|nivel|procedi/i.test(k));
-    console.warn('[initCascada] COLUMNAS DE PROCESO Y SUS VALORES:');
-    rel.forEach(k=>console.warn('   ['+k+'] = '+JSON.stringify(v0[k])));
-    fTipo.innerHTML='<option value="">⚠️ Ver consola (F12) para columnas</option>';
+    fTipo.innerHTML='<option value="">⚠️ Sin ruta de procesos en el inventario</option>';
+    console.warn('[initCascada] Se leyeron', inv.length, 'filas pero la columna "Ruta completa" vino vacía. Ejemplo 1ª fila:', (inv[0]||{}).values);
   } else {
     fillSelect(fTipo, opcionesTipo);
+    // Diagnóstico temporal: muestra cómo se está segmentando la ruta de la 1ª fila
+    console.log('[initCascada] Ejemplo de segmentos de ruta:', _segmentosRuta(inv[0]), '→ opciones de Tipo:', opcionesTipo.map(o=>o.value));
   }
 
   fTipo.onchange = () => {
@@ -2049,13 +2069,13 @@ async function initCascada() {
     fillSelect(n1, opcionesInv(inv, {[C.tipo]:fTipo.value,[C.n0]:n0.value}, C.n1)); n1.disabled=false; };
   n1.onchange = () => { [n2,n3,pr].forEach(reset);
     if(!n1.value) return;
-    fillSelect(n2, opcionesInv(inv, {[C.n0]:n0.value,[C.n1]:n1.value}, C.n2)); n2.disabled=false; };
+    fillSelect(n2, opcionesInv(inv, {[C.tipo]:fTipo.value,[C.n0]:n0.value,[C.n1]:n1.value}, C.n2)); n2.disabled=false; };
   n2.onchange = () => { [n3,pr].forEach(reset);
     if(!n2.value) return;
-    fillSelect(n3, opcionesInv(inv, {[C.n1]:n1.value,[C.n2]:n2.value}, C.n3)); n3.disabled=false; };
+    fillSelect(n3, opcionesInv(inv, {[C.tipo]:fTipo.value,[C.n0]:n0.value,[C.n1]:n1.value,[C.n2]:n2.value}, C.n3)); n3.disabled=false; };
   n3.onchange = () => { reset(pr);
     if(!n3.value) return;
-    fillSelect(pr, opcionesInv(inv, {[C.n2]:n2.value,[C.n3]:n3.value}, C.proc)); pr.disabled=false; };
+    fillSelect(pr, opcionesInv(inv, {[C.tipo]:fTipo.value,[C.n0]:n0.value,[C.n1]:n1.value,[C.n2]:n2.value,[C.n3]:n3.value}, C.proc)); pr.disabled=false; };
 }
 
 /* ============================================================
