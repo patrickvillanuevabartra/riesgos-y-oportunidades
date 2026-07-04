@@ -2010,13 +2010,27 @@ const INV_COLS_ALT = {
   'Proceso nivel 3':  ['Proceso nivel 3','Procesos nivel 3','Nivel 3','Proceso nivel 3 - string'],
   'Procedimiento':    ['Procedimiento','Procedimientos','Procedimiento - string']
 };
-// Lee el valor de una columna del inventario tolerando nombres alternativos y
-// descartando placeholders (el propio nombre de columna) o IDs de 22 chars.
+// Lee el valor de una columna del inventario tolerando: nombres alternativos,
+// placeholders (el propio nombre de columna), IDs de relación (traducidos con
+// STATE.relNames) y variantes de clave que contengan la palabra buscada.
 function _leerColInv(v, col){
+  const esID = x => /^[a-zA-Z0-9_\-]{22}$/.test(String(x));
+  const trad = x => (esID(x) && STATE.relNames && STATE.relNames[x]) ? STATE.relNames[x] : x;
+  const val1 = raw => {
+    if(raw==null || raw==='') return '';
+    if(Array.isArray(raw)) raw = raw.find(z=>z!=null && z!=='');
+    if(raw==null || raw==='') return '';
+    const t = trad(raw);
+    return esID(t) ? '' : t; // si sigue siendo un ID sin traducir, descartar
+  };
+  // 1) nombres alternativos conocidos
   const alts = INV_COLS_ALT[col] || [col];
-  for(const c of alts){
-    const x = v[c];
-    if(x!=null && x!=='' && x!==c && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) return x;
+  for(const c of alts){ if(c in v && v[c]!==c){ const r=val1(v[c]); if(r) return r; } }
+  // 2) búsqueda flexible: cualquier clave que "empiece por" el nombre de columna
+  //    (QuintaDB a veces añade sufijos). Excluye el placeholder = nombre exacto.
+  const objetivo = col.toLowerCase();
+  for(const k in v){
+    if(k.toLowerCase().startsWith(objetivo) && v[k]!==k){ const r=val1(v[k]); if(r) return r; }
   }
   return '';
 }
@@ -5302,8 +5316,8 @@ function setConn(ok, msg) {
   initStaticSelects();
   try {
     await ensureRelOptions();
+    await precargarMaestrasProceso(); // diccionario id→nombre PRIMERO, para traducir relaciones del inventario
     await initCascada();
-    await precargarMaestrasProceso(); // diccionario id→nombre para traducir relaciones
     setConn(true);
     // El dashboard se renderiza al iniciar sesión (ver entrarApp), no antes.
     if(SESION) renderDashboard();
