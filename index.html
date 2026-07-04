@@ -2662,12 +2662,13 @@ function segmentoDesactualizado(r){
   if(!segs.length) return '';
   const inv = STATE.inventario || [];
   if(!inv.length) return ''; // inventario no cargado aún → no marcar
-  const C = INV_COLS;
-  const cols = [C.tipo, C.n0, C.n1, C.n2, C.n3, C.proc];
-  // Conjunto de TODOS los valores existentes en el inventario (cualquier columna).
+  // El inventario guarda la jerarquía en "Ruta completa"; los campos relacionales
+  // vienen null. Construimos el conjunto de valores existentes desde los segmentos
+  // de la ruta de cada fila del inventario.
   const existentes = new Set();
-  inv.forEach(rec=>{ const vv=rec.values||{}; cols.forEach(c=>{ if(vv[c]) existentes.add(vv[c]); }); });
-  // Buscar el primer segmento que ya no exista en el inventario.
+  inv.forEach(rec=>{ _segmentosRuta(rec).forEach(s=>existentes.add(s)); });
+  if(!existentes.size) return ''; // no se pudo leer ninguna ruta → no marcar
+  // Buscar el primer segmento del registro que ya no exista en el inventario.
   for(const s of segs){ if(!existentes.has(s)) return s; }
   return '';
 }
