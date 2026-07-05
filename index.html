@@ -2405,19 +2405,21 @@ async function cargarAvanceMedidas(){
   try {
     const recs = STATE.matriz.length ? STATE.matriz : (await loadMatriz());
     const RF = CONFIG.REPORTE_FIELDS;
-    // Mapa de reportId → estado (leyendo toda la subtabla de una vez)
+    // Mapa de reportId → {estado, ts} leyendo toda la subtabla de una vez
     const d = await API.records(CONFIG.ENTITIES.REPORTES);
-    const estadoPorReporte = {};
-    (d.records||[]).forEach(r=>{ estadoPorReporte[r.id] = (r.values||{})[RF.estado.col] || ''; });
+    const fechaComp = s => { const m=String(s||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/); return m?new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+m[6]).getTime():0; };
+    const infoReporte = {};
+    (d.records||[]).forEach(r=>{ infoReporte[r.id] = { estado:(r.values||{})[RF.estado.col]||'', ts:fechaComp(r.created_at) }; });
 
     const cont = { 'Pendiente':0, 'En Proceso':0, 'Culminado/Ejecutado':0 };
     recs.forEach(r=>{
       const subIds=subIdsDe(r, SUBFORM_FIELD_ID);
       let estado='Pendiente';
       if(subIds.length){
-        // estado del último reporte vinculado
-        const ultId = subIds[subIds.length-1];
-        estado = estadoPorReporte[ultId] || 'Pendiente';
+        // Estado del reporte MÁS RECIENTE por fecha (no por posición en la lista)
+        let mejorTs=-1, mejorEstado='Pendiente';
+        subIds.forEach(id=>{ const inf=infoReporte[id]; if(inf && inf.ts>=mejorTs){ mejorTs=inf.ts; mejorEstado=inf.estado||'Pendiente'; } });
+        estado = mejorEstado;
       }
       if(cont[estado]!==undefined) cont[estado]++;
     });
