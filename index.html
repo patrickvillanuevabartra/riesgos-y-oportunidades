@@ -982,7 +982,49 @@ document.querySelectorAll('nav button').forEach(b => {
 /* ============================================================
    ESTADO en memoria
    ============================================================ */
-const STATE = { matriz: [], maestras: {}, inventario: [], relNames: {} };
+const STATE = { matriz: [], maestras: {}, inventario: [], relNames: {}, subCache: null };
+
+/* ============================================================
+   CACHÉ GLOBAL DE SUBREGISTROS (optimización de velocidad)
+   Lee las tres tablas de subformularios de golpe con API.records
+   y las indexa por ID (sid → values + created_at), en vez de pedir
+   cada subregistro uno por uno. Con respaldo a lectura individual.
+   ============================================================ */
+async function precargarSubcache(forzar){
+  if(STATE.subCache && !forzar) return STATE.subCache;
+  const E = CONFIG.ENTITIES;
+  // Leer las 3 tablas EN PARALELO (no dependen entre sí)
+  const res = await Promise.allSettled([
+    API.records(E.REPORTES),
+    API.records(E.MONITOREO),
+    API.records(E.PROG_METAS)
+  ]);
+  const idx = { reportes:{}, monitoreo:{}, metas:{} };
+  const indexar = (destino, r) => { if(r.status==='fulfilled'){ (r.value.records||[]).forEach(rec=>{ destino[rec.id] = { values: rec.values||{}, created_at: rec.created_at }; }); } };
+  indexar(idx.reportes,   res[0]);
+  indexar(idx.monitoreo,  res[1]);
+  indexar(idx.metas,      res[2]);
+  STATE.subCache = idx;
+  return idx;
+}
+// Invalidar el caché tras crear/editar/eliminar subregistros
+function invalidarSubcache(){ STATE.subCache = null; }
+window.invalidarSubcache = invalidarSubcache;
+
+// Devuelve {values, created_at} de un subregistro desde el caché indicado
+// ('reportes' | 'monitoreo' | 'metas'); si no está, lee individual (respaldo).
+async function getSub(bucket, id){
+  const c = STATE.subCache;
+  if(c && c[bucket] && c[bucket][id]) return c[bucket][id];
+  // Respaldo: lectura individual
+  try{
+    const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+id+'.json','GET',{name_value:1});
+    const rec = d.record||{};
+    return { values: rec.values||{}, created_at: rec.created_at };
+  }catch(_){ return null; }
+}
+window.precargarSubcache = precargarSubcache;
+window.getSub = getSub;
 // relNames: diccionario global { idDeRegistro : nombreLegible } para traducir
 // los IDs que QuintaDB devuelve en los campos de relación a su texto.
 
@@ -1703,9 +1745,10 @@ async function _avanceUltimoReporte(r){
       return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]).getTime();
     };
     let mejor=null, mejorFecha=-1;
+    await precargarSubcache();
     for(const rid of sub){
-      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','GET',{name_value:1});
-      const rec = d.record||{};
+      const rec = await getSub('reportes', rid);
+      if(!rec) continue;
       const ts = fechaComparable(rec.created_at);
       if(ts>=mejorFecha){ mejorFecha=ts; mejor=rec; }
     }
@@ -2467,6 +2510,7 @@ async function renderAvancePorRangos(recs){
   const medidas=[[],[],[],[]];   // 4 bandas → lista de {desc,ofi,pct}
   const monitoreo=[[],[],[],[]];
   let sinMedidas=0, sinMon=0, totalMon=0;
+  await precargarSubcache(); // índice masivo de subregistros
   for(const r of recs){
     if(esOportunidad(r)) continue; // el avance aplica a riesgos
     const desc=descripcionDe(r), ofi=(oficinaDe(r)==='Sin oficina asignada'?'—':oficinaDe(r));
@@ -2474,7 +2518,7 @@ async function renderAvancePorRangos(recs){
     const subIds=subIdsDe(r, SUBFORM_FIELD_ID);
     if(subIds.length){
       let mejor=null, mf=-1;
-      for(const rid of subIds){ try{ const d=await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','GET',{name_value:1}); const rec=d.record||{}; const ts=fechaComp(rec.created_at); if(ts>=mf){mf=ts;mejor=rec;} }catch(_){} }
+      for(const rid of subIds){ const rec=await getSub('reportes', rid); if(!rec) continue; const ts=fechaComp(rec.created_at); if(ts>=mf){mf=ts;mejor=rec;} }
       const pv=(mejor&&mejor.values)?mejor.values:{};
       const pct=numOf(pv[RF.pct_completado.col]);
       if(!isNaN(pct)){ const p=Math.max(0,Math.min(100,pct)); medidas[bandaDe(p)].push({desc,ofi,pct:Math.round(p)}); }
@@ -2994,7 +3038,8 @@ async function renderSeguimiento() {
   const tb = document.getElementById('tablaSeguimiento');
   try {
     const recs = await loadMatriz();
-    await precargarMaestrasProceso(); // garantizar diccionario id→nombre
+    // Precargar en paralelo el diccionario de procesos y el índice de subregistros
+    await Promise.allSettled([ precargarMaestrasProceso(), precargarSubcache() ]);
     const F = CONFIG.MATRIZ_FIELDS;
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
     // Encabezado de la primera columna según el tipo seleccionado
@@ -3121,20 +3166,19 @@ async function renderSeguimiento() {
 // Lee el último reporte de cada riesgo con reportes y muestra su estado en la columna.
 async function cargarUltimosEstados(filasConReportes) {
   const RF = CONFIG.REPORTE_FIELDS;
-  // Convierte "DD-MM-YYYY HH:MM:SS" a algo comparable cronológicamente
   const fechaComparable = s => {
     const m = String(s||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/);
     if(!m) return 0;
     return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]).getTime();
   };
+  await precargarSubcache(); // asegura el índice de subregistros (lectura masiva)
   for (const f of filasConReportes) {
     try {
-      // Consultar TODOS los reportes vinculados y quedarnos con el MÁS RECIENTE
-      // (el orden en subform_values no es necesariamente cronológico).
+      // Reporte MÁS RECIENTE (el orden en subform_values no es cronológico).
       let mejor = null, mejorFecha = -1;
       for (const rid of f.subIds) {
-        const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','GET',{name_value:1});
-        const rec = d.record || {};
+        const rec = await getSub('reportes', rid);
+        if(!rec) continue;
         const ts = fechaComparable(rec.created_at);
         if (ts >= mejorFecha) { mejorFecha = ts; mejor = rec; }
       }
@@ -3191,12 +3235,13 @@ async function cargarCumplimientoMonitoreo(filasConMonitoreo){
     return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +m[6]).getTime();
   };
   const numOf = x => { if(x===''||x==null) return NaN; const n=parseFloat(String(x).replace('%','').replace(',','.').trim()); return isNaN(n)?NaN:n; };
+  await precargarSubcache();
   for(const f of filasConMonitoreo){
     try{
       let mejor=null, mejorFecha=-1;
       for(const rid of f.monIds){
-        const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','GET',{name_value:1});
-        const rec = d.record||{};
+        const rec = await getSub('monitoreo', rid);
+        if(!rec) continue;
         const ts = fechaComparable(rec.created_at);
         if(ts>=mejorFecha){ mejorFecha=ts; mejor=rec; }
       }
@@ -3230,9 +3275,10 @@ function barraAvance(pct){
 // === Render del historial de reportes (HTML) para un riesgo ===
 async function renderHistorialHTML(subIds){
   if(!subIds.length) return '<p class="hint">Este riesgo aún no tiene reportes.</p>';
+  await precargarSubcache();
   const reps = await Promise.all(subIds.map(id =>
-    API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+id+'.json','GET',{name_value:1})
-      .then(d=>d.record).catch(()=>null)
+    getSub('reportes', id)
+      .then(s=> s ? {values:s.values, created_at:s.created_at} : null).catch(()=>null)
   ));
   const RF = CONFIG.REPORTE_FIELDS;
   const val=(rec,col)=> rec && rec.values ? (rec.values[col]||'') : '';
@@ -3510,10 +3556,12 @@ async function medidasAl100(riesgoId){
   const RF = CONFIG.REPORTE_FIELDS;
   const fechaComparable = s => { const m=String(s||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/); return m?new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+m[6]).getTime():0; };
   try{
+    await precargarSubcache();
     let mejor=null, mejorFecha=-1;
     for(const rid of subIds){
-      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','GET',{name_value:1});
-      const rec=d.record||{}; const ts=fechaComparable(rec.created_at);
+      const rec = await getSub('reportes', rid);
+      if(!rec) continue;
+      const ts=fechaComparable(rec.created_at);
       if(ts>=mejorFecha){ mejorFecha=ts; mejor=rec; }
     }
     const v=(mejor&&mejor.values)?mejor.values:{};
@@ -3569,7 +3617,7 @@ window.abrirMetasMonitoreo = abrirMetasMonitoreo;
 
 // Refresca las pestañas tras guardar (relee el riesgo)
 async function refrescarMon(riesgoId){
-  STATE.matriz=[]; await loadMatriz(true);
+  invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
   const rr = STATE.matriz.find(x=>x.id===riesgoId);
   if(rr && document.getElementById('modalMon') && !document.getElementById('modalMon').classList.contains('hidden')){
     await renderMonPaneMetas(riesgoId, rr);
@@ -3711,10 +3759,12 @@ async function _cumplimientoMonitoreo(r){
   if(!monIds.length) return null;
   const fechaComp = s => { const m=String(s||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/); return m?new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+m[6]).getTime():0; };
   const numOf = x => { if(x===''||x==null) return NaN; const n=parseFloat(String(x).replace('%','').replace(',','.').trim()); return isNaN(n)?NaN:n; };
+  await precargarSubcache();
   let mejor=null, mf=-1;
   for(const rid of monIds){
-    const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','GET',{name_value:1});
-    const rec=d.record||{}; const ts=fechaComp(rec.created_at);
+    const rec = await getSub('monitoreo', rid);
+    if(!rec) continue;
+    const ts=fechaComp(rec.created_at);
     if(ts>=mf){ mf=ts; mejor=rec; }
   }
   const v=(mejor&&mejor.values)?mejor.values:{};
@@ -3738,7 +3788,7 @@ async function guardarCertificacion(riesgoId){
     campos[F.certificacion_control.id] = val;
     await API.saveForm(riesgoId, campos);
     toast('Certificación guardada.');
-    STATE.matriz=[]; await loadMatriz(true);
+    invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
     if(rr) await renderMonPaneCert(riesgoId, rr);
     if(typeof renderSeguimiento==='function') renderSeguimiento();
@@ -3771,10 +3821,11 @@ window.refrescarPanelTrasGuardar = refrescarPanelTrasGuardar;
 // Carga los datos de las metas (fecha, ref, meta) para el desplegable
 async function cargarMetasData(ids){
   const out = [];
+  await precargarSubcache();
   for(const id of ids){
     try{
-      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+id+'.json','GET',{name_value:1});
-      const v = d.record.values||{};
+      const sub = await getSub('metas', id);
+      const v = (sub && sub.values)||{};
       const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
       out.push({
         id, fecha:g('Fecha de programación'),
@@ -4071,10 +4122,11 @@ function agruparPorPeriodo(items, itemHtml){
 async function renderMetasHTML(ids){
   const MF = CONFIG.PROG_METAS_FIELDS;
   let html = '';
+  await precargarSubcache();
   for(const id of ids){
     try{
-      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+id+'.json','GET',{name_value:1});
-      const v = d.record.values||{};
+      const sub = await getSub('metas', id);
+      const v = (sub && sub.values)||{};
       const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
       const plan = g('Plan de monitoreo para el cumplimiento de la meta');
       html += `<div class="rep-item">
@@ -4090,10 +4142,11 @@ async function renderMetasHTML(ids){
 // Lista de reportes de monitoreo (medición real), agrupada por periodo
 async function renderMonitoreoHTML(ids, riesgoId){
   const items = [];
+  await precargarSubcache();
   for(const id of ids){
     try{
-      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+id+'.json','GET',{name_value:1});
-      const v = d.record.values||{};
+      const sub = await getSub('monitoreo', id);
+      const v = (sub && sub.values)||{};
       const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
       const real = _fmtNum(g('Valor real obtenido'));
       const meta = _fmtNum(g('Valor meta'));
@@ -4162,7 +4215,7 @@ async function guardarMeta(riesgoId){
     // 2) Guardar los campos de control/indicador del riesgo (llamada aparte, método de formulario)
     try { await API.saveForm(riesgoId, _camposControlForm()); } catch(e){ console.warn('No se guardaron los campos de control:', e.message); }
     toast('Meta agregada.');
-    STATE.matriz=[]; await loadMatriz(true);
+    invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
     refrescarPanelTrasGuardar(riesgoId, rr);
   }catch(err){ toast('Error al guardar la meta: '+err.message, true); btn.disabled=false; btn.textContent='Guardar meta'; }
@@ -4208,7 +4261,7 @@ async function guardarMonitoreo(riesgoId){
     // 2) Guardar los campos de control/indicador del riesgo (llamada aparte)
     try { await API.saveForm(riesgoId, _camposControlForm()); } catch(e){ console.warn('No se guardaron los campos de control:', e.message); }
     toast('Reporte de monitoreo agregado.');
-    STATE.matriz=[]; await loadMatriz(true);
+    invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
     refrescarPanelTrasGuardar(riesgoId, rr);
   }catch(err){ toast('Error al guardar: '+err.message, true); btn.disabled=false; btn.textContent='Guardar reporte de monitoreo'; }
@@ -4222,7 +4275,7 @@ async function eliminarSubregistro(riesgoId, subId, tipo){
   try{
     await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+subId+'.json','DELETE');
     toast('Registro eliminado.');
-    STATE.matriz=[]; await loadMatriz(true);
+    invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
     refrescarPanelTrasGuardar(riesgoId, rr);
   }catch(err){ toast('Error al eliminar: '+err.message, true); }
@@ -4232,8 +4285,8 @@ window.eliminarSubregistro = eliminarSubregistro;
 // Editar una meta: carga sus valores en el formulario de añadir meta y cambia el botón a "Actualizar"
 async function editarMeta(riesgoId, metaId){
   try{
-    const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+metaId+'.json','GET',{name_value:1});
-    const v = d.record.values||{};
+    const sub = await getSub('metas', metaId);
+    const v = (sub && sub.values) || {};
     const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
     // Si el modal nuevo está abierto, asegurar la pestaña de metas; si no, abrir el acordeón (compat.)
     const modalMon=document.getElementById('modalMon');
@@ -4262,7 +4315,7 @@ window.editarMeta = editarMeta;
 
 // Cancela el modo edición de una meta: recarga el panel con el formulario limpio
 async function cancelarEdicionMeta(riesgoId){
-  STATE.matriz=[]; await loadMatriz(true);
+  invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
   const rr = STATE.matriz.find(x=>x.id===riesgoId);
   if(rr){ await renderMonPaneMetas(riesgoId, rr); setMonTab('metas'); }
 }
@@ -4288,7 +4341,7 @@ async function actualizarMeta(riesgoId, metaId){
   try{
     await API.saveForm(metaId, vals, CONFIG.ENTITIES.PROG_METAS);
     toast('Meta actualizada.');
-    STATE.matriz=[]; await loadMatriz(true);
+    invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
     refrescarPanelTrasGuardar(riesgoId, rr);
   }catch(err){ toast('Error al actualizar: '+err.message, true); btn.disabled=false; btn.textContent='Actualizar meta'; }
@@ -4298,8 +4351,8 @@ window.actualizarMeta = actualizarMeta;
 // Editar un reporte de monitoreo
 async function editarMonitoreo(riesgoId, monId){
   try{
-    const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+monId+'.json','GET',{name_value:1});
-    const v = d.record.values||{};
+    const sub = await getSub('monitoreo', monId);
+    const v = (sub && sub.values) || {};
     const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
     const modalMon=document.getElementById('modalMon');
     if(modalMon && !modalMon.classList.contains('hidden')){ setMonTab('rep'); }
@@ -4324,7 +4377,7 @@ window.editarMonitoreo = editarMonitoreo;
 
 // Cancela el modo edición de un reporte de monitoreo: recarga el panel limpio
 async function cancelarEdicionMon(riesgoId){
-  STATE.matriz=[]; await loadMatriz(true);
+  invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
   const rr = STATE.matriz.find(x=>x.id===riesgoId);
   if(rr){ await renderMonPaneRep(riesgoId, rr); setMonTab('rep'); }
 }
@@ -4371,8 +4424,8 @@ async function verDetalleMon(riesgoId, monId){
   cont.innerHTML = '<p class="hint">Cargando…</p>';
   document.getElementById('modalDetalleSub').classList.remove('hidden');
   try{
-    const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+monId+'.json','GET',{name_value:1});
-    const v = d.record.values||{};
+    const sub = await getSub('monitoreo', monId);
+    const v = (sub && sub.values) || {};
     const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
     let pct = g('% cumplimiento');
     if(pct!=='' && pct!=null) pct = (Math.round(parseFloat(pct)*10)/10)+'%';
@@ -4414,7 +4467,7 @@ async function actualizarMonitoreo(riesgoId, monId){
   try{
     await API.saveForm(monId, vals, CONFIG.ENTITIES.MONITOREO);
     toast('Reporte actualizado.');
-    STATE.matriz=[]; await loadMatriz(true);
+    invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
     refrescarPanelTrasGuardar(riesgoId, rr);
   }catch(err){ toast('Error al actualizar: '+err.message, true); btn.disabled=false; btn.textContent='Actualizar reporte'; }
@@ -4449,7 +4502,7 @@ async function guardarReporte(riesgoId){
     await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT',
       { json_subforms_values: JSON.stringify(subforms) });
     toast('Reporte agregado correctamente.');
-    STATE.matriz=[];
+    invalidarSubcache(); STATE.matriz=[];
     await loadMatriz(true);
     await renderSeguimiento();
     // Al GUARDAR un reporte nuevo: cerrar el modal (o reabrir el acordeón si esa fue la vía)
@@ -4535,7 +4588,7 @@ async function guardarEdicionReporte(repId){
     const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('Tardó demasiado. Recarga para verificar si se guardó.')),25000));
     await Promise.race([guardar, timeout]);
     toast('Reporte actualizado.');
-    STATE.matriz=[];
+    invalidarSubcache(); STATE.matriz=[];
     await loadMatriz(true);
     await renderSeguimiento();
     const rid = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
@@ -4555,7 +4608,7 @@ async function eliminarReporte(repId){
     const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('Tardó demasiado. Recarga para verificar.')),25000));
     await Promise.race([borrar, timeout]);
     toast('Reporte eliminado.');
-    STATE.matriz=[];
+    invalidarSubcache(); STATE.matriz=[];
     await loadMatriz(true);
     await renderSeguimiento();
     const rid = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
@@ -4726,7 +4779,7 @@ async function eliminarRiesgo(riesgoId){
   try {
     await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','DELETE',{});
     toast('Riesgo eliminado.');
-    STATE.matriz=[]; await loadMatriz(true); renderSeguimiento();
+    invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true); renderSeguimiento();
   } catch(e){ toast('Error al eliminar: '+e.message, true); }
 }
 window.eliminarRiesgo = eliminarRiesgo;
@@ -4749,7 +4802,7 @@ async function archivarRiesgo(riesgoId){
   try {
     await API.saveForm(riesgoId, { [F.estado_registro.id]: archivar ? 'Archivado' : 'Activo' });
     toast(archivar ? 'Registro archivado.' : 'Registro reactivado.');
-    STATE.matriz=[]; await loadMatriz(true); renderSeguimiento(); renderDashboard();
+    invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true); renderSeguimiento(); renderDashboard();
   } catch(e){ toast('Error al '+accion+': '+e.message, true); }
 }
 window.archivarRiesgo = archivarRiesgo;
@@ -5121,7 +5174,7 @@ async function guardarEdit(){
     console.log('[guardarEdit] Respuesta:', resp);
     toast('Cambios guardados.');
     btn.disabled=false; btn.textContent='Guardar cambios'; // reactivar antes de cerrar
-    STATE.matriz=[]; await loadMatriz(true);
+    invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
     cerrarEdit(); renderSeguimiento();
   }catch(err){
     console.error('[guardarEdit] ERROR completo:', err);
@@ -5210,10 +5263,12 @@ async function puedeReevaluar(r){
   let pctMedidas = NaN, estado = '';
   if(subIds.length){
     const fechaComp = s => { const m=String(s||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/); return m?new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+m[6]).getTime():0; };
+    await precargarSubcache();
     let mejor=null, mf=-1;
     for(const rid of subIds){
-      const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','GET',{name_value:1});
-      const rec=d.record||{}; const ts=fechaComp(rec.created_at);
+      const rec = await getSub('reportes', rid);
+      if(!rec) continue;
+      const ts=fechaComp(rec.created_at);
       if(ts>=mf){ mf=ts; mejor=rec; }
     }
     const v=(mejor&&mejor.values)?mejor.values:{};
@@ -5282,7 +5337,7 @@ async function guardarReeval(){
     await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+REEVAL_ACTUAL+'.json','PUT',
       { json_values: JSON.stringify(values) });
     toast('Reevaluación guardada.');
-    STATE.matriz=[]; await loadMatriz(true);
+    invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
     cerrarReeval(); renderReeval();
   }catch(err){
     toast('Error al guardar: '+err.message, true);
@@ -5307,8 +5362,9 @@ function setConn(ok, msg) {
 (async function init(){
   initStaticSelects();
   try {
-    await ensureRelOptions();
-    await precargarMaestrasProceso(); // diccionario id→nombre PRIMERO, para traducir relaciones del inventario
+    // ensureRelOptions y precargarMaestrasProceso son independientes → en paralelo.
+    // initCascada depende de las maestras (para traducir), así que va después.
+    await Promise.allSettled([ ensureRelOptions(), precargarMaestrasProceso() ]);
     await initCascada();
     setConn(true);
     // El dashboard se renderiza al iniciar sesión (ver entrarApp), no antes.
