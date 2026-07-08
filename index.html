@@ -2148,21 +2148,23 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   put(F.consecuencias, v('f_consec'));
   put(F.existen_controles, v('f_existe_ctrl'));
   const _existe = v('f_existe_ctrl');
-  if(_existe==='No'){
-    // Sin controles: respuesta + medida
+  const _esN4 = nivelInherenteForm()===4;
+  const _conControl = (_esN4 && _existe==='Sí');
+  if(!_conControl){
+    // Tratamiento normal (nivel <4, o nivel 4 sin control): respuesta + medida.
+    // Estos campos están visibles siempre que NO haya control "Sí" en nivel 4.
     put(F.respuesta, v('f_respuesta'));
     put(F.medida_respuesta, v('f_medida'));
-  } else if(_existe==='Sí'){
-    // Con control: control establecido (+ monitoreo si nivel 4)
+  }
+  if(_conControl){
+    // Nivel 4 con control: control establecido + sistema de monitoreo
     put(F.control_establecido, v('f_control'));
-    if(nivelInherenteForm()===4){
-      put(F.indicador, v('f_indicador'));
-      if(F.tipo_indicador) put(F.tipo_indicador, v('f_tipo_ind'));
-      put(F.formula_indicador, v('f_formula'));
-      put(F.frecuencia_medicion, v('f_frec_med'));
-      put(F.frecuencia_calculo, v('f_frec_calc'));
-      // Plan de monitoreo se gestiona ahora en el subformulario de metas
-    }
+    put(F.indicador, v('f_indicador'));
+    if(F.tipo_indicador) put(F.tipo_indicador, v('f_tipo_ind'));
+    put(F.formula_indicador, v('f_formula'));
+    put(F.frecuencia_medicion, v('f_frec_med'));
+    put(F.frecuencia_calculo, v('f_frec_calc'));
+    // Plan de monitoreo se gestiona en el subformulario de metas
   }
 
   // Origen según fuente → se guarda el NOMBRE en el campo de texto correspondiente
@@ -2210,6 +2212,10 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
 
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Guardando…';
   try {
+    // DIAGNÓSTICO TEMPORAL
+    console.log('[guardar] respuesta leída (f_respuesta):', JSON.stringify(v('f_respuesta')), '| medida (f_medida):', JSON.stringify(v('f_medida')));
+    console.log('[guardar] _conControl:', (nivelInherenteForm()===4 && v('f_existe_ctrl')==='Sí'), '| campos respuesta:', campos[F.respuesta.id], '| campos medida:', campos[F.medida_respuesta.id]);
+    console.log('[guardar] TODOS los campos enviados:', JSON.stringify(campos));
     await API.saveForm(null, campos, CONFIG.ENTITIES.MATRIZ); // null = crear nuevo registro (POST)
     toast('Registro guardado correctamente.');
     document.getElementById('formRiesgo').reset();
@@ -5139,19 +5145,21 @@ async function guardarEdit(){
   // Controles (texto)
   if(g('ed_ctrl')) set(F.existen_controles, g('ed_ctrl'));
   const _edExiste = g('ed_ctrl');
-  if(_edExiste==='No'){
+  const _edN4 = (window._edNivelInherente||0)===4;
+  const _edConControl = (_edN4 && _edExiste==='Sí');
+  if(!_edConControl){
+    // Respuesta + medida visibles salvo en nivel 4 con control "Sí"
     if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
     set(F.medida_respuesta, limpiar(g('ed_medida')));
-  } else if(_edExiste==='Sí'){
+  }
+  if(_edConControl){
     set(F.control_establecido, limpiar(g('ed_control')));
-    if((window._edNivelInherente||0)===4){
-      set(F.indicador, limpiar(g('ed_indicador')));
-      if(F.tipo_indicador && g('ed_tipo_ind')) set(F.tipo_indicador, g('ed_tipo_ind'));
-      set(F.formula_indicador, limpiar(g('ed_formula')));
-      if(g('ed_frec_med')) set(F.frecuencia_medicion, g('ed_frec_med'));
-      if(g('ed_frec_calc')) set(F.frecuencia_calculo, g('ed_frec_calc'));
-      // Plan de monitoreo se gestiona en el subformulario de metas
-    }
+    set(F.indicador, limpiar(g('ed_indicador')));
+    if(F.tipo_indicador && g('ed_tipo_ind')) set(F.tipo_indicador, g('ed_tipo_ind'));
+    set(F.formula_indicador, limpiar(g('ed_formula')));
+    if(g('ed_frec_med')) set(F.frecuencia_medicion, g('ed_frec_med'));
+    if(g('ed_frec_calc')) set(F.frecuencia_calculo, g('ed_frec_calc'));
+    // Plan de monitoreo se gestiona en el subformulario de metas
   }
   // La certificación ya NO se edita aquí: se gestiona en el modal "Control y Seguimiento" (🎯).
   // Solo se escribe si por alguna razón el campo existiera en este formulario.
