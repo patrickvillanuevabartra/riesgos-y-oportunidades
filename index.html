@@ -1443,10 +1443,12 @@ function actualizarDescEvalEdit(){
   // Nivel inherente en vivo (según la escala del tipo) + badge con su descripción
   const p = num(g('ed_prob')), i = num(g('ed_imp'));
   const idx = p*i;
-  const lvl = idx ? (esOport ? nivelOportDe(idx) : nivelDe(idx)) : 0;
+  const lvlCalc = idx ? (esOport ? nivelOportDe(idx) : nivelDe(idx)) : 0;
+  // Si no se puede calcular (selects vacíos), conservar el nivel original del registro
+  const lvl = lvlCalc || (window._edNivelInherente||0);
   const badge = document.getElementById('ed_nivel_badge');
   if(badge) badge.innerHTML = lvl ? badgeNivel(lvl, esOport) : '<span class="lvl-badge" style="background:var(--mist)">Pendiente</span>';
-  // Mantener sincronizado el nivel usado por la sección 4 (controles nivel 4)
+  // Mantener sincronizado el nivel de la sección 4 y refrescar SIEMPRE su visibilidad
   window._edNivelInherente = lvl;
   if(typeof toggleControles==='function') toggleControles('ed');
 }
@@ -1517,9 +1519,11 @@ window.setExisteCtrlEd = setExisteCtrlEd;
 // prefijo 'f' = Registrar, 'ed' = Editar.
 function toggleControles(pref){
   const selId = (pref==='f') ? 'f_existe_ctrl' : 'ed_ctrl';
-  const existe = (document.getElementById(selId)||{}).value || '';
-  const esSi = existe==='Sí';
-  const esNo = existe==='No';
+  const raw = (document.getElementById(selId)||{}).value || '';
+  const existe = String(raw).trim();
+  // Tolerar "Si" sin tilde y variaciones de mayúsculas
+  const esSi = /^s[ií]$/i.test(existe);
+  const esNo = /^no$/i.test(existe);
   const nivel = (pref==='f') ? nivelInherenteForm() : (window._edNivelInherente||0);
   const esN4 = nivel===4;
   // Título dinámico de la sección 4
@@ -2273,6 +2277,18 @@ document.getElementById('btnReset').onclick = () => {
 const NIVEL_COLORS = {1:'var(--n1)',2:'var(--n2)',3:'var(--n3)',4:'var(--n4)'};
 function nivelDe(idx){ if(!idx)return 0; if(idx>12)return 4; if(idx>9)return 3; if(idx>4)return 2; return 1; }
 
+// ¿El registro tiene "¿Existen controles?" = Sí? Lectura robusta: por nombre de
+// columna o por ID de campo, tolerando "Si" sin tilde y placeholders.
+function tieneControlSi(r){
+  const v = r.values||{};
+  const idCtrl = CONFIG.MATRIZ_FIELDS.existen_controles.id;
+  let raw = v['¿Existen controles?'];
+  if(!raw || raw==='¿Existen controles?') raw = v[idCtrl];
+  if(!raw || raw==='¿Existen controles?' || raw==='Seleccione') return false;
+  return /^s[ií]$/i.test(String(raw).trim());
+}
+window.tieneControlSi = tieneControlSi;
+
 // Descripción textual del nivel (1-4). Riesgos y oportunidades usan etiquetas distintas.
 const _TXT_NIVEL_RIESGO = {1:'Bajo',2:'Medio',3:'Alto',4:'Intolerable'};
 const _TXT_NIVEL_OPORT  = {1:'Bajo',2:'Medio',3:'Alto',4:'Muy alto'};
@@ -2563,10 +2579,8 @@ async function renderAvancePorRangos(recs){
       else sinMedidas++;
     } else sinMedidas++;
     // 2) Monitoreo del control (solo nivel 4 con control)
-    const v=r.values||{};
-    const existeCtrl=(v['¿Existen controles?']&&v['¿Existen controles?']!=='¿Existen controles?')?String(v['¿Existen controles?']).trim():'';
     const esN4=(nivelInherenteDe(r).nivel===4);
-    if(esN4 && existeCtrl==='Sí'){
+    if(esN4 && tieneControlSi(r)){
       totalMon++;
       const pctM=await _cumplimientoMonitoreo(r);
       if(pctM==null) sinMon++;
@@ -3104,8 +3118,17 @@ async function renderSeguimiento() {
       const arch=esArchivado(r);
       // ¿Es nivel 4 con controles "Sí"? → habilita el módulo de metas/monitoreo
       const vR=r.values||{};
-      const existeCtrl=(vR['¿Existen controles?']&&vR['¿Existen controles?']!=='¿Existen controles?')?String(vR['¿Existen controles?']).trim():'';
-      const tieneMonitoreo = (ni.nivel===4 && existeCtrl==='Sí');
+      // Lectura robusta: por nombre de columna o por ID de campo; tolera "Si" sin tilde.
+      const _idCtrl = CONFIG.MATRIZ_FIELDS.existen_controles.id;
+      let _rawCtrl = vR['¿Existen controles?'];
+      if(!_rawCtrl || _rawCtrl==='¿Existen controles?') _rawCtrl = vR[_idCtrl];
+      const existeCtrl = (_rawCtrl && _rawCtrl!=='¿Existen controles?' && _rawCtrl!=='Seleccione') ? String(_rawCtrl).trim() : '';
+      const _esSi = /^s[ií]$/i.test(existeCtrl);
+      const tieneMonitoreo = (ni.nivel===4 && _esSi);
+      // DIAGNÓSTICO TEMPORAL: por qué un riesgo no muestra el botón de monitoreo
+      if(ni.nivel===4 && !tieneMonitoreo){
+        console.warn('[monitoreo] Nivel 4 SIN botón →', String(desc).slice(0,50), '| ¿Existen controles? =', JSON.stringify(vR['¿Existen controles?']), '| existeCtrl leído =', JSON.stringify(existeCtrl));
+      }
       const monIds = subIdsDe(r, CONFIG.MATRIZ_FIELDS.reporte_monitoreo.id);
       return {id:r.id, op, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch, tieneMonitoreo, monIds, nMon:monIds.length};
     })
@@ -4985,7 +5008,11 @@ function editarRiesgo(riesgoId){
 
   document.getElementById('editModal').classList.remove('hidden');
   // Activar el interruptor "¿Existen controles?" según el valor guardado (ed_ctrl es hidden)
-  const _ecVal = (document.getElementById('ed_ctrl')||{}).value || '';
+  // Normalizar el valor crudo de QuintaDB ("Si"/"sí"/" Sí ") a "Sí"/"No"
+  const _ecRaw = String((document.getElementById('ed_ctrl')||{}).value || '').trim();
+  const _ecVal = /^s[ií]$/i.test(_ecRaw) ? 'Sí' : (/^no$/i.test(_ecRaw) ? 'No' : '');
+  const _hidCtrl = document.getElementById('ed_ctrl');
+  if(_hidCtrl) _hidCtrl.value = _ecVal; // dejar el hidden normalizado
   if(_ecVal) setExisteCtrlEd(_ecVal); else toggleControles('ed');
   actualizarDescEvalEdit(); // mostrar descripciones de prob/impacto
   // El módulo de metas/monitoreo ya NO vive aquí: se gestiona desde el botón 🎯 de Seguimiento.
