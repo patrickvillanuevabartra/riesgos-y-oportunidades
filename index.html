@@ -3240,9 +3240,10 @@ async function cargarUltimosEstados(filasConReportes) {
       } else if (pctRaw !== '' && pctRaw != null) {
         pctMedidas = Math.max(0, Math.min(100, parseInt(pctRaw)||0));
       }
-      // Habilitación del MONITOREO: solo si las medidas están al 100%.
+      // Habilitación del MONITOREO: medidas al 100% Y último estado Culminado/Ejecutado.
       if (f.tieneMonitoreo) {
-        const completo = (pctMedidas === 100);
+        const culminado = /culmin|ejecut/i.test(String(est));
+        const completo = (pctMedidas === 100) && culminado;
         const btnMon = document.getElementById('btnmon-'+f.id);
         const celMon = document.getElementById('moncumpl-'+f.id);
         if (completo) {
@@ -3253,7 +3254,14 @@ async function cargarUltimosEstados(filasConReportes) {
           }
         } else {
           if (btnMon) btnMon.style.display = 'none';             // mantener oculto
-          if (celMon) celMon.innerHTML = '<span class="hint" title="Disponible cuando las medidas de respuesta estén al 100%">🔒 medidas &lt;100%</span>';
+          // Mensaje según el motivo real del bloqueo
+          const motivo = (pctMedidas !== 100)
+            ? '🔒 medidas &lt;100%'
+            : '🔒 falta Culminado/Ejecutado';
+          const titulo = (pctMedidas !== 100)
+            ? 'Disponible cuando las medidas de respuesta estén al 100%'
+            : 'Las medidas están al 100%, pero el último estado debe ser Culminado/Ejecutado';
+          if (celMon) celMon.innerHTML = `<span class="hint" title="${titulo}">${motivo}</span>`;
         }
       }
     } catch(_) {
