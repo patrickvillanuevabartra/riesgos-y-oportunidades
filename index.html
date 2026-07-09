@@ -1531,7 +1531,11 @@ function toggleControles(pref){
   // Recorre wrappers
   document.querySelectorAll('[id^="'+pref+'_wrap_"], [id="'+pref+'_nota_no"], [id="'+pref+'_nota_si"]').forEach(el=>{
     // El interruptor "¿Existen controles?" siempre visible: no depende del nivel.
-    if(el.id===pref+'_wrap_existe'){ el.classList.remove('hidden'); return; }
+    if(el.id===pref+'_wrap_existe'){
+      el.classList.remove('hidden');
+      el.style.setProperty('display','flex','important');
+      return;
+    }
     let mostrar = true;
     if(el.classList.contains('solo-n4')) mostrar = esN4;                 // solo nivel 4
     if(el.classList.contains('ctrl-no'))  mostrar = mostrar && esNo;
@@ -5021,6 +5025,16 @@ function editarRiesgo(riesgoId){
 
   // Cargar desplegables dinámicos y preseleccionar valores actuales
   cargarRelEdit(v);
+
+  // GARANTÍA FINAL: el interruptor "¿Existen controles?" debe verse siempre.
+  // Se aplica al final de todo el render y con estilo inline, que vence a
+  // cualquier regla .hidden{display:none!important} que se haya podido aplicar.
+  setTimeout(()=>{
+    const w = document.getElementById('ed_wrap_existe');
+    if(w){ w.classList.remove('hidden'); w.style.setProperty('display','flex','important'); }
+    const sw = document.getElementById('ed_ctrl_switch');
+    if(sw){ sw.classList.remove('hidden'); sw.style.setProperty('display','inline-flex','important'); }
+  }, 0);
 }
 window.editarRiesgo = editarRiesgo;
 function cerrarEdit(){ document.getElementById('editModal').classList.add('hidden'); }
