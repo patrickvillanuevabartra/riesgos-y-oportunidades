@@ -1440,17 +1440,12 @@ function actualizarDescEvalEdit(){
   const g=id=>{ const el=document.getElementById(id); return el?el.value:''; };
   set('ed_desc_prob', descProbabilidad(g('ed_prob')));
   set('ed_desc_imp', descImpacto(g('ed_imp'), esOport));
-  // Nivel inherente en vivo (según la escala del tipo) + badge con su descripción
-  const p = num(g('ed_prob')), i = num(g('ed_imp'));
-  const idx = p*i;
-  const lvlCalc = idx ? (esOport ? nivelOportDe(idx) : nivelDe(idx)) : 0;
-  // Si no se puede calcular (selects vacíos), conservar el nivel original del registro
-  const lvl = lvlCalc || (window._edNivelInherente||0);
+  // Badge de nivel: SOLO informativo. No modifica _edNivelInherente ni la visibilidad
+  // de la sección 4 (eso lo gestiona editarRiesgo/toggleControles como antes).
+  const idx = num(g('ed_prob'))*num(g('ed_imp'));
+  const lvl = idx ? (esOport ? nivelOportDe(idx) : nivelDe(idx)) : (window._edNivelInherente||0);
   const badge = document.getElementById('ed_nivel_badge');
   if(badge) badge.innerHTML = lvl ? badgeNivel(lvl, esOport) : '<span class="lvl-badge" style="background:var(--mist)">Pendiente</span>';
-  // Mantener sincronizado el nivel de la sección 4 y refrescar SIEMPRE su visibilidad
-  window._edNivelInherente = lvl;
-  if(typeof toggleControles==='function') toggleControles('ed');
 }
 window.actualizarDescEvalEdit = actualizarDescEvalEdit;
 function calcIndice() {
@@ -1526,6 +1521,7 @@ function toggleControles(pref){
   const esNo = /^no$/i.test(existe);
   const nivel = (pref==='f') ? nivelInherenteForm() : (window._edNivelInherente||0);
   const esN4 = nivel===4;
+  if(pref==='ed') console.log('[toggleControles ed] nivel=',nivel,'esN4=',esN4,'valor ed_ctrl=',JSON.stringify(existe),'esSi=',esSi);
   // Título dinámico de la sección 4
   const titEl = document.getElementById(pref==='f'?'f_sec4_titulo':'ed_sec4_titulo');
   if(titEl) titEl.textContent = esN4 ? 'Controles y tratamiento' : 'Tratamiento';
@@ -3125,10 +3121,6 @@ async function renderSeguimiento() {
       const existeCtrl = (_rawCtrl && _rawCtrl!=='¿Existen controles?' && _rawCtrl!=='Seleccione') ? String(_rawCtrl).trim() : '';
       const _esSi = /^s[ií]$/i.test(existeCtrl);
       const tieneMonitoreo = (ni.nivel===4 && _esSi);
-      // DIAGNÓSTICO TEMPORAL: por qué un riesgo no muestra el botón de monitoreo
-      if(ni.nivel===4 && !tieneMonitoreo){
-        console.warn('[monitoreo] Nivel 4 SIN botón →', String(desc).slice(0,50), '| ¿Existen controles? =', JSON.stringify(vR['¿Existen controles?']), '| existeCtrl leído =', JSON.stringify(existeCtrl));
-      }
       const monIds = subIdsDe(r, CONFIG.MATRIZ_FIELDS.reporte_monitoreo.id);
       return {id:r.id, op, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch, tieneMonitoreo, monIds, nMon:monIds.length};
     })
