@@ -480,7 +480,7 @@
         <div class="section-title"><span class="section-num">4</span><span id="f_sec4_titulo">Tratamiento</span></div>
         <div class="section-desc" id="f_sec4_desc">Define cómo se tratará el riesgo. Los controles con indicadores aplican solo a riesgos de nivel 4.</div>
         <!-- Pregunta ¿Existen controles? — SOLO nivel 4 -->
-        <div class="field solo-n4 hidden" id="f_wrap_existe" style="margin-bottom:14px">
+        <div class="field" id="f_wrap_existe" style="margin-bottom:14px">
           <label style="margin-bottom:6px">¿Existen controles?</label>
           <div class="ctrl-switch" id="f_ctrl_switch">
             <button type="button" data-v="No" onclick="setExisteCtrl('f','No')">🛠️ No · requiere medidas</button>
@@ -1521,7 +1521,6 @@ function toggleControles(pref){
   const esNo = /^no$/i.test(existe);
   const nivel = (pref==='f') ? nivelInherenteForm() : (window._edNivelInherente||0);
   const esN4 = nivel===4;
-  if(pref==='ed') console.log('[toggleControles ed] nivel=',nivel,'esN4=',esN4,'valor ed_ctrl=',JSON.stringify(existe),'esSi=',esSi);
   // Título dinámico de la sección 4
   const titEl = document.getElementById(pref==='f'?'f_sec4_titulo':'ed_sec4_titulo');
   if(titEl) titEl.textContent = esN4 ? 'Controles y tratamiento' : 'Tratamiento';
@@ -1532,13 +1531,16 @@ function toggleControles(pref){
   // Recorre wrappers
   document.querySelectorAll('[id^="'+pref+'_wrap_"], [id="'+pref+'_nota_no"], [id="'+pref+'_nota_si"]').forEach(el=>{
     let mostrar = true;
-    if(el.classList.contains('solo-n4')) mostrar = esN4;                 // solo nivel 4 (pregunta y notas)
+    if(el.classList.contains('solo-n4')) mostrar = esN4;                 // solo nivel 4
     if(el.classList.contains('ctrl-no'))  mostrar = mostrar && esNo;
     if(el.classList.contains('ctrl-si'))  mostrar = mostrar && esSi;
-    if(el.classList.contains('ctrl-n4'))  mostrar = mostrar && esSi && esN4;
-    // Las notas no/si dependen además de la elección
-    if(el.id===pref+'_nota_no') mostrar = esN4 && esNo;
-    if(el.id===pref+'_nota_si') mostrar = esN4 && esSi;
+    // ctrl-n4: bloque de indicadores. Se muestra con "Sí"; si el nivel se pudo
+    // calcular, se exige que sea 4. Si el nivel es 0 (no calculable), no se oculta
+    // para no perder la funcionalidad.
+    if(el.classList.contains('ctrl-n4'))  mostrar = mostrar && esSi && (esN4 || nivel===0);
+    // Las notas no/si dependen de la elección (ya no del nivel)
+    if(el.id===pref+'_nota_no') mostrar = esNo;
+    if(el.id===pref+'_nota_si') mostrar = esSi;
     el.classList.toggle('hidden', !mostrar);
   });
   // Respuesta y Medida(s): ocultas cuando el riesgo es nivel 4 con control "Sí"
@@ -1550,8 +1552,6 @@ function toggleControles(pref){
     if(el.id && !idOk) return;
     el.classList.toggle('hidden', ocultarTratam);
   });
-  // En nivel<4 no aplica "¿Existen controles?": se limpia para no arrastrar valor
-  if(!esN4 && pref==='f'){ const h=document.getElementById('f_existe_ctrl'); if(h) h.value=''; }
 }
 window.toggleControles = toggleControles;
 ['f_prob_r_inh','f_imp_r_inh','f_prob_o_inh','f_imp_o_inh'].forEach(id=>{
@@ -2159,24 +2159,20 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   put(F.causas, v('f_causas'));
   put(F.consecuencias, v('f_consec'));
   put(F.existen_controles, v('f_existe_ctrl'));
-  const _existe = v('f_existe_ctrl');
-  const _esN4 = nivelInherenteForm()===4;
-  const _conControl = (_esN4 && _existe==='Sí');
+  const _existe = String(v('f_existe_ctrl')||'').trim();
+  const _conControl = /^s[ií]$/i.test(_existe);
   if(!_conControl){
-    // Tratamiento normal (nivel <4, o nivel 4 sin control): respuesta + medida.
-    // Estos campos están visibles siempre que NO haya control "Sí" en nivel 4.
+    // Sin control: respuesta + medida de tratamiento
     put(F.respuesta, v('f_respuesta'));
     put(F.medida_respuesta, v('f_medida'));
-  }
-  if(_conControl){
-    // Nivel 4 con control: control establecido + sistema de monitoreo
+  } else {
+    // Con control: control establecido + sistema de monitoreo (indicadores)
     put(F.control_establecido, v('f_control'));
     put(F.indicador, v('f_indicador'));
     if(F.tipo_indicador) put(F.tipo_indicador, v('f_tipo_ind'));
     put(F.formula_indicador, v('f_formula'));
     put(F.frecuencia_medicion, v('f_frec_med'));
     put(F.frecuencia_calculo, v('f_frec_calc'));
-    // Plan de monitoreo se gestiona en el subformulario de metas
   }
 
   // Origen según fuente → se guarda el NOMBRE en el campo de texto correspondiente
@@ -4966,7 +4962,7 @@ function editarRiesgo(riesgoId){
 
     <div class="edit-sec"><div class="edit-sec-tit" id="ed_sec4_titulo">4 · Tratamiento</div>
     <!-- Pregunta ¿Existen controles? — SOLO nivel 4 -->
-    <div class="field solo-n4 hidden" id="ed_wrap_existe" style="margin-bottom:12px">
+    <div class="field" id="ed_wrap_existe" style="margin-bottom:12px">
       <label style="margin-bottom:6px">¿Existen controles?</label>
       <div class="ctrl-switch" id="ed_ctrl_switch">
         <button type="button" data-v="No" onclick="setExisteCtrlEd('No')">🛠️ No · requiere medidas</button>
@@ -5224,22 +5220,18 @@ async function guardarEdit(){
   if(g('ed_imp'))  set(F.imp_riesgo_inh, g('ed_imp'));
   // Controles (texto)
   if(g('ed_ctrl')) set(F.existen_controles, g('ed_ctrl'));
-  const _edExiste = g('ed_ctrl');
-  const _edN4 = (window._edNivelInherente||0)===4;
-  const _edConControl = (_edN4 && _edExiste==='Sí');
+  const _edExiste = String(g('ed_ctrl')||'').trim();
+  const _edConControl = /^s[ií]$/i.test(_edExiste);
   if(!_edConControl){
-    // Respuesta + medida visibles salvo en nivel 4 con control "Sí"
     if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
     set(F.medida_respuesta, limpiar(g('ed_medida')));
-  }
-  if(_edConControl){
+  } else {
     set(F.control_establecido, limpiar(g('ed_control')));
     set(F.indicador, limpiar(g('ed_indicador')));
     if(F.tipo_indicador && g('ed_tipo_ind')) set(F.tipo_indicador, g('ed_tipo_ind'));
     set(F.formula_indicador, limpiar(g('ed_formula')));
     if(g('ed_frec_med')) set(F.frecuencia_medicion, g('ed_frec_med'));
     if(g('ed_frec_calc')) set(F.frecuencia_calculo, g('ed_frec_calc'));
-    // Plan de monitoreo se gestiona en el subformulario de metas
   }
   // La certificación ya NO se edita aquí: se gestiona en el modal "Control y Seguimiento" (🎯).
   // Solo se escribe si por alguna razón el campo existiera en este formulario.
