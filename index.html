@@ -700,7 +700,7 @@
     <div class="modal">
       <div class="modal-head">
         <div>
-          <div class="eyebrow">Editar riesgo</div>
+          <div class="eyebrow">Editar riesgo · v2 ✅</div>
           <h2 id="editTitulo" style="font-size:18px">Riesgo</h2>
         </div>
         <button class="modal-close" onclick="cerrarEdit()">&times;</button>
@@ -1530,6 +1530,8 @@ function toggleControles(pref){
     : 'Define cómo se tratará el riesgo mediante la respuesta y las medidas. Los controles con indicadores aplican solo a riesgos de nivel 4.';
   // Recorre wrappers
   document.querySelectorAll('[id^="'+pref+'_wrap_"], [id="'+pref+'_nota_no"], [id="'+pref+'_nota_si"]').forEach(el=>{
+    // El interruptor "¿Existen controles?" siempre visible: no depende del nivel.
+    if(el.id===pref+'_wrap_existe'){ el.classList.remove('hidden'); return; }
     let mostrar = true;
     if(el.classList.contains('solo-n4')) mostrar = esN4;                 // solo nivel 4
     if(el.classList.contains('ctrl-no'))  mostrar = mostrar && esNo;
@@ -4961,7 +4963,6 @@ function editarRiesgo(riesgoId){
     </div></div>
 
     <div class="edit-sec"><div class="edit-sec-tit" id="ed_sec4_titulo">4 · Tratamiento</div>
-    <!-- Pregunta ¿Existen controles? — SOLO nivel 4 -->
     <div class="field" id="ed_wrap_existe" style="margin-bottom:12px">
       <label style="margin-bottom:6px">¿Existen controles?</label>
       <div class="ctrl-switch" id="ed_ctrl_switch">
@@ -5002,6 +5003,9 @@ function editarRiesgo(riesgoId){
   const _hidCtrl = document.getElementById('ed_ctrl');
   if(_hidCtrl) _hidCtrl.value = _ecVal; // dejar el hidden normalizado
   if(_ecVal) setExisteCtrlEd(_ecVal); else toggleControles('ed');
+  // Red de seguridad: el interruptor "¿Existen controles?" SIEMPRE debe verse.
+  const _wrapExiste = document.getElementById('ed_wrap_existe');
+  if(_wrapExiste) _wrapExiste.classList.remove('hidden');
   actualizarDescEvalEdit(); // mostrar descripciones de prob/impacto
   // El módulo de metas/monitoreo ya NO vive aquí: se gestiona desde el botón 🎯 de Seguimiento.
   // Asegurar que el botón Guardar esté activo (por si quedó deshabilitado de un guardado anterior)
