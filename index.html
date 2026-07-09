@@ -2127,6 +2127,7 @@ async function initCascada() {
    ============================================================ */
 document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   e.preventDefault();
+  console.log('[submit] Botón Guardar pulsado — iniciando guardado');
   if(!puedeCrear()){ toast('Solo el administrador puede crear nuevos registros.', true); return; }
   const btn = document.getElementById('btnGuardar');
   const F = CONFIG.MATRIZ_FIELDS;
@@ -5368,6 +5369,7 @@ function setConn(ok, msg) {
    ARRANQUE
    ============================================================ */
 (async function init(){
+  console.log('%c[VERSIÓN] Riesgos build con diagnóstico de guardado — 2026-07-08','color:#1f7a3d;font-weight:bold');
   initStaticSelects();
   try {
     // ensureRelOptions y precargarMaestrasProceso son independientes → en paralelo.
