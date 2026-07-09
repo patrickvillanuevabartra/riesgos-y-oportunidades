@@ -725,8 +725,11 @@
       <div class="modal-body">
         <p class="hint" style="margin-bottom:16px">Captura la evaluación posterior al tratamiento. El índice y el nivel residual los calcula QuintaDB automáticamente.</p>
         <div class="grid">
-          <div class="field"><label>Probabilidad residual</label><select id="reevalProb"></select></div>
-          <div class="field"><label>Impacto residual</label><select id="reevalImp"></select></div>
+          <div class="field"><label>Probabilidad residual</label><select id="reevalProb" onchange="actualizarNivelReeval()"></select></div>
+          <div class="field"><label>Descripción probabilidad</label><div class="readonly-pill" id="reeval_desc_prob">—</div></div>
+          <div class="field"><label>Impacto residual</label><select id="reevalImp" onchange="actualizarNivelReeval()"></select></div>
+          <div class="field"><label>Descripción impacto</label><div class="readonly-pill" id="reeval_desc_imp">—</div></div>
+          <div class="field full"><label>Nivel residual</label><div id="reeval_nivel_badge"><span class="lvl-badge" style="background:var(--mist)">Pendiente</span></div></div>
           <div class="field full"><label>Fecha de reevaluación</label><input type="date" id="reevalFecha"></div>
         </div>
       </div>
@@ -1437,6 +1440,15 @@ function actualizarDescEvalEdit(){
   const g=id=>{ const el=document.getElementById(id); return el?el.value:''; };
   set('ed_desc_prob', descProbabilidad(g('ed_prob')));
   set('ed_desc_imp', descImpacto(g('ed_imp'), esOport));
+  // Nivel inherente en vivo (según la escala del tipo) + badge con su descripción
+  const p = num(g('ed_prob')), i = num(g('ed_imp'));
+  const idx = p*i;
+  const lvl = idx ? (esOport ? nivelOportDe(idx) : nivelDe(idx)) : 0;
+  const badge = document.getElementById('ed_nivel_badge');
+  if(badge) badge.innerHTML = lvl ? badgeNivel(lvl, esOport) : '<span class="lvl-badge" style="background:var(--mist)">Pendiente</span>';
+  // Mantener sincronizado el nivel usado por la sección 4 (controles nivel 4)
+  window._edNivelInherente = lvl;
+  if(typeof toggleControles==='function') toggleControles('ed');
 }
 window.actualizarDescEvalEdit = actualizarDescEvalEdit;
 function calcIndice() {
@@ -1448,9 +1460,10 @@ function calcIndice() {
   document.getElementById('calc_indice').textContent = idx || '—';
   const badge = document.getElementById('calc_nivel');
   if (!idx) { badge.innerHTML = '<span class="lvl-badge" style="background:var(--mist)">Pendiente</span>'; toggleControles('f'); return; }
-  let lvl=1, txt='Bajo';
-  if (idx>12){lvl=4;txt='Intolerable';} else if(idx>9){lvl=3;txt='Alto';} else if(idx>4){lvl=2;txt='Medio';}
-  badge.innerHTML = `<span class="lvl-badge lvl-${lvl}">Nivel ${lvl} · ${txt}</span>`;
+  // Riesgo y Oportunidad tienen escalas distintas (impacto 1-4 vs 1-3)
+  const esOport = (tipo === 'Oportunidad');
+  const lvl = esOport ? nivelOportDe(idx) : nivelDe(idx);
+  badge.innerHTML = badgeNivel(lvl, esOport);
   toggleControles('f'); // recalcular visibilidad de monitoreo según nivel
 }
 
@@ -1462,7 +1475,8 @@ function nivelInherenteForm(){
   else if(tipo==='Oportunidad'){ p=num(document.getElementById('f_prob_o_inh').value); i=num(document.getElementById('f_imp_o_inh').value); }
   const idx=p*i;
   if(!idx) return 0;
-  if(idx>12) return 4; if(idx>9) return 3; if(idx>4) return 2; return 1;
+  // Escalas distintas: oportunidad usa impacto 1-3
+  return (tipo==='Oportunidad') ? nivelOportDe(idx) : nivelDe(idx);
 }
 
 // Interruptor de pestañas "¿Existen controles?" en Registrar (pref 'f').
@@ -2098,8 +2112,6 @@ async function initCascada() {
     console.warn('[initCascada] Se leyeron', inv.length, 'filas pero la columna "Ruta completa" vino vacía. Ejemplo 1ª fila:', (inv[0]||{}).values);
   } else {
     fillSelect(fTipo, opcionesTipo);
-    // Diagnóstico temporal: muestra cómo se está segmentando la ruta de la 1ª fila
-    console.log('[initCascada] Ejemplo de segmentos de ruta:', _segmentosRuta(inv[0]), '→ opciones de Tipo:', opcionesTipo.map(o=>o.value));
   }
 
   fTipo.onchange = () => {
@@ -2127,7 +2139,6 @@ async function initCascada() {
    ============================================================ */
 document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   e.preventDefault();
-  console.log('[submit] Botón Guardar pulsado — iniciando guardado');
   if(!puedeCrear()){ toast('Solo el administrador puede crear nuevos registros.', true); return; }
   const btn = document.getElementById('btnGuardar');
   const F = CONFIG.MATRIZ_FIELDS;
@@ -2213,15 +2224,12 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
 
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Guardando…';
   try {
-    // DIAGNÓSTICO TEMPORAL
-    console.log('[guardar] respuesta leída (f_respuesta):', JSON.stringify(v('f_respuesta')), '| medida (f_medida):', JSON.stringify(v('f_medida')));
-    console.log('[guardar] _conControl:', (nivelInherenteForm()===4 && v('f_existe_ctrl')==='Sí'), '| campos respuesta:', campos[F.respuesta.id], '| campos medida:', campos[F.medida_respuesta.id]);
-    console.log('[guardar] TODOS los campos enviados:', JSON.stringify(campos));
     await API.saveForm(null, campos, CONFIG.ENTITIES.MATRIZ); // null = crear nuevo registro (POST)
     toast('Registro guardado correctamente.');
     document.getElementById('formRiesgo').reset();
     limpiarMultiselects();
     limpiarInterruptorCtrl();
+    limpiarPillsResponsable();
     showOrigin(''); showEval(''); calcIndice(); toggleControles('f');
     STATE.matriz = []; // invalidar caché
   } catch(err) {
@@ -2238,6 +2246,15 @@ function limpiarMultiselects(){
     c.classList.remove('open');
   });
 }
+// Los "readonly-pill" son <div>, no inputs: form.reset() NO los limpia.
+// Esta función los devuelve a su estado vacío ("—").
+function limpiarPillsResponsable(){
+  ['f_resp_proc','f_resp_cel','f_resp_cor'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.textContent='—';
+  });
+}
+window.limpiarPillsResponsable = limpiarPillsResponsable;
+
 // Reinicia el interruptor "¿Existen controles?" de Registrar (sin selección)
 function limpiarInterruptorCtrl(){
   const hid=document.getElementById('f_existe_ctrl'); if(hid) hid.value='';
@@ -2247,7 +2264,7 @@ function limpiarInterruptorCtrl(){
 }
 window.limpiarInterruptorCtrl = limpiarInterruptorCtrl;
 document.getElementById('btnReset').onclick = () => {
-  document.getElementById('formRiesgo').reset(); limpiarMultiselects(); limpiarInterruptorCtrl(); showOrigin(''); showEval(''); calcIndice(); toggleControles('f');
+  document.getElementById('formRiesgo').reset(); limpiarMultiselects(); limpiarInterruptorCtrl(); limpiarPillsResponsable(); showOrigin(''); showEval(''); calcIndice(); toggleControles('f');
 };
 
 /* ============================================================
@@ -2255,6 +2272,20 @@ document.getElementById('btnReset').onclick = () => {
    ============================================================ */
 const NIVEL_COLORS = {1:'var(--n1)',2:'var(--n2)',3:'var(--n3)',4:'var(--n4)'};
 function nivelDe(idx){ if(!idx)return 0; if(idx>12)return 4; if(idx>9)return 3; if(idx>4)return 2; return 1; }
+
+// Descripción textual del nivel (1-4). Riesgos y oportunidades usan etiquetas distintas.
+const _TXT_NIVEL_RIESGO = {1:'Bajo',2:'Medio',3:'Alto',4:'Intolerable'};
+const _TXT_NIVEL_OPORT  = {1:'Bajo',2:'Medio',3:'Alto',4:'Muy alto'};
+function descNivel(n, esOport){
+  if(!n) return '';
+  return (esOport ? _TXT_NIVEL_OPORT : _TXT_NIVEL_RIESGO)[n] || '';
+}
+// Badge completo "Nivel N · Descripción" (o guion si no hay nivel)
+function badgeNivel(n, esOport){
+  if(!n) return '<span class="hint" style="font-size:12px">—</span>';
+  return `<span class="lvl-badge lvl-${n}">Nivel ${n} · ${descNivel(n, esOport)}</span>`;
+}
+window.descNivel = descNivel; window.badgeNivel = badgeNivel;
 
 async function loadMatriz(forzar) {
   if (!forzar && STATE.matriz.length) return STATE.matriz;
@@ -3008,11 +3039,13 @@ async function descargarExcel(){
       ['Prob. inherente', r=>g(r,'Probabilidad riesgo inherente',F.prob_riesgo_inh.id)],
       ['Imp. inherente', r=>g(r,'Impacto riesgo inherente',F.imp_riesgo_inh.id)],
       ['Nivel inherente', r=>{ const op=esOportunidad(r); return (op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel||''; }],
+      ['Descripción nivel inherente', r=>{ const op=esOportunidad(r); const n=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel; return descNivel(n,op); }],
       ['Respuesta', r=>g(r,'Respuesta al riesgo u oportunidad',F.respuesta.id)],
       ['Control establecido', r=>g(r,'Control establecido',F.control_establecido.id)],
       ['Prob. residual', r=>g(r,'Probabilidad riesgo residual',F.prob_riesgo_res.id)],
       ['Imp. residual', r=>g(r,'Impacto riesgo residual',F.imp_riesgo_res.id)],
-      ['Nivel residual', r=>{ const idx=num(g(r,'Índice de prioridad riesgo residual',F.indice_riesgo_res.id)); return nivelDe(idx)||''; }],
+      ['Nivel residual', r=>{ const op=esOportunidad(r); if(op){ let i=num(g(r,'Índice de prioridad oportunidad residual','')); if(!i) i=num(g(r,'Probabilidad oportunidad residual',''))*num(g(r,'Impacto oportunidad residual','')); return nivelOportDe(i)||''; } const idx=num(g(r,'Índice de prioridad riesgo residual',F.indice_riesgo_res.id)); return nivelDe(idx)||''; }],
+      ['Descripción nivel residual', r=>{ const op=esOportunidad(r); let n; if(op){ let i=num(g(r,'Índice de prioridad oportunidad residual','')); if(!i) i=num(g(r,'Probabilidad oportunidad residual',''))*num(g(r,'Impacto oportunidad residual','')); n=nivelOportDe(i); } else { n=nivelDe(num(g(r,'Índice de prioridad riesgo residual',F.indice_riesgo_res.id))); } return descNivel(n,op); }],
       ['Certificación control', r=>g(r,'Certificación de Implementación del Control',F.certificacion_control.id)],
       ['Creado', r=>r.created_at||''],
       ['Última actualización', r=>r.updated_at||'']
@@ -3106,7 +3139,7 @@ async function renderSeguimiento() {
     Object.values(grupos).forEach(arr => arr.sort((a,b)=> (b.idx-a.idx) || (b.nivel-a.nivel)));
     const oficinasOrdenadas = Object.keys(grupos).sort();
 
-    const nivelBadge = n => n ? `<span class="lvl-badge lvl-${n}">Nivel ${n}</span>` : '<span class="hint" style="font-size:12px">—</span>';
+    const nivelBadge = (n, esOport) => badgeNivel(n, esOport);
     // Etiqueta visual de tipo (solo se muestra en la vista "Todos" para distinguir)
     const tipoTag = f => (SEG_TIPO==='todos')
       ? (f.op ? '<span class="tag tag-proc" style="margin-right:6px">Oportunidad</span>' : '<span class="tag tag-noproc" style="margin-right:6px">Riesgo</span>')
@@ -3119,7 +3152,7 @@ async function renderSeguimiento() {
           ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>80?f.desc.slice(0,80)+'…':f.desc}</a>
         </td>
         <td data-label="Proceso" title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>36?f.proc.slice(0,36)+'…':f.proc}${f.desact?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
-        <td data-label="Nivel inh.">${nivelBadge(f.nivel)}</td>
+        <td data-label="Nivel inh.">${nivelBadge(f.nivel, f.op)}</td>
         <td data-label="Reportes"><strong>${f.nReportes}</strong></td>
         <td data-label="Último estado" id="estado-${f.id}" style="font-size:12px">${f.nReportes?'<span class="hint">…</span>':estadoPill('Pendiente')}</td>
         <td data-label="% Avance medidas" id="avance-${f.id}" style="min-width:110px">${f.nReportes?'<span class="hint">…</span>':'<span class="hint">—</span>'}</td>
@@ -4651,7 +4684,7 @@ function verDetalle(riesgoId){
     ['Impacto inherente','Impacto riesgo inherente'],
     ['Descripción impacto inherente','__desc_imp_inh__'],
     ['Índice inherente','Índice de prioridad riesgo inherente'],
-    ['Nivel inherente','Nivel de riesgo inherente'],
+    ['Nivel inherente','__nivel_inh__'],
     ['¿Existen controles?','¿Existen controles?'],
     ['Control establecido','Control establecido'],
     ['Respuesta','Respuesta al riesgo u oportunidad'],
@@ -4665,7 +4698,7 @@ function verDetalle(riesgoId){
     ['Descripción probabilidad residual','__desc_prob_res__'],
     ['Impacto residual','Impacto riesgo residual'],
     ['Descripción impacto residual','__desc_imp_res__'],
-    ['Nivel residual','Nivel de riesgo residual'],
+    ['Nivel residual','__nivel_res__'],
   ];
   const F2 = CONFIG.MATRIZ_FIELDS;
   const _esOport = esOportunidad(r);
@@ -4680,6 +4713,24 @@ function verDetalle(riesgoId){
     if(col==='__desc_imp_inh__'){ const i=_esOport?v['Impacto oportunidad inherente']:v['Impacto riesgo inherente']; return descImpacto(i,_esOport); }
     if(col==='__desc_prob_res__'){ const p=_esOport?v['Probabilidad oportunidad residual']:v['Probabilidad riesgo residual']; return descProbabilidad(p); }
     if(col==='__desc_imp_res__'){ const i=_esOport?v['Impacto oportunidad residual']:v['Impacto riesgo residual']; return descImpacto(i,_esOport); }
+    // Niveles: se calculan (el campo fórmula de QuintaDB puede venir vacío) y se
+    // muestran con su descripción, p.ej. "Nivel 4 · Intolerable".
+    if(col==='__nivel_inh__'){
+      const n = (_esOport ? nivelOportInherenteDe(r) : nivelInherenteDe(r)).nivel;
+      return n ? `Nivel ${n} · ${descNivel(n,_esOport)}` : '';
+    }
+    if(col==='__nivel_res__'){
+      let n;
+      if(_esOport){
+        let idxR=num(v['Índice de prioridad oportunidad residual']);
+        if(!idxR) idxR=num(v['Probabilidad oportunidad residual'])*num(v['Impacto oportunidad residual']);
+        n=nivelOportDe(idxR);
+      } else {
+        const idxR=num(v['Índice de prioridad riesgo residual']);
+        n=nivelDe(idxR);
+      }
+      return n ? `Nivel ${n} · ${descNivel(n,_esOport)}` : '';
+    }
     const val = v[col];
     if(!val || val===col) return '';
     return val;
@@ -4887,6 +4938,7 @@ function editarRiesgo(riesgoId){
       <div class="field"><label>Descripción probabilidad</label><div class="readonly-pill" id="ed_desc_prob">—</div></div>
       <div class="field"><label>Impacto inherente</label><select id="ed_imp" onchange="actualizarDescEvalEdit()">${opt(['1: Muy bajo','2: Bajo','3: Moderado','4: Alto'],cur('Impacto riesgo inherente'))}</select></div>
       <div class="field"><label>Descripción impacto</label><div class="readonly-pill" id="ed_desc_imp">—</div></div>
+      <div class="field full"><label>Nivel inherente</label><div id="ed_nivel_badge"><span class="lvl-badge" style="background:var(--mist)">Pendiente</span></div></div>
     </div></div>
 
     <div class="edit-sec"><div class="edit-sec-tit" id="ed_sec4_titulo">4 · Tratamiento</div>
@@ -5235,9 +5287,9 @@ async function renderReeval() {
       return `<tr id="reev-row-${r.id}">
         <td style="max-width:280px" title="${(desc||'').replace(/"/g,'&quot;')}">${tag}${desc.length>80?desc.slice(0,80)+'…':desc}</td>
         <td title="${(proc||'').replace(/"/g,'&quot;')}">${proc.length>34?proc.slice(0,34)+'…':proc}</td>
-        <td>${nInh?`<span class="lvl-badge lvl-${nInh}">Nivel ${nInh}</span>`:'—'}</td>
+        <td>${badgeNivel(nInh, op)}</td>
         <td id="reev-proc-${r.id}"><span class="hint">evaluando…</span></td>
-        <td>${nRes?`<span class="lvl-badge lvl-${nRes}">Nivel ${nRes}</span>`:'—'}</td>
+        <td>${badgeNivel(nRes, op)}</td>
         <td id="reev-act-${r.id}"><span class="hint">…</span></td>
       </tr>`;
     }).join('');
@@ -5320,8 +5372,24 @@ function abrirReeval(riesgoId){
   document.getElementById('reevalImp').innerHTML = opt(impOpts);
   document.getElementById('reevalFecha').value='';
   document.getElementById('reevalModal').classList.remove('hidden');
+  actualizarNivelReeval(); // resetear descripciones y badge
 }
 window.abrirReeval = abrirReeval;
+
+// Muestra en vivo las descripciones de prob/impacto y el nivel residual con su descripción
+function actualizarNivelReeval(){
+  const r = STATE.matriz.find(x=>x.id===REEVAL_ACTUAL);
+  const esOport = r ? esOportunidad(r) : false;
+  const g = id => { const el=document.getElementById(id); return el?el.value:''; };
+  const set = (id,txt) => { const el=document.getElementById(id); if(el) el.textContent = txt||'—'; };
+  set('reeval_desc_prob', descProbabilidad(g('reevalProb')));
+  set('reeval_desc_imp', descImpacto(g('reevalImp'), esOport));
+  const idx = num(g('reevalProb'))*num(g('reevalImp'));
+  const lvl = idx ? (esOport ? nivelOportDe(idx) : nivelDe(idx)) : 0;
+  const badge = document.getElementById('reeval_nivel_badge');
+  if(badge) badge.innerHTML = lvl ? badgeNivel(lvl, esOport) : '<span class="lvl-badge" style="background:var(--mist)">Pendiente</span>';
+}
+window.actualizarNivelReeval = actualizarNivelReeval;
 
 function cerrarReeval(){ document.getElementById('reevalModal').classList.add('hidden'); }
 
@@ -5369,7 +5437,6 @@ function setConn(ok, msg) {
    ARRANQUE
    ============================================================ */
 (async function init(){
-  console.log('%c[VERSIÓN] Riesgos build con diagnóstico de guardado — 2026-07-08','color:#1f7a3d;font-weight:bold');
   initStaticSelects();
   try {
     // ensureRelOptions y precargarMaestrasProceso son independientes → en paralelo.
