@@ -172,12 +172,15 @@
   th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mist);font-weight:600;padding:10px 12px;border-bottom:2px solid var(--line)}
   td{padding:11px 12px;border-bottom:1px solid var(--line);color:var(--slate)}
   /* Tabla de seguimiento: filas compactas y celdas centradas verticalmente */
-  table.tabla-cards{font-size:12.5px}
-  table.tabla-cards > thead > tr > th{padding:7px 6px;font-size:11.5px;vertical-align:bottom;line-height:1.25}
-  table.tabla-cards > tbody > tr:not(.grupo-row):not(.hist-row) > td{padding:6px 6px;vertical-align:middle}
-  table.tabla-cards td.cards-main{min-width:190px;line-height:1.3}
+  table.tabla-cards{font-size:12px}
+  table.tabla-cards > thead > tr > th{padding:7px 4px;font-size:11px;vertical-align:bottom;line-height:1.22}
+  table.tabla-cards > tbody > tr:not(.grupo-row):not(.hist-row) > td{padding:6px 4px;vertical-align:middle}
+  table.tabla-cards td.cards-main{width:210px;max-width:210px;line-height:1.28}
+  /* Anchos ajustados para evitar el scroll horizontal */
+  table.tabla-cards td[data-label="Proceso"]{width:110px;max-width:110px}
   /* Etiquetas y textos secundarios más compactos */
-  table.tabla-cards td .tag{padding:3px 7px;font-size:11.5px}
+  table.tabla-cards td .tag{padding:3px 6px;font-size:11px;white-space:nowrap}
+  table.tabla-cards td .hint{font-size:11.5px}
   tr:hover td{background:var(--paper)}
   .tag{display:inline-block;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600}
   .tag-proc{background:#e8f3ec;color:var(--n1)} .tag-noproc{background:var(--paper);color:var(--mist)}
@@ -282,7 +285,7 @@
   /* Botón de ícono (ojo) */
   .icon-btn{background:#fff;border:1px solid var(--line);border-radius:8px;width:36px;height:32px;cursor:pointer;font-size:16px;line-height:1;transition:.15s}
   /* En la tabla de seguimiento los botones son más compactos (4 por línea) */
-  table.tabla-cards td.cards-acciones .icon-btn{width:30px;height:28px;font-size:14px;border-radius:6px}
+  table.tabla-cards td.cards-acciones .icon-btn{width:27px;height:26px;font-size:13px;border-radius:6px}
   .icon-btn:hover{border-color:var(--brand-2);background:var(--paper)}
   /* Panel de historial (acordeón bajo el riesgo) */
   .hist-panel{padding:18px 20px}
@@ -3244,9 +3247,9 @@ async function renderSeguimiento() {
       <tr>
         <td data-label="#" style="text-align:center;color:var(--mist);font-variant-numeric:tabular-nums">${num}</td>
         <td class="cards-main" data-label="Descripción">
-          ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>52?f.desc.slice(0,52)+'…':f.desc}</a>
+          ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>42?f.desc.slice(0,42)+'…':f.desc}</a>
         </td>
-        <td data-label="Proceso" style="max-width:140px" title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>24?f.proc.slice(0,24)+'…':f.proc}${f.desact?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
+        <td data-label="Proceso" title="${(f.proc||'').replace(/"/g,'&quot;')}" style="font-size:11.5px">${f.proc.length>18?f.proc.slice(0,18)+'…':f.proc}${f.desact?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
         <td data-label="Nivel inherente" style="white-space:nowrap">${nivelBadge(f.nivel, f.op)}</td>
         <td data-label="¿Tiene control?" style="white-space:nowrap">${
           f.ctrlTxt==='Sí' ? '<span class="tag tag-proc" title="Cuenta con un control establecido: se monitorea mediante indicadores">🛡️ Sí</span>'
@@ -3261,15 +3264,15 @@ async function renderSeguimiento() {
             : '<span title="No aplica: el monitoreo solo existe en registros de nivel 4 con control" style="color:var(--mist)">—</span>'}
         </td>
         <td data-label="Estado de medidas" id="estado-${f.id}" style="font-size:12px">${f.nReportes?'<span class="hint">…</span>':estadoPill('Pendiente')}</td>
-        <td data-label="% Avance de medidas" id="avance-${f.id}" style="min-width:104px">${f.nReportes?'<span class="hint">…</span>':'<span class="hint">—</span>'}</td>
-        <td data-label="% Cumplim. de monitoreo" id="moncumpl-${f.id}" style="min-width:104px">${f.tieneMonitoreo?'<span class="hint">…</span>':'<span class="hint" title="Solo aplica a registros de nivel 4 con control establecido">n/a</span>'}</td>
+        <td data-label="% Avance de medidas" id="avance-${f.id}" style="min-width:82px">${f.nReportes?'<span class="hint">…</span>':'<span class="hint">—</span>'}</td>
+        <td data-label="% Cumplim. de monitoreo" id="moncumpl-${f.id}" style="min-width:82px">${f.tieneMonitoreo?'<span class="hint">…</span>':'<span class="hint" title="Solo aplica a registros de nivel 4 con control establecido">n/a</span>'}</td>
         <td data-label="¿Procede reevaluación?" title="${(f.procedeTexto||'').replace(/"/g,'&quot;')}">${
           f.procede
             ? '<span class="tag tag-proc">✓ Procede</span>'
             : '<span class="tag tag-noproc">No procede</span>'
         }</td>
-        <td class="cards-acciones" style="text-align:right;vertical-align:middle;padding:5px 6px">
-          <div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:flex-end;width:132px;margin-left:auto">
+        <td class="cards-acciones" style="text-align:right;vertical-align:middle;padding:5px 4px">
+          <div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;width:116px;margin-left:auto">
           <button class="icon-btn" title="Reporte de acciones a la(s) medida(s) de respuesta" onclick="abrirReporteAcciones('${f.id}')">📋</button>
           ${f.tieneMonitoreo?`<button class="icon-btn" id="btnmon-${f.id}" title="Control y Seguimiento (se habilita cuando las medidas estén al 100%)" onclick="abrirMetasMonitoreo('${f.id}')" style="border-color:var(--brand-2);display:none">🎯</button>`:''}
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
