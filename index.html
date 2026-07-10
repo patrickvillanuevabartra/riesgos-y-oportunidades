@@ -128,7 +128,7 @@
   .calc .v{font-family:'IBM Plex Sans',sans-serif;font-size:26px;font-weight:600;margin-top:3px}
   .lvl-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:8px;font-size:13px;font-weight:600;color:#fff;margin-top:4px;white-space:nowrap}
   /* Dentro de tablas el badge no necesita margen superior */
-  table.tabla-cards td .lvl-badge{margin-top:0;padding:5px 10px;font-size:12.5px}
+  table.tabla-cards td .lvl-badge{margin-top:0;padding:4px 8px;font-size:11.5px;gap:4px}
   .lvl-1{background:var(--n1)} .lvl-2{background:var(--n2)} .lvl-3{background:var(--n3)} .lvl-4{background:var(--n4)}
 
   /* Botones */
@@ -172,8 +172,12 @@
   th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mist);font-weight:600;padding:10px 12px;border-bottom:2px solid var(--line)}
   td{padding:11px 12px;border-bottom:1px solid var(--line);color:var(--slate)}
   /* Tabla de seguimiento: filas compactas y celdas centradas verticalmente */
-  table.tabla-cards > tbody > tr:not(.grupo-row):not(.hist-row) > td{padding:7px 10px;vertical-align:middle}
-  table.tabla-cards td.cards-main{min-width:230px;line-height:1.35}
+  table.tabla-cards{font-size:12.5px}
+  table.tabla-cards > thead > tr > th{padding:8px 6px;font-size:11.5px}
+  table.tabla-cards > tbody > tr:not(.grupo-row):not(.hist-row) > td{padding:6px 6px;vertical-align:middle}
+  table.tabla-cards td.cards-main{min-width:190px;line-height:1.3}
+  /* Etiquetas y textos secundarios más compactos */
+  table.tabla-cards td .tag{padding:3px 7px;font-size:11.5px}
   tr:hover td{background:var(--paper)}
   .tag{display:inline-block;padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600}
   .tag-proc{background:#e8f3ec;color:var(--n1)} .tag-noproc{background:var(--paper);color:var(--mist)}
@@ -277,6 +281,8 @@
   .riesgo-link:hover{color:var(--brand-2)}
   /* Botón de ícono (ojo) */
   .icon-btn{background:#fff;border:1px solid var(--line);border-radius:8px;width:36px;height:32px;cursor:pointer;font-size:16px;line-height:1;transition:.15s}
+  /* En la tabla de seguimiento los botones son más compactos (4 por línea) */
+  table.tabla-cards td.cards-acciones .icon-btn{width:30px;height:28px;font-size:14px;border-radius:6px}
   .icon-btn:hover{border-color:var(--brand-2);background:var(--paper)}
   /* Panel de historial (acordeón bajo el riesgo) */
   .hist-panel{padding:18px 20px}
@@ -586,7 +592,7 @@
 
     <div id="segTotales" style="margin-bottom:12px"></div>
     <div class="card"><div class="tabla-wrap" style="padding:6px 4px"><table class="tabla-cards">
-      <thead><tr><th style="width:38px;text-align:center">#</th><th id="thSegPrimera">Riesgo</th><th>Proceso</th><th style="white-space:nowrap">Nivel inh.</th><th title="¿Existen controles? (Sí/No)" style="cursor:help;white-space:nowrap">Controles</th><th>Reportes</th><th>Último estado</th><th title="% Avance de cumplimiento de medidas de respuesta" style="cursor:help">% Avance medidas</th><th title="% cumplimiento del plan de monitoreo (último reporte de monitoreo del control)" style="cursor:help">% Cumpl. monitoreo</th><th>¿Procede reevaluación?</th><th style="text-align:right">Acciones</th></tr></thead>
+      <thead><tr><th style="width:30px;text-align:center">#</th><th id="thSegPrimera">Riesgo</th><th>Proceso</th><th style="white-space:nowrap">Nivel inh.</th><th title="¿Existen controles? (Sí/No)" style="cursor:help;white-space:nowrap">Ctrl.</th><th style="white-space:nowrap" title="N° de reportes de acciones">Rep.</th><th>Último estado</th><th title="% Avance de cumplimiento de medidas de respuesta" style="cursor:help;white-space:nowrap">% Medidas</th><th title="% cumplimiento del plan de monitoreo (último reporte de monitoreo del control)" style="cursor:help;white-space:nowrap">% Monit.</th><th style="white-space:nowrap" title="¿Procede reevaluación?">¿Reeval.?</th><th style="text-align:right">Acciones</th></tr></thead>
       <tbody id="tablaSeguimiento"><tr><td colspan="11" class="empty"><h3>Cargando…</h3></td></tr></tbody>
     </table></div></div>
   </section>
@@ -3176,9 +3182,9 @@ async function renderSeguimiento() {
       <tr>
         <td data-label="#" style="text-align:center;color:var(--mist);font-variant-numeric:tabular-nums">${num}</td>
         <td class="cards-main" data-label="Descripción">
-          ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>62?f.desc.slice(0,62)+'…':f.desc}</a>
+          ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>52?f.desc.slice(0,52)+'…':f.desc}</a>
         </td>
-        <td data-label="Proceso" style="max-width:170px" title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>30?f.proc.slice(0,30)+'…':f.proc}${f.desact?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
+        <td data-label="Proceso" style="max-width:140px" title="${(f.proc||'').replace(/"/g,'&quot;')}">${f.proc.length>24?f.proc.slice(0,24)+'…':f.proc}${f.desact?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
         <td data-label="Nivel inh." style="white-space:nowrap">${nivelBadge(f.nivel, f.op)}</td>
         <td data-label="Controles" style="white-space:nowrap">${
           f.ctrlTxt==='Sí' ? '<span class="tag tag-proc" title="El riesgo cuenta con un control establecido">🛡️ Sí</span>'
@@ -3194,8 +3200,8 @@ async function renderSeguimiento() {
             ? '<span class="tag tag-proc">✓ Procede</span>'
             : '<span class="tag tag-noproc">No procede</span>'
         }</td>
-        <td class="cards-acciones" style="text-align:right;vertical-align:middle;padding:6px 8px">
-          <div style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;width:160px;margin-left:auto">
+        <td class="cards-acciones" style="text-align:right;vertical-align:middle;padding:5px 6px">
+          <div style="display:flex;flex-wrap:wrap;gap:3px;justify-content:flex-end;width:132px;margin-left:auto">
           <button class="icon-btn" title="Reporte de acciones a la(s) medida(s) de respuesta" onclick="abrirReporteAcciones('${f.id}')">📋</button>
           ${f.tieneMonitoreo?`<button class="icon-btn" id="btnmon-${f.id}" title="Control y Seguimiento (se habilita cuando las medidas estén al 100%)" onclick="abrirMetasMonitoreo('${f.id}')" style="border-color:var(--brand-2);display:none">🎯</button>`:''}
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
