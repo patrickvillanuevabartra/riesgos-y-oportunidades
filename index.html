@@ -763,6 +763,7 @@
           <div class="field"><label>Descripción impacto</label><div class="readonly-pill" id="reeval_desc_imp">—</div></div>
           <div class="field full"><label>Nivel residual</label><div id="reeval_nivel_badge"><span class="lvl-badge" style="background:var(--mist)">Pendiente</span></div></div>
           <div class="field full"><div id="reeval_nivel_accion" class="hint" style="font-size:12px;padding:8px 11px;background:var(--paper);border-left:3px solid var(--line);border-radius:6px;display:none"></div></div>
+          <div class="field full"><label>Estatus resultante tras el tratamiento</label><div id="reeval_estatus"><span class="hint" style="font-size:12px">Se definirá al elegir probabilidad e impacto residuales.</span></div></div>
           <div class="field full"><label>Fecha de reevaluación</label><input type="date" id="reevalFecha"></div>
         </div>
       </div>
@@ -795,9 +796,19 @@
     </details>
 
     <div class="card"><div class="tabla-wrap" style="padding:6px 4px"><table>
-      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Nivel inherente</th><th>¿Procede?</th><th>Nivel residual</th><th></th></tr></thead>
-      <tbody id="tablaReeval"><tr><td colspan="6" class="empty"><h3>Cargando…</h3></td></tr></tbody>
-    </table></div></div>
+      <thead><tr><th>Riesgo</th><th>Proceso</th><th>Nivel inherente</th><th>¿Procede?</th><th>Nivel residual</th><th title="Decisión de gestión tras la reevaluación (ISO 31000, cl. 6.5)" style="cursor:help">Estatus post-tratamiento</th><th></th></tr></thead>
+      <tbody id="tablaReeval"><tr><td colspan="7" class="empty"><h3>Cargando…</h3></td></tr></tbody>
+    </table></div>
+    <div class="hint" style="font-size:11.5px;padding:10px 12px 4px;border-top:1px solid var(--line);margin-top:4px;line-height:1.6">
+      <strong>Estatus post-tratamiento.</strong> Se deriva del <em>nivel residual</em> (el que queda después de aplicar los controles y medidas) y expresa la decisión de gestión sobre la aceptabilidad del riesgo, conforme a ISO 31000 (cl. 6.5). Solo se define una vez realizada la reevaluación.
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px 14px">
+        <span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--n1);margin-right:5px"></i><strong>Aceptado</strong> — no requiere acciones adicionales</span>
+        <span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--n2);margin-right:5px"></i><strong>En Vigilancia</strong> — tolerable, solo monitoreo</span>
+        <span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--n3);margin-right:5px"></i><strong>En Mitigación Obligatoria</strong> — requiere medidas adicionales</span>
+        <span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--n4);margin-right:5px"></i><strong>Crítico</strong> — intervención inmediata</span>
+      </div>
+      <div style="margin-top:6px;opacity:.85">En oportunidades el estatus mide la <em>eficacia del aprovechamiento</em>: Incipiente → En Crecimiento → Consolidada → Maximizada.</div>
+    </div></div>
   </section>
 
   <!-- ===================== ADMINISTRACIÓN (solo admin) ===================== -->
@@ -2410,6 +2421,63 @@ function accionNivel(n, esOport){
 }
 window.accionNivel = accionNivel;
 
+/* ============================================================
+   ESTATUS POST-TRATAMIENTO (se deriva del NIVEL RESIDUAL)
+   Responde "¿qué hacemos ahora con este registro?" una vez
+   aplicado el tratamiento y realizada la reevaluación.
+   Cierra el ciclo PHVA (fase Actuar) e implementa la decisión
+   de aceptabilidad del riesgo residual (ISO 31000, cl. 6.5).
+   ============================================================ */
+const _ESTATUS_RIESGO = {
+  1:{ titulo:'Aceptado',
+      detalle:'No requiere acciones adicionales. La organización decide si mantiene el control actual.' },
+  2:{ titulo:'En Vigilancia',
+      detalle:'El riesgo es tolerable. Se decide si se mejora el control o solo se monitorea.' },
+  3:{ titulo:'En Mitigación Obligatoria',
+      detalle:'Acción requerida: implementar medidas adicionales para bajar el nivel a Nivel 2 o 1.' },
+  4:{ titulo:'Crítico / Intervención Inmediata',
+      detalle:'Acción inmediata: detener o cambiar la operación hasta reducir la probabilidad.' }
+};
+const _ESTATUS_OPORT = {
+  1:{ titulo:'Oportunidad Incipiente',
+      detalle:'Mínimo impacto: la oportunidad sigue en su nivel más básico a pesar de las medidas.' },
+  2:{ titulo:'Oportunidad en Crecimiento',
+      detalle:'Éxito parcial: la medida aumentó el valor, pero aún tiene camino por recorrer.' },
+  3:{ titulo:'Oportunidad Consolidada',
+      detalle:'Buen aprovechamiento: la medida acercó la oportunidad a su potencial.' },
+  4:{ titulo:'Oportunidad Maximizada',
+      detalle:'Éxito total: la medida logró llevar la oportunidad a su punto más alto.' }
+};
+// Devuelve {titulo, detalle} del estatus según el nivel RESIDUAL. Vacío si aún no hay residual.
+function estatusPostTratamiento(nivelResidual, esOport){
+  if(!nivelResidual) return null;
+  return (esOport ? _ESTATUS_OPORT : _ESTATUS_RIESGO)[nivelResidual] || null;
+}
+// Nivel residual de un registro (0 si aún no fue reevaluado)
+function nivelResidualDe(r){
+  const v = r.values||{};
+  const n = x=>{ const m=String(x||'').match(/^(\d+)/); return m?+m[1]:0; };
+  const op = esOportunidad(r);
+  if(op){
+    let idx = n(v['Índice de prioridad oportunidad residual']);
+    if(!idx) idx = n(v['Probabilidad oportunidad residual'])*n(v['Impacto oportunidad residual']);
+    return nivelOportDe(idx);
+  }
+  let idx = n(v['Índice de prioridad riesgo residual']);
+  if(!idx) idx = n(v['Probabilidad riesgo residual'])*n(v['Impacto riesgo residual']);
+  return nivelDe(idx);
+}
+// Píldora visual del estatus, coloreada según el nivel residual
+function pillEstatus(nivelResidual, esOport){
+  const e = estatusPostTratamiento(nivelResidual, esOport);
+  if(!e) return '<span class="hint" style="font-size:11.5px" title="Se define tras la reevaluación">Sin reevaluar</span>';
+  const color = NIVEL_COLORS[nivelResidual] || 'var(--mist)';
+  return `<span class="tag" style="background:${color};color:#fff;border:0;white-space:nowrap;cursor:help" title="${e.detalle.replace(/"/g,'&quot;')}">${e.titulo}</span>`;
+}
+window.estatusPostTratamiento = estatusPostTratamiento;
+window.nivelResidualDe = nivelResidualDe;
+window.pillEstatus = pillEstatus;
+
 function descNivel(n, esOport){
   if(!n) return '';
   return (esOport ? _TXT_NIVEL_OPORT : _TXT_NIVEL_RIESGO)[n] || '';
@@ -3216,6 +3284,8 @@ async function descargarExcel(){
       ['Imp. residual', r=>g(r,'Impacto riesgo residual',F.imp_riesgo_res.id)],
       ['Nivel residual', r=>{ const op=esOportunidad(r); if(op){ let i=num(g(r,'Índice de prioridad oportunidad residual','')); if(!i) i=num(g(r,'Probabilidad oportunidad residual',''))*num(g(r,'Impacto oportunidad residual','')); return nivelOportDe(i)||''; } const idx=num(g(r,'Índice de prioridad riesgo residual',F.indice_riesgo_res.id)); return nivelDe(idx)||''; }],
       ['Descripción nivel residual', r=>{ const op=esOportunidad(r); let n; if(op){ let i=num(g(r,'Índice de prioridad oportunidad residual','')); if(!i) i=num(g(r,'Probabilidad oportunidad residual',''))*num(g(r,'Impacto oportunidad residual','')); n=nivelOportDe(i); } else { n=nivelDe(num(g(r,'Índice de prioridad riesgo residual',F.indice_riesgo_res.id))); } return descNivel(n,op); }],
+      ['Estatus post-tratamiento', r=>{ const op=esOportunidad(r); const e=estatusPostTratamiento(nivelResidualDe(r),op); return e?e.titulo:'Sin reevaluar'; }],
+      ['Decisión de gestión', r=>{ const op=esOportunidad(r); const e=estatusPostTratamiento(nivelResidualDe(r),op); return e?e.detalle:''; }],
       ['Certificación control', r=>g(r,'Certificación de Implementación del Control',F.certificacion_control.id)],
       ['Creado', r=>r.created_at||''],
       ['Última actualización', r=>r.updated_at||'']
@@ -4904,6 +4974,7 @@ function verDetalle(riesgoId){
     ['Impacto residual','Impacto riesgo residual'],
     ['Descripción impacto residual','__desc_imp_res__'],
     ['Nivel residual','__nivel_res__'],
+    ['Estatus post-tratamiento','__estatus_post__'],
   ];
   const F2 = CONFIG.MATRIZ_FIELDS;
   const _esOport = esOportunidad(r);
@@ -4939,6 +5010,11 @@ function verDetalle(riesgoId){
         n=nivelDe(idxR);
       }
       return n ? `Nivel ${n} · ${descNivel(n,_esOport)}` : '';
+    }
+    if(col==='__estatus_post__'){
+      const n = nivelResidualDe(r);
+      const e = estatusPostTratamiento(n, _esOport);
+      return e ? (e.titulo+'. '+e.detalle) : 'Sin reevaluar';
     }
     const val = v[col];
     if(!val || val===col) return '';
@@ -5508,7 +5584,7 @@ async function renderReeval() {
     await precargarMaestrasProceso(); // garantizar diccionario id→nombre
     const F = CONFIG.MATRIZ_FIELDS;
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
-    if(!recs.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty"><h3>Sin riesgos</h3><p>Registra el primero en la pestaña Registrar.</p></div></td></tr>'; return; }
+    if(!recs.length){ tb.innerHTML='<tr><td colspan="7"><div class="empty"><h3>Sin riesgos</h3><p>Registra el primero en la pestaña Registrar.</p></div></td></tr>'; return; }
     // Pinta primero las filas con estado "evaluando…" y luego resuelve el "procede" en vivo.
     tb.innerHTML = recs.map(r=>{
       const op = esOportunidad(r);
@@ -5533,6 +5609,7 @@ async function renderReeval() {
         <td>${badgeNivel(nInh, op)}</td>
         <td id="reev-proc-${r.id}"><span class="hint">evaluando…</span></td>
         <td>${badgeNivel(nRes, op)}</td>
+        <td>${pillEstatus(nRes, op)}</td>
         <td id="reev-act-${r.id}"><span class="hint">…</span></td>
       </tr>`;
     }).join('');
@@ -5551,7 +5628,7 @@ async function renderReeval() {
         : `<span class="hint" style="font-size:12px" title="${(info.motivo||'').replace(/"/g,'&quot;')}">🔒 Bloqueado</span>`;
     }
   } catch(e){ setConn(false,e.message);
-    tb.innerHTML=`<tr><td colspan="6"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
+    tb.innerHTML=`<tr><td colspan="7"><div class="empty"><h3>No se pudo cargar</h3><p>${e.message}</p></div></td></tr>`; }
 }
 
 // Determina si un riesgo puede reevaluarse, según su nivel inherente:
@@ -5638,6 +5715,16 @@ function actualizarNivelReeval(){
       cajaAcc.style.borderLeftColor = NIVEL_COLORS[lvl] || 'var(--line)';
       cajaAcc.style.display = '';
     } else cajaAcc.style.display = 'none';
+  }
+  // Estatus post-tratamiento: qué hacer con el registro tras la reevaluación
+  const cajaEst = document.getElementById('reeval_estatus');
+  if(cajaEst){
+    if(lvl){
+      const e = estatusPostTratamiento(lvl, esOport);
+      cajaEst.innerHTML = `${pillEstatus(lvl, esOport)}<div class="hint" style="font-size:12px;margin-top:6px">${e?e.detalle:''}</div>`;
+    } else {
+      cajaEst.innerHTML = '<span class="hint" style="font-size:12px">Se definirá al elegir probabilidad e impacto residuales.</span>';
+    }
   }
 }
 window.actualizarNivelReeval = actualizarNivelReeval;
