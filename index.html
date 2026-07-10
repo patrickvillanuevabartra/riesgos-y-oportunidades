@@ -2603,13 +2603,19 @@ async function renderDashboard() {
     // Distribución inherente vs residual (nivel 4 arriba → nivel 1 abajo, por criticidad)
     const nombres={1:'Nivel 1 · Bajo',2:'Nivel 2 · Medio',3:'Nivel 3 · Alto',4:'Nivel 4 · Intolerable'};
     const maxD=Math.max(1,...Object.values(distInh),...Object.values(distRes));
-    document.getElementById('distNiveles').innerHTML = [4,3,2,1].map(n=>`
+    document.getElementById('distNiveles').innerHTML = [4,3,2,1].map(n=>{
+      const cI = distInh[n]||0, cR = distRes[n]||0;
+      // Ancho real: 0 registros → barra sin ancho (no un mínimo falso que aparente valor)
+      const wI = cI ? (cI/maxD*100) : 0;
+      const wR = cR ? (cR/maxD*100) : 0;
+      return `
       <div class="bar-row"><div class="lbl">${nombres[n]}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(distInh[n]/maxD*100)||2}%;background:${NIVEL_COLORS[n]}">${distInh[n]||''}</div></div>
+        <div class="bar-track">${cI?`<div class="bar-fill" style="width:${wI}%;background:${NIVEL_COLORS[n]}">${cI}</div>`:'<span class="hint" style="font-size:11px;padding-left:8px;line-height:22px">0</span>'}</div>
       </div>
       <div class="bar-row"><div class="lbl" style="opacity:.6;font-size:11px">→ residual</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${(distRes[n]/maxD*100)||2}%;background:${NIVEL_COLORS[n]};opacity:.55">${distRes[n]||''}</div></div>
-      </div>`).join('');
+        <div class="bar-track">${cR?`<div class="bar-fill" style="width:${wR}%;background:${NIVEL_COLORS[n]};opacity:.55">${cR}</div>`:'<span class="hint" style="font-size:11px;padding-left:8px;line-height:22px" title="Aún no hay registros reevaluados en este nivel">0 · sin reevaluar</span>'}</div>
+      </div>`;
+    }).join('');
 
     // Por proceso
     const procEntries=Object.entries(porProc).sort((a,b)=>b[1]-a[1]).slice(0,6);
