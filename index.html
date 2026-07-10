@@ -500,8 +500,8 @@
           <input type="hidden" id="f_existe_ctrl" value="">
         </div>
         <!-- Notas contextuales (solo nivel 4) -->
-        <div class="ctrl-nota no solo-n4 hidden" id="f_nota_no" style="margin-bottom:14px">🛠️ <strong>Sin control aún.</strong> Define la respuesta y la(s) medida(s). El <strong>avance de esas medidas</strong> se registra después con el botón 📋 «Reporte de acciones» en Seguimiento.</div>
-        <div class="ctrl-nota si solo-n4 hidden" id="f_nota_si" style="margin-bottom:14px">🛡️ <strong>Control existente.</strong> Aquí defines el control, su indicador, fórmula y frecuencias (la <em>planificación</em>). El <strong>monitoreo</strong> (metas, mediciones y certificación) se gestiona luego con el botón 🎯 «Control y Seguimiento» en Seguimiento, cuando las medidas estén al 100%.</div>
+        <div class="ctrl-nota no solo-n4 hidden" id="f_nota_no" style="margin-bottom:14px">🛠️ <strong>Sin control aún.</strong> Define la respuesta y la(s) medida(s). El <strong>avance de esas medidas</strong> se registra después con el botón 📋 «Reporte de acciones» en Seguimiento.<br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar registro»</strong> para que quede registrada tu elección en «¿Existen controles?».</span></div>
+        <div class="ctrl-nota si solo-n4 hidden" id="f_nota_si" style="margin-bottom:14px">🛡️ <strong>Control existente.</strong> Aquí defines el control, su indicador, fórmula y frecuencias (la <em>planificación</em>). El <strong>monitoreo</strong> (metas, mediciones y certificación) se gestiona luego con el botón 🎯 «Control y Seguimiento» en Seguimiento, cuando las medidas estén al <strong>100%</strong> y el último estado sea <strong>Culminado/Ejecutado</strong>.<br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar registro»</strong> para que quede registrada tu elección en «¿Existen controles?».</span></div>
         <div class="grid">
           <!-- Respuesta + Medida: visibles salvo cuando hay control "Sí" (nivel 4) -->
           <div class="field oculta-si-control" id="f_wrap_respuesta"><label>Respuesta</label><select id="f_respuesta"><option value="">Seleccione…</option><option>Eliminar</option><option>Mitigar</option><option>Trasladar</option><option>Asumir</option></select></div>
@@ -1491,6 +1491,11 @@ function nivelInherenteForm(){
 // Actualiza el hidden, resalta el botón activo, muestra la nota y recalcula campos.
 function setExisteCtrl(pref, val){
   if(pref!=='f') return;
+  // Los controles solo aplican al nivel más alto (4)
+  if(nivelInherenteForm()!==4){
+    toast('Los controles con indicadores solo aplican a registros de nivel 4 (el más alto).', true);
+    return;
+  }
   const hid = document.getElementById('f_existe_ctrl');
   if(hid) hid.value = val;
   // Resaltar botón activo
@@ -1508,6 +1513,11 @@ window.setExisteCtrl = setExisteCtrl;
 
 // Interruptor "¿Existen controles?" en Editar (hidden ed_ctrl + botones + notas).
 function setExisteCtrlEd(val){
+  // Los controles solo aplican al nivel más alto (4)
+  if((window._edNivelInherente||0)!==4){
+    toast('Los controles con indicadores solo aplican a registros de nivel 4 (el más alto).', true);
+    return;
+  }
   const hid = document.getElementById('ed_ctrl');
   if(hid) hid.value = val;
   document.querySelectorAll('#ed_ctrl_switch button').forEach(b=>{
@@ -1541,10 +1551,30 @@ function toggleControles(pref){
     : 'Define cómo se tratará el riesgo mediante la respuesta y las medidas. Los controles con indicadores aplican solo a riesgos de nivel 4.';
   // Recorre wrappers
   document.querySelectorAll('[id^="'+pref+'_wrap_"], [id="'+pref+'_nota_no"], [id="'+pref+'_nota_si"]').forEach(el=>{
-    // El interruptor "¿Existen controles?" siempre visible: no depende del nivel.
+    // El interruptor "¿Existen controles?" siempre visible, pero solo se HABILITA
+    // en el nivel más alto (nivel 4, tanto para riesgos como para oportunidades),
+    // porque los controles con indicadores solo aplican a ese nivel.
     if(el.id===pref+'_wrap_existe'){
       el.classList.remove('hidden');
       el.style.setProperty('display','flex','important');
+      const botones = el.querySelectorAll('.ctrl-switch button');
+      botones.forEach(b=>{
+        b.disabled = !esN4;
+        b.style.opacity = esN4 ? '' : '.45';
+        b.style.cursor  = esN4 ? 'pointer' : 'not-allowed';
+        b.title = esN4 ? '' : 'Los controles con indicadores solo aplican al nivel 4 (el más alto).';
+      });
+      // Aviso bajo el interruptor cuando no aplica
+      let aviso = document.getElementById(pref+'_aviso_ctrl');
+      if(!aviso){
+        aviso = document.createElement('div');
+        aviso.id = pref+'_aviso_ctrl';
+        aviso.className = 'hint';
+        aviso.style.cssText = 'font-size:12px;margin-top:6px';
+        el.appendChild(aviso);
+      }
+      aviso.textContent = esN4 ? '' : 'Disponible solo para el nivel 4 (el más alto). Este registro se trata con respuesta y medidas.';
+      aviso.style.display = esN4 ? 'none' : '';
       return;
     }
     let mostrar = true;
@@ -1569,6 +1599,19 @@ function toggleControles(pref){
     if(el.id && !idOk) return;
     el.classList.toggle('hidden', ocultarTratam);
   });
+  // Si el nivel NO es 4, los controles no aplican. En el formulario de Registrar
+  // se limpia la elección para no arrastrar un "Sí" indebido. En Editar se respeta
+  // el valor ya guardado (solo queda deshabilitado el interruptor).
+  if(!esN4 && pref==='f'){
+    const hid = document.getElementById(selId);
+    if(hid && hid.value){
+      hid.value = '';
+      document.querySelectorAll('#f_ctrl_switch button').forEach(b=>b.classList.remove('on-si','on-no'));
+      const nNo=document.getElementById('f_nota_no'), nSi=document.getElementById('f_nota_si');
+      if(nNo) nNo.classList.add('hidden');
+      if(nSi) nSi.classList.add('hidden');
+    }
+  }
 }
 window.toggleControles = toggleControles;
 ['f_prob_r_inh','f_imp_r_inh','f_prob_o_inh','f_imp_o_inh'].forEach(id=>{
@@ -3169,7 +3212,9 @@ async function renderSeguimiento() {
     // Agrupar por oficina; dentro de cada grupo ordenar por nivel inherente (mayor arriba)
     const grupos = {};
     filas.forEach(f => { (grupos[f.oficina] = grupos[f.oficina] || []).push(f); });
-    Object.values(grupos).forEach(arr => arr.sort((a,b)=> (b.idx-a.idx) || (b.nivel-a.nivel)));
+    // Ordenar por NIVEL descendente (4 arriba → 1 abajo). El índice solo desempata,
+    // porque riesgos y oportunidades usan escalas distintas y no son comparables.
+    Object.values(grupos).forEach(arr => arr.sort((a,b)=> (b.nivel-a.nivel) || (b.idx-a.idx)));
     const oficinasOrdenadas = Object.keys(grupos).sort();
 
     const nivelBadge = (n, esOport) => badgeNivel(n, esOport);
@@ -5010,8 +5055,8 @@ function _editarRiesgoInterno(riesgoId){
       </div>
       <input type="hidden" id="ed_ctrl" value="${cur('¿Existen controles?')||''}">
     </div>
-    <div class="ctrl-nota no solo-n4 hidden" id="ed_nota_no" style="margin-bottom:12px">🛠️ <strong>Sin control aún.</strong> Define la respuesta y la(s) medida(s). El <strong>avance</strong> se registra con el botón 📋 «Reporte de acciones» en Seguimiento.</div>
-    <div class="ctrl-nota si solo-n4 hidden" id="ed_nota_si" style="margin-bottom:12px">🛡️ <strong>Control existente.</strong> Aquí defines el control, indicador, fórmula y frecuencias (la <em>planificación</em>). El <strong>monitoreo, metas y certificación</strong> se gestionan con el botón 🎯 «Control y Seguimiento» en Seguimiento, cuando las medidas estén al 100%.</div>
+    <div class="ctrl-nota no solo-n4 hidden" id="ed_nota_no" style="margin-bottom:12px">🛠️ <strong>Sin control aún.</strong> Define la respuesta y la(s) medida(s). El <strong>avance</strong> se registra con el botón 📋 «Reporte de acciones» en Seguimiento.<br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar cambios»</strong> para que quede registrado el cambio en «¿Existen controles?».</span></div>
+    <div class="ctrl-nota si solo-n4 hidden" id="ed_nota_si" style="margin-bottom:12px">🛡️ <strong>Control existente.</strong> Aquí defines el control, indicador, fórmula y frecuencias (la <em>planificación</em>). El <strong>monitoreo, metas y certificación</strong> se gestionan con el botón 🎯 «Control y Seguimiento» en Seguimiento, cuando las medidas estén al <strong>100%</strong> y el último estado se encuentre en <strong>Culminado/Ejecutado</strong>.<br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar cambios»</strong> para que quede registrado el cambio en «¿Existen controles?».</span></div>
     <div class="grid">
       <!-- Respuesta + Medida: visibles salvo cuando hay control "Sí" -->
       <div class="field oculta-si-control" id="ed_wrap_respuesta"><label>Respuesta</label><select id="ed_resp">${opt(['Eliminar','Mitigar','Trasladar','Asumir'],cur('Respuesta al riesgo u oportunidad'))}</select></div>
@@ -5041,7 +5086,18 @@ function _editarRiesgoInterno(riesgoId){
   const _ecVal = /^s[ií]$/i.test(_ecRaw) ? 'Sí' : (/^no$/i.test(_ecRaw) ? 'No' : '');
   const _hidCtrl = document.getElementById('ed_ctrl');
   if(_hidCtrl) _hidCtrl.value = _ecVal; // dejar el hidden normalizado
-  if(_ecVal) setExisteCtrlEd(_ecVal); else toggleControles('ed');
+  // Marcar visualmente el botón activo SIN pasar por la validación de nivel,
+  // para no perder el valor de registros ya guardados.
+  if(_ecVal){
+    document.querySelectorAll('#ed_ctrl_switch button').forEach(b=>{
+      b.classList.remove('on-si','on-no');
+      if(b.dataset.v===_ecVal) b.classList.add(_ecVal==='Sí'?'on-si':'on-no');
+    });
+    const nNo=document.getElementById('ed_nota_no'), nSi=document.getElementById('ed_nota_si');
+    if(nNo) nNo.classList.toggle('hidden', _ecVal!=='No');
+    if(nSi) nSi.classList.toggle('hidden', _ecVal!=='Sí');
+  }
+  toggleControles('ed');
   // Red de seguridad: el interruptor "¿Existen controles?" SIEMPRE debe verse.
   const _wrapExiste = document.getElementById('ed_wrap_existe');
   if(_wrapExiste) _wrapExiste.classList.remove('hidden');
