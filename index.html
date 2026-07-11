@@ -5682,22 +5682,33 @@ async function puedeReevaluar(r){
   }
   const medidas100 = (pctMedidas===100);
   const culminado = /culmin|ejecut/i.test(String(estado));
-  // Los niveles 3-4 CON control tienen monitoreo formal: su reevaluación depende
-  // del cumplimiento del plan de monitoreo. El resto, del avance de las medidas.
   const _conControl = (typeof tieneControlSi==='function') ? tieneControlSi(r) : false;
   const viaMonitoreo = (nivel>=3 && _conControl);
+
   if(viaMonitoreo){
+    // NIVEL 3-4 CON CONTROL: monitoreo al 100% Y control certificado.
     const pctMon = await _cumplimientoMonitoreo(r);
-    const etq = 'Nivel '+nivel+' con control:';
-    if(pctMon==null) return {procede:false, motivo:etq+' aún sin reportes de monitoreo del control.'};
-    if(pctMon>=100) return {procede:true};
-    return {procede:false, motivo:etq+' el cumplimiento de monitoreo ('+pctMon+'%) debe llegar al 100%.'};
+    if(pctMon==null) return {procede:false, motivo:'Nivel '+nivel+' con control: aún sin reportes de monitoreo del control.'};
+    if(pctMon<100) return {procede:false, motivo:'Nivel '+nivel+' con control: el cumplimiento de monitoreo ('+pctMon+'%) debe llegar al 100%.'};
+    // Verificar certificación del control
+    const certRaw = String((r.values||{})['Certificación de Implementación del Control']||'');
+    const certificado = /certificad|operativ/i.test(certRaw);
+    if(!certificado) return {procede:false, motivo:'Nivel '+nivel+' con control: falta certificar el control (marca «Certificado/Operativo» en la pestaña Certificación).'};
+    return {procede:true};
   } else {
-    // Tratamiento por medidas: 100% + estado culminado
-    if(medidas100 && culminado) return {procede:true};
-    if(!subIds.length) return {procede:false, motivo:'Aún sin reportes de avance de las medidas de respuesta.'};
-    if(!medidas100) return {procede:false, motivo:'Las medidas de respuesta deben estar al 100% (actual: '+(isNaN(pctMedidas)?'—':pctMedidas+'%')+').'};
-    return {procede:false, motivo:'El último estado debe ser «Culminado/Ejecutado» (actual: '+(estado||'—')+').'};
+    // NIVEL 1-2 (o cualquiera sin monitoreo formal): medidas 100% + Culminado.
+    // Además, si el riesgo es nivel 1-2, el interruptor debe estar en "Sí" (el
+    // control ya quedó implementado tras cumplir las medidas).
+    if(!medidas100 || !culminado){
+      if(!subIds.length) return {procede:false, motivo:'Aún sin reportes de avance de las medidas de respuesta.'};
+      if(!medidas100) return {procede:false, motivo:'Las medidas de respuesta deben estar al 100% (actual: '+(isNaN(pctMedidas)?'—':pctMedidas+'%')+').'};
+      return {procede:false, motivo:'El último estado debe ser «Culminado/Ejecutado» (actual: '+(estado||'—')+').'};
+    }
+    // Medidas completas: para nivel 1-2 se exige además el control en "Sí"
+    if(nivel<=2 && !_conControl){
+      return {procede:false, motivo:'Medidas completas. Marca «Sí, ya existe un control» en el interruptor para confirmar que el control quedó implementado y habilitar la reevaluación.'};
+    }
+    return {procede:true};
   }
 }
 window.puedeReevaluar = puedeReevaluar;
