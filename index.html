@@ -3252,6 +3252,7 @@ async function descargarExcel(){
       ['Responsable', r=>leerTexto(r,F.responsable_txt,true)],
       ['Prob. inherente', r=>g(r,'Probabilidad riesgo inherente',F.prob_riesgo_inh.id)],
       ['Imp. inherente', r=>g(r,'Impacto riesgo inherente',F.imp_riesgo_inh.id)],
+      ['Índice inherente (P×I)', r=>{ const op=esOportunidad(r); const info=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)); const p=num(op?g(r,'Probabilidad oportunidad inherente',''):g(r,'Probabilidad riesgo inherente','')); const i=num(op?g(r,'Impacto oportunidad inherente',''):g(r,'Impacto riesgo inherente','')); return info.idx?`P${p} × I${i} = ${info.idx}`:''; }],
       ['Nivel inherente', r=>{ const op=esOportunidad(r); return (op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel||''; }],
       ['Descripción nivel inherente', r=>{ const op=esOportunidad(r); const n=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel; return descNivel(n,op); }],
       ['Acción recomendada (nivel inherente)', r=>{ const op=esOportunidad(r); const n=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel; return accionNivel(n,op); }],
@@ -3273,6 +3274,7 @@ async function descargarExcel(){
       // --- Residual ---
       ['Prob. residual', r=>g(r,'Probabilidad riesgo residual',F.prob_riesgo_res.id)],
       ['Imp. residual', r=>g(r,'Impacto riesgo residual',F.imp_riesgo_res.id)],
+      ['Índice residual (P×I)', r=>{ const op=esOportunidad(r); const p=num(op?g(r,'Probabilidad oportunidad residual',''):g(r,'Probabilidad riesgo residual','')); const i=num(op?g(r,'Impacto oportunidad residual',''):g(r,'Impacto riesgo residual','')); let idx=num(op?g(r,'Índice de prioridad oportunidad residual',''):g(r,'Índice de prioridad riesgo residual','')); if(!idx) idx=p*i; return idx?`P${p} × I${i} = ${idx}`:''; }],
       ['Nivel residual', r=>{ const op=esOportunidad(r); if(op){ let i=num(g(r,'Índice de prioridad oportunidad residual','')); if(!i) i=num(g(r,'Probabilidad oportunidad residual',''))*num(g(r,'Impacto oportunidad residual','')); return nivelOportDe(i)||''; } const idx=num(g(r,'Índice de prioridad riesgo residual',F.indice_riesgo_res.id)); return nivelDe(idx)||''; }],
       ['Descripción nivel residual', r=>{ const op=esOportunidad(r); let n; if(op){ let i=num(g(r,'Índice de prioridad oportunidad residual','')); if(!i) i=num(g(r,'Probabilidad oportunidad residual',''))*num(g(r,'Impacto oportunidad residual','')); n=nivelOportDe(i); } else { n=nivelDe(num(g(r,'Índice de prioridad riesgo residual',F.indice_riesgo_res.id))); } return descNivel(n,op); }],
       ['Estatus post-tratamiento', r=>{ const op=esOportunidad(r); const e=estatusPostTratamiento(nivelResidualDe(r),op); return e?e.titulo:'Sin reevaluar'; }],
@@ -4998,7 +5000,7 @@ function verDetalle(riesgoId){
     ['Descripción probabilidad inherente','__desc_prob_inh__'],
     ['Impacto inherente','Impacto riesgo inherente'],
     ['Descripción impacto inherente','__desc_imp_inh__'],
-    ['Índice inherente','Índice de prioridad riesgo inherente'],
+    ['Índice de prioridad inherente','__indice_inh__'],
     ['Nivel inherente','__nivel_inh__'],
     ['Acción recomendada','__accion_inh__'],
     ['¿Existen controles?','¿Existen controles?'],
@@ -5014,6 +5016,7 @@ function verDetalle(riesgoId){
     ['Descripción probabilidad residual','__desc_prob_res__'],
     ['Impacto residual','Impacto riesgo residual'],
     ['Descripción impacto residual','__desc_imp_res__'],
+    ['Índice de prioridad residual','__indice_res__'],
     ['Nivel residual','__nivel_res__'],
     ['Estatus post-tratamiento','__estatus_post__'],
   ];
@@ -5032,6 +5035,20 @@ function verDetalle(riesgoId){
     if(col==='__desc_imp_res__'){ const i=_esOport?v['Impacto oportunidad residual']:v['Impacto riesgo residual']; return descImpacto(i,_esOport); }
     // Niveles: se calculan (el campo fórmula de QuintaDB puede venir vacío) y se
     // muestran con su descripción, p.ej. "Nivel 4 · Intolerable".
+    // Índice de prioridad (P×I) con desglose. Funciona para riesgo y oportunidad.
+    if(col==='__indice_inh__'){
+      const p = num(_esOport ? v['Probabilidad oportunidad inherente'] : v['Probabilidad riesgo inherente']);
+      const i = num(_esOport ? v['Impacto oportunidad inherente'] : v['Impacto riesgo inherente']);
+      const idx = (_esOport ? nivelOportInherenteDe(r) : nivelInherenteDe(r)).idx || (p*i);
+      return idx ? `P${p} × I${i} = ${idx}` : '';
+    }
+    if(col==='__indice_res__'){
+      const p = num(_esOport ? v['Probabilidad oportunidad residual'] : v['Probabilidad riesgo residual']);
+      const i = num(_esOport ? v['Impacto oportunidad residual'] : v['Impacto riesgo residual']);
+      let idx = num(_esOport ? v['Índice de prioridad oportunidad residual'] : v['Índice de prioridad riesgo residual']);
+      if(!idx) idx = p*i;
+      return idx ? `P${p} × I${i} = ${idx}` : '';
+    }
     if(col==='__nivel_inh__'){
       const n = (_esOport ? nivelOportInherenteDe(r) : nivelInherenteDe(r)).nivel;
       return n ? `Nivel ${n} · ${descNivel(n,_esOport)}` : '';
