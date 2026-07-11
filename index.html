@@ -3413,11 +3413,7 @@ async function renderSeguimiento() {
         <td data-label="Estado de medidas" id="estado-${f.id}" style="font-size:12px">${f.nReportes?'<span class="hint">…</span>':estadoPill('Pendiente')}</td>
         <td data-label="% Avance de medidas" id="avance-${f.id}" style="min-width:82px">${f.nReportes?'<span class="hint">…</span>':'<span class="hint">—</span>'}</td>
         <td data-label="% Cumplim. de monitoreo" id="moncumpl-${f.id}" style="min-width:82px">${f.tieneMonitoreo?'<span class="hint">…</span>':'<span class="hint" title="El monitoreo formal con indicadores y certificación aplica a riesgos de nivel alto o intolerable (3-4) con control establecido. En niveles bajo y medio, el control se documenta pero no requiere certificación formal.">n/a</span>'}</td>
-        <td data-label="¿Procede reevaluación?" title="${(f.procedeTexto||'').replace(/"/g,'&quot;')}">${
-          f.procede
-            ? '<span class="tag tag-proc">✓ Procede</span>'
-            : '<span class="tag tag-noproc">No procede</span>'
-        }</td>
+        <td data-label="¿Procede reevaluación?" id="procede-${f.id}" title="Evaluando condiciones…"><span class="hint" style="font-size:11.5px">…</span></td>
         <td class="cards-acciones" style="text-align:right;vertical-align:middle;padding:5px 4px">
           <div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;width:116px;margin-left:auto">
           <button class="icon-btn" title="Reporte de acciones a la(s) medida(s) de respuesta" onclick="abrirReporteAcciones('${f.id}')">📋</button>
@@ -3448,6 +3444,8 @@ async function renderSeguimiento() {
     // Cargar "último estado" + "% avance" de forma diferida (solo con reportes).
     // Esta función decide además si habilita el monitoreo (cuando medidas = 100%).
     cargarUltimosEstados(filas.filter(f=>f.subIds.length));
+    // Calcular "¿Procede reevaluación?" con la lógica real, para TODAS las filas.
+    cargarProcedeReeval(filas);
     // Riesgos nivel 4 con control pero SIN reportes de acciones aún: medidas = 0% → monitoreo bloqueado.
     filas.filter(f=>f.tieneMonitoreo && !f.subIds.length).forEach(f=>{
       const btnMon=document.getElementById('btnmon-'+f.id);
@@ -3547,6 +3545,33 @@ async function cargarUltimosEstados(filasConReportes) {
     }
   }
 }
+
+// Calcula "¿Procede reevaluación?" para cada fila usando la lógica REAL
+// (puedeReevaluar), que considera medidas 100% + Culminado + interruptor "Sí"
+// (nivel 1-2) o monitoreo 100% + certificación (nivel 3-4). Actualiza la celda en vivo.
+async function cargarProcedeReeval(filas){
+  await precargarSubcache();
+  for(const f of filas){
+    const cel = document.getElementById('procede-'+f.id);
+    if(!cel) continue;
+    try{
+      const r = STATE.matriz.find(x=>x.id===f.id);
+      if(!r){ cel.innerHTML='<span class="hint">—</span>'; continue; }
+      const info = await puedeReevaluar(r);
+      if(info.procede){
+        cel.innerHTML = '<span class="tag tag-proc">✓ Procede</span>';
+        cel.title = 'Cumple las condiciones para reevaluar.';
+      } else {
+        cel.innerHTML = '<span class="tag tag-noproc">No procede</span>';
+        cel.title = info.motivo || 'Aún no cumple las condiciones para reevaluar.';
+      }
+    }catch(e){
+      cel.innerHTML = '<span class="hint">—</span>';
+      cel.title = 'No se pudo evaluar: '+(e.message||e);
+    }
+  }
+}
+window.cargarProcedeReeval = cargarProcedeReeval;
 
 // Lee el último reporte de monitoreo de cada riesgo nivel 4 con control y muestra
 // su "% cumplimiento" en la columna correspondiente de la tabla de seguimiento.
