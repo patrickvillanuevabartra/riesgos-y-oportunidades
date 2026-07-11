@@ -496,7 +496,7 @@
 
       <div class="section">
         <div class="section-title"><span class="section-num">4</span><span id="f_sec4_titulo">Tratamiento</span></div>
-        <div class="section-desc" id="f_sec4_desc">Define cómo se tratará el riesgo. Los controles con indicadores aplican solo a riesgos de nivel 4.</div>
+        <div class="section-desc" id="f_sec4_desc">Indica si ya existe un control y descríbelo. El monitoreo formal con indicadores se reserva a niveles alto e intolerable (3-4).</div>
         <!-- Pregunta ¿Existen controles? — SOLO nivel 4 -->
         <div class="field" id="f_wrap_existe" style="margin-bottom:14px">
           <label style="margin-bottom:6px">¿Ya existe un control implementado para este riesgo?</label>
@@ -506,9 +506,9 @@
           </div>
           <input type="hidden" id="f_existe_ctrl" value="">
           <div class="hint" style="font-size:12px;margin-top:6px">Si <strong>ya hay un control</strong>, definirás su indicador y sistema de monitoreo. Si <strong>aún no lo hay</strong>, el riesgo se tratará con respuesta y medidas.</div>        </div>
-        <!-- Notas contextuales (solo nivel 4) -->
-        <div class="ctrl-nota no solo-n4 hidden" id="f_nota_no" style="margin-bottom:14px">🛠️ <strong>El riesgo se tratará con medidas de respuesta.</strong> Como no existe un control previo, a continuación debes indicar la <strong>respuesta</strong> (eliminar, mitigar, trasladar o asumir) y describir la(s) <strong>medida(s)</strong> concretas que se implementarán.<br><span style="display:inline-block;margin-top:6px">📋 Más adelante, el avance de esas medidas se irá registrando desde el botón «Reporte de acciones» en la pestaña <strong>Seguimiento</strong>.</span><br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar registro»</strong> para conservar esta elección.</span></div>
-        <div class="ctrl-nota si solo-n4 hidden" id="f_nota_si" style="margin-bottom:14px">🛡️ <strong>Control existente.</strong> Aquí defines el control, su indicador, fórmula y frecuencias (la <em>planificación</em>). El <strong>monitoreo</strong> (metas, mediciones y certificación) se gestiona luego con el botón 🎯 «Control y Seguimiento» en Seguimiento, cuando las medidas estén al <strong>100%</strong> y el último estado sea <strong>Culminado/Ejecutado</strong>.<br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar registro»</strong> para que quede registrada tu elección en «¿Existen controles?».</span></div>
+        <!-- Notas contextuales del interruptor de control -->
+        <div class="ctrl-nota no hidden" id="f_nota_no" style="margin-bottom:14px">🛠️ <strong>El riesgo se tratará con medidas de respuesta.</strong> Como no existe un control previo, a continuación debes indicar la <strong>respuesta</strong> (eliminar, mitigar, trasladar o asumir) y describir la(s) <strong>medida(s)</strong> concretas que se implementarán.<br><span style="display:inline-block;margin-top:6px">📋 Más adelante, el avance de esas medidas se irá registrando desde el botón «Reporte de acciones» en la pestaña <strong>Seguimiento</strong>.</span><br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar registro»</strong> para conservar esta elección.</span></div>
+        <div class="ctrl-nota si hidden" id="f_nota_si" style="margin-bottom:14px">🛡️ <strong>Control existente.</strong> Describe el control que ya está implementado para este riesgo.<span class="solo-n4"> Al ser un riesgo de nivel alto, define también su <strong>indicador, fórmula y frecuencias</strong>; el monitoreo (metas, mediciones y certificación) se gestiona luego con el botón 🎯 «Control y Seguimiento» en Seguimiento, cuando las medidas estén al <strong>100%</strong> y el estado sea <strong>Culminado/Ejecutado</strong>.</span><br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar registro»</strong> para conservar esta elección.</span></div>
         <div class="grid">
           <!-- Respuesta + Medida: visibles salvo cuando hay control "Sí" (nivel 4) -->
           <div class="field oculta-si-control" id="f_wrap_respuesta"><label>Respuesta</label><select id="f_respuesta"><option value="">Seleccione…</option><option>Eliminar</option><option>Mitigar</option><option>Trasladar</option><option>Asumir</option></select></div>
@@ -559,7 +559,7 @@
         </div>
         <ol>
           <li><strong>📋 Reporte de acciones a las medidas de respuesta.</strong> Registra cómo avanza lo que se comprometió a hacer para tratar el riesgo. El <strong>% completado</strong> de cada reporte alimenta la columna <strong>«% Avance medidas»</strong>.</li>
-          <li><strong>🎯 Metas, control y plan de monitoreo.</strong> Es la etapa <em>posterior</em>: solo se habilita cuando las medidas llegan al <strong>100%</strong>. Recién ahí tiene sentido medir el control con indicadores. Mientras tanto verás un candado 🔒 en la columna «% Cumpl. monitoreo». Aplica solo a riesgos de <strong>nivel 4 con control «Sí»</strong>.</li>
+          <li><strong>🎯 Metas, control y plan de monitoreo.</strong> Es la etapa <em>posterior</em>: solo se habilita cuando las medidas llegan al <strong>100%</strong>. Recién ahí tiene sentido medir el control con indicadores. Mientras tanto verás un candado 🔒 en la columna «% Cumpl. monitoreo». Aplica a riesgos de <strong>nivel alto o intolerable (3-4) con control «Sí»</strong>.</li>
           <li><strong>Reevaluación (riesgo residual).</strong> Procede cuando el control está <strong>Certificado/Operativo</strong> y al menos una acción está <strong>Culminada/Ejecutada</strong>. Se gestiona en la pestaña «Reevaluación».</li>
         </ol>
         <div class="tip">📌 Recordatorio: «% Avance medidas» mide cuánto se han ejecutado las acciones; «% Cumpl. monitoreo» mide qué tan bien funciona el control ya implementado. No son lo mismo y no conviven hasta completar las medidas.</div>
@@ -604,11 +604,11 @@
         <th id="thSegPrimera">Riesgo</th>
         <th>Proceso</th>
         <th style="white-space:nowrap" title="Nivel de riesgo/oportunidad inherente (antes del tratamiento)">Nivel inherente</th>
-        <th style="white-space:nowrap;cursor:help" title="¿El registro cuenta con un control ya establecido? Define la ruta de tratamiento. Solo aplica a nivel 4.">¿Tiene control?</th>
+        <th style="white-space:nowrap;cursor:help" title="¿El registro cuenta con un control ya establecido? Se documenta en todos los niveles; el monitoreo formal con indicadores aplica a niveles 3-4.">¿Tiene control?</th>
         <th style="white-space:nowrap;cursor:help" title="Reportes generados. Izquierda: reportes de avance de las medidas de respuesta (botón 📋). Derecha: reportes de monitoreo del control (botón 🎯). El guion indica que no aplica.">N° reportes<br><span style="font-weight:400;font-size:10.5px">medidas / monitoreo</span></th>
         <th style="white-space:nowrap;cursor:help" title="Estado del último reporte de las medidas de respuesta">Estado<br><span style="font-weight:400;font-size:10.5px">de medidas</span></th>
         <th style="white-space:nowrap;cursor:help" title="% de avance acumulado en la ejecución de las medidas de respuesta">% Avance<br><span style="font-weight:400;font-size:10.5px">de medidas</span></th>
-        <th style="white-space:nowrap;cursor:help" title="% de cumplimiento del plan de monitoreo del control (último reporte de monitoreo). Solo para nivel 4 con control.">% Cumplim.<br><span style="font-weight:400;font-size:10.5px">de monitoreo</span></th>
+        <th style="white-space:nowrap;cursor:help" title="% de cumplimiento del plan de monitoreo del control (último reporte de monitoreo). Aplica a niveles 3-4 con control.">% Cumplim.<br><span style="font-weight:400;font-size:10.5px">de monitoreo</span></th>
         <th style="white-space:nowrap;cursor:help" title="¿El registro cumple las condiciones para ser reevaluado?">¿Procede<br><span style="font-weight:400;font-size:10.5px">reevaluación?</span></th>
         <th style="text-align:right">Acciones</th>
       </tr></thead>
@@ -617,7 +617,7 @@
     <div class="hint" style="font-size:11.5px;padding:8px 10px 2px;border-top:1px solid var(--line);margin-top:4px">
       <strong>N° reportes</strong> = <span style="color:var(--slate);font-weight:700">medidas</span> / <span style="color:var(--brand);font-weight:700">monitoreo</span>.
       Los reportes de medidas se registran con 📋 «Reporte de acciones»; los de monitoreo, con 🎯 «Control y Seguimiento».
-      El guion (—) indica que el monitoreo no aplica (solo para nivel 4 con control establecido).
+      El guion (—) indica que el monitoreo formal no aplica (se reserva a niveles 3-4 con control establecido).
     </div></div>
   </section>
 
@@ -1477,7 +1477,7 @@ function actualizarDescEval(){
   set('f_desc_prob_o', descProbabilidad(g('f_prob_o_inh')));
   set('f_desc_imp_o', descImpacto(g('f_imp_o_inh'), true));
   // Recalcular índice/nivel: esto refresca el badge Y la visibilidad del interruptor
-  // de controles (que solo debe verse en nivel 4).
+  // de controles (visible en todos los niveles; monitoreo formal en 3-4).
   if(typeof calcIndice==='function') calcIndice();
 }
 window.actualizarDescEval = actualizarDescEval;
@@ -1590,65 +1590,53 @@ function toggleControles(pref){
   const esNo = /^no$/i.test(existe);
   const nivel = (pref==='f') ? nivelInherenteForm() : (window._edNivelInherente||0);
   const esN4 = nivel===4;
+  // Umbral del sistema de monitoreo formal (indicador/fórmula/frecuencias/🎯): niveles 3 y 4.
+  const monitoreoFormal = nivel>=3;
   // Título dinámico de la sección 4
   const titEl = document.getElementById(pref==='f'?'f_sec4_titulo':'ed_sec4_titulo');
-  if(titEl) titEl.textContent = esN4 ? 'Controles y tratamiento' : 'Tratamiento';
+  if(titEl) titEl.textContent = 'Tratamiento y controles';
   const descEl = document.getElementById(pref==='f'?'f_sec4_desc':'ed_sec4_desc');
-  if(descEl) descEl.textContent = esN4
-    ? 'Riesgo nivel 4 (intolerable): indica si ya existe un control establecido. Si lo hay, definirás su indicador y sistema de monitoreo; si no, se tratará con respuesta y medidas.'
-    : 'Este riesgo se trata mediante la respuesta (eliminar, mitigar, trasladar o asumir) y las medidas concretas que definas a continuación. Los controles con indicadores aplican únicamente a riesgos de nivel 4.';
+  if(descEl) descEl.textContent = monitoreoFormal
+    ? 'Indica si ya existe un control. Al ser un riesgo de nivel alto, si hay control definirás su indicador y sistema de monitoreo; si no, se tratará con respuesta y medidas.'
+    : 'Indica si ya existe un control para este riesgo y descríbelo. El tratamiento se completa con la respuesta y las medidas. El monitoreo formal con indicadores se reserva a los niveles alto e intolerable.';
   // Recorre wrappers
   document.querySelectorAll('[id^="'+pref+'_wrap_"], [id="'+pref+'_nota_no"], [id="'+pref+'_nota_si"]').forEach(el=>{
-    // El interruptor "¿Existen controles?" SOLO se muestra en nivel 4, porque los
-    // controles con indicadores solo aplican a ese nivel. En niveles 1-3 se oculta
-    // por completo y el usuario ve directamente la respuesta y las medidas.
+    // El interruptor "¿Existe un control?" se muestra en TODOS los niveles:
+    // documentar controles es parte del tratamiento de cualquier riesgo.
     if(el.id===pref+'_wrap_existe'){
+      el.classList.remove('hidden');
+      el.style.setProperty('display','flex','important');
+      el.querySelectorAll('.ctrl-switch button').forEach(b=>{ b.disabled=false; b.style.opacity=''; b.style.cursor='pointer'; b.title=''; });
       const aviso = document.getElementById(pref+'_aviso_ctrl');
-      if(esN4){
-        el.classList.remove('hidden');
-        el.style.setProperty('display','flex','important');
-        el.querySelectorAll('.ctrl-switch button').forEach(b=>{ b.disabled=false; b.style.opacity=''; b.style.cursor='pointer'; b.title=''; });
-        if(aviso) aviso.style.display='none';
-      } else {
-        el.classList.add('hidden');
-        el.style.setProperty('display','none','important');
-      }
+      if(aviso) aviso.style.display='none';
       return;
     }
     let mostrar = true;
-    if(el.classList.contains('solo-n4')) mostrar = esN4;                 // solo nivel 4
+    // solo-n4 / ctrl-n4 = bloque de monitoreo formal (indicador, fórmula, frecuencias).
+    // Ahora se despliega en niveles 3-4 cuando hay control "Sí".
+    if(el.classList.contains('solo-n4')) mostrar = monitoreoFormal;
     if(el.classList.contains('ctrl-no'))  mostrar = mostrar && esNo;
     if(el.classList.contains('ctrl-si'))  mostrar = mostrar && esSi;
-    // ctrl-n4: bloque de indicadores. Se muestra con "Sí"; si el nivel se pudo
-    // calcular, se exige que sea 4. Si el nivel es 0 (no calculable), no se oculta
-    // para no perder la funcionalidad.
-    if(el.classList.contains('ctrl-n4'))  mostrar = mostrar && esSi && (esN4 || nivel===0);
-    // Las notas no/si dependen de la elección (ya no del nivel)
+    if(el.classList.contains('ctrl-n4'))  mostrar = mostrar && esSi && (monitoreoFormal || nivel===0);
+    // Notas: la nota "Sí" siempre que haya control; la "No" siempre que no
     if(el.id===pref+'_nota_no') mostrar = esNo;
     if(el.id===pref+'_nota_si') mostrar = esSi;
     el.classList.toggle('hidden', !mostrar);
   });
-  // Respuesta y Medida(s): ocultas cuando el riesgo es nivel 4 con control "Sí"
-  const ocultarTratam = (esN4 && esSi);
+  // Respuesta y Medida(s): se ocultan solo cuando hay control "Sí" CON monitoreo formal
+  // (nivel 3-4). En niveles 1-2 con control, se documenta el control y además se
+  // definen medidas, porque no hay indicadores que sustituyan al tratamiento.
+  const ocultarTratam = (monitoreoFormal && esSi);
   document.querySelectorAll('.'+'oculta-si-control').forEach(el=>{
-    // Solo afectar los del formulario correspondiente (por prefijo de sus ids o su contexto)
     const idOk = !el.id || el.id.startsWith(pref+'_');
-    // Los spacers sin id: filtrarlos por pertenencia al form activo no es trivial; se ocultan junto al bloque
     if(el.id && !idOk) return;
     el.classList.toggle('hidden', ocultarTratam);
   });
-  // Si el nivel NO es 4, los controles no aplican. En el formulario de Registrar
-  // se limpia la elección para no arrastrar un "Sí" indebido. En Editar se respeta
-  // el valor ya guardado (solo queda deshabilitado el interruptor).
-  if(!esN4 && pref==='f'){
-    const hid = document.getElementById(selId);
-    if(hid && hid.value){
-      hid.value = '';
-      document.querySelectorAll('#f_ctrl_switch button').forEach(b=>b.classList.remove('on-si','on-no'));
-      const nNo=document.getElementById('f_nota_no'), nSi=document.getElementById('f_nota_si');
-      if(nNo) nNo.classList.add('hidden');
-      if(nSi) nSi.classList.add('hidden');
-    }
+  // Fragmentos "solo-n4" dentro de las notas (texto de indicadores): visibles solo
+  // con monitoreo formal (nivel 3-4).
+  const notaSiEl = document.getElementById(pref+'_nota_si');
+  if(notaSiEl){
+    notaSiEl.querySelectorAll('.solo-n4').forEach(sp=>{ sp.style.display = monitoreoFormal ? '' : 'none'; });
   }
 }
 window.toggleControles = toggleControles;
@@ -2262,18 +2250,26 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   const _conControl = /^s[ií]$/i.test(_existeRaw);
   const _existeNorm = _conControl ? 'Sí' : (/^no$/i.test(_existeRaw) ? 'No' : '');
   if(_existeNorm) campos[F.existen_controles.id] = _existeNorm;
-  if(!_conControl){
+  const _monFormal = nivelInherenteForm()>=3; // indicadores/monitoreo solo en 3-4
+  if(_conControl){
+    // Documentar el control (en todos los niveles)
+    put(F.control_establecido, v('f_control'));
+    if(_monFormal){
+      // Nivel alto/intolerable: además, sistema de monitoreo con indicadores
+      put(F.indicador, v('f_indicador'));
+      if(F.tipo_indicador) put(F.tipo_indicador, v('f_tipo_ind'));
+      put(F.formula_indicador, v('f_formula'));
+      put(F.frecuencia_medicion, v('f_frec_med'));
+      put(F.frecuencia_calculo, v('f_frec_calc'));
+    } else {
+      // Nivel bajo/medio con control: se documenta el control y también las medidas
+      put(F.respuesta, v('f_respuesta'));
+      put(F.medida_respuesta, v('f_medida'));
+    }
+  } else {
     // Sin control: respuesta + medida de tratamiento
     put(F.respuesta, v('f_respuesta'));
     put(F.medida_respuesta, v('f_medida'));
-  } else {
-    // Con control: control establecido + sistema de monitoreo (indicadores)
-    put(F.control_establecido, v('f_control'));
-    put(F.indicador, v('f_indicador'));
-    if(F.tipo_indicador) put(F.tipo_indicador, v('f_tipo_ind'));
-    put(F.formula_indicador, v('f_formula'));
-    put(F.frecuencia_medicion, v('f_frec_med'));
-    put(F.frecuencia_calculo, v('f_frec_calc'));
   }
 
   // Origen según fuente → se guarda el NOMBRE en el campo de texto correspondiente
@@ -2730,7 +2726,7 @@ function emptyCard(t,m){ return `<div class="empty" style="grid-column:1/-1"><h3
 // Reporte "Avance de cumplimiento por rangos": clasifica cada riesgo en 4 bandas
 // (0-25 / 26-50 / 51-75 / 76-100) según DOS métricas distintas:
 //   1) % de avance de las MEDIDAS DE RESPUESTA (último reporte de acciones).
-//   2) % de cumplimiento del PLAN DE MONITOREO (último reporte de monitoreo, solo nivel 4 con control).
+//   2) % de cumplimiento del PLAN DE MONITOREO (último reporte de monitoreo, niveles 3-4 con control).
 async function renderAvancePorRangos(recs){
   const cont=document.getElementById('avancePorRangos');
   if(!cont) return;
@@ -2758,9 +2754,9 @@ async function renderAvancePorRangos(recs){
       if(!isNaN(pct)){ const p=Math.max(0,Math.min(100,pct)); medidas[bandaDe(p)].push({desc,ofi,pct:Math.round(p)}); }
       else sinMedidas++;
     } else sinMedidas++;
-    // 2) Monitoreo del control (solo nivel 4 con control)
-    const esN4=(nivelInherenteDe(r).nivel===4);
-    if(esN4 && tieneControlSi(r)){
+    // 2) Monitoreo del control (niveles 3-4 con control)
+    const conMonitoreoFormal=(nivelInherenteDe(r).nivel>=3);
+    if(conMonitoreoFormal && tieneControlSi(r)){
       totalMon++;
       const pctM=await _cumplimientoMonitoreo(r);
       if(pctM==null) sinMon++;
@@ -2824,10 +2820,10 @@ async function renderAvancePorRangos(recs){
   html+='<div style="border-top:1px dashed var(--line);margin:18px 0"></div>';
   if(totalMon===0){
     html+=`<div><div style="font-weight:700;font-size:14px;color:var(--ink)">🎯 % Cumplimiento del plan de monitoreo</div>
-      <div style="font-size:12px;color:var(--mist);margin:6px 0 0">No hay riesgos de nivel 4 con control que requieran monitoreo del plan en el filtro actual.</div></div>`;
+      <div style="font-size:12px;color:var(--mist);margin:6px 0 0">No hay riesgos de nivel 3-4 con control que requieran monitoreo del plan en el filtro actual.</div></div>`;
   } else {
     html+=bloque('🎯 % Cumplimiento del plan de monitoreo',
-      'Según el último reporte de monitoreo del control. Solo riesgos nivel 4 con control.',
+      'Según el último reporte de monitoreo del control. Riesgos de nivel 3-4 con control.',
       monitoreo, sinMon, totalMon, 'rng-mon');
   }
   cont.innerHTML=html;
@@ -3257,7 +3253,7 @@ async function descargarExcel(){
       ['Descripción nivel inherente', r=>{ const op=esOportunidad(r); const n=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel; return descNivel(n,op); }],
       ['Acción recomendada (nivel inherente)', r=>{ const op=esOportunidad(r); const n=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel; return accionNivel(n,op); }],
       // --- Tratamiento ---
-      ['¿Tiene control?', r=>{ const op=esOportunidad(r); const nivel=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel; if(nivel!==4) return 'No aplica'; const v=r.values||{}; const raw=v['¿Existen controles?']||v[F.existen_controles.id]||''; return (raw && raw!=='¿Existen controles?') ? String(raw).trim() : ''; }],
+      ['¿Tiene control?', r=>{ const v=r.values||{}; const raw=v['¿Existen controles?']||v[F.existen_controles.id]||''; return (raw && raw!=='¿Existen controles?') ? String(raw).trim() : ''; }],
       ['Respuesta', r=>g(r,'Respuesta al riesgo u oportunidad',F.respuesta.id)],
       ['Medida(s) de respuesta', r=>g(r,'Medida(s) de respuesta',F.medida_respuesta.id)],
       ['Control establecido', r=>g(r,'Control establecido',F.control_establecido.id)],
@@ -3342,16 +3338,11 @@ async function renderSeguimiento() {
       if(!_rawCtrl || _rawCtrl==='¿Existen controles?') _rawCtrl = vR[_idCtrl];
       const existeCtrl = (_rawCtrl && _rawCtrl!=='¿Existen controles?' && _rawCtrl!=='Seleccione') ? String(_rawCtrl).trim() : '';
       const _esSi = /^s[ií]$/i.test(existeCtrl);
-      const tieneMonitoreo = (ni.nivel===4 && _esSi);
-      // Columna "¿Tiene control?": el control formal solo aplica al nivel 4.
-      //  - Nivel 1-3 → "No aplica" (por diseño: se tratan con medidas de respuesta)
-      //  - Nivel 4   → "Sí" / "No" según la decisión, o "—" si aún no se registró
-      let ctrlTxt;
-      if(ni.nivel!==4){
-        ctrlTxt = 'n/a';
-      } else {
-        ctrlTxt = _esSi ? 'Sí' : (/^no$/i.test(existeCtrl) ? 'No' : '');
-      }
+      // Monitoreo formal (indicadores/metas/🎯) en niveles 3-4 con control "Sí"
+      const tieneMonitoreo = (ni.nivel>=3 && _esSi);
+      // Columna "¿Tiene control?": ahora se documenta en TODOS los niveles.
+      //  Sí / No según la elección; "—" si aún no se registró.
+      const ctrlTxt = _esSi ? 'Sí' : (/^no$/i.test(existeCtrl) ? 'No' : '');
       const monIds = subIdsDe(r, CONFIG.MATRIZ_FIELDS.reporte_monitoreo.id);
       // Estado de certificación del control (para destacar cuando procede certificar)
       const _certRaw = vR['Certificación de Implementación del Control'] || vR[CONFIG.MATRIZ_FIELDS.certificacion_control.id] || '';
@@ -3405,21 +3396,20 @@ async function renderSeguimiento() {
         <td data-label="Proceso" title="${(f.proc||'').replace(/"/g,'&quot;')}" style="font-size:11.5px">${f.proc.length>18?f.proc.slice(0,18)+'…':f.proc}${f.desact?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
         <td data-label="Nivel inherente" style="white-space:nowrap">${nivelBadge(f.nivel, f.op)}</td>
         <td data-label="¿Tiene control?" style="white-space:nowrap">${
-          f.ctrlTxt==='Sí' ? '<span class="tag tag-proc" title="Cuenta con un control establecido: se monitorea mediante indicadores">🛡️ Sí</span>'
-          : f.ctrlTxt==='No' ? '<span class="tag tag-noproc" title="Nivel 4 sin control: se trata mediante medidas de respuesta">🛠️ No</span>'
-          : f.ctrlTxt==='n/a' ? '<span class="hint" style="font-size:11.5px" title="El control formal con indicadores solo aplica a nivel 4. Este registro se trata con medidas de respuesta.">No aplica</span>'
-          : '<span class="hint" style="font-size:12px" title="Nivel 4: falta registrar si tiene control (edite el registro)">—</span>'
+          f.ctrlTxt==='Sí' ? '<span class="tag tag-proc" title="Cuenta con un control establecido">🛡️ Sí</span>'
+          : f.ctrlTxt==='No' ? '<span class="tag tag-noproc" title="Sin control: se trata mediante medidas de respuesta">🛠️ No</span>'
+          : '<span class="hint" style="font-size:12px" title="Aún no registrado (edite el riesgo para indicarlo)">—</span>'
         }</td>
         <td data-label="N° reportes (medidas / monitoreo)" style="text-align:center;white-space:nowrap">
           <span title="${f.nReportes} reporte(s) de avance de las medidas de respuesta" style="font-weight:700;color:var(--slate)">${f.nReportes}</span>
           <span style="color:var(--mist);margin:0 3px">/</span>
           ${f.tieneMonitoreo
             ? `<span title="${f.nMon} reporte(s) de monitoreo del control" style="font-weight:700;color:var(--brand)">${f.nMon}</span>`
-            : '<span title="No aplica: el monitoreo solo existe en registros de nivel 4 con control" style="color:var(--mist)">—</span>'}
+            : '<span title="No aplica: el monitoreo formal se reserva a registros de nivel 3-4 con control" style="color:var(--mist)">—</span>'}
         </td>
         <td data-label="Estado de medidas" id="estado-${f.id}" style="font-size:12px">${f.nReportes?'<span class="hint">…</span>':estadoPill('Pendiente')}</td>
         <td data-label="% Avance de medidas" id="avance-${f.id}" style="min-width:82px">${f.nReportes?'<span class="hint">…</span>':'<span class="hint">—</span>'}</td>
-        <td data-label="% Cumplim. de monitoreo" id="moncumpl-${f.id}" style="min-width:82px">${f.tieneMonitoreo?'<span class="hint">…</span>':'<span class="hint" title="Solo aplica a registros de nivel 4 con control establecido">n/a</span>'}</td>
+        <td data-label="% Cumplim. de monitoreo" id="moncumpl-${f.id}" style="min-width:82px">${f.tieneMonitoreo?'<span class="hint">…</span>':'<span class="hint" title="El monitoreo formal con indicadores y certificación aplica a riesgos de nivel alto o intolerable (3-4) con control establecido. En niveles bajo y medio, el control se documenta pero no requiere certificación formal.">n/a</span>'}</td>
         <td data-label="¿Procede reevaluación?" title="${(f.procedeTexto||'').replace(/"/g,'&quot;')}">${
           f.procede
             ? '<span class="tag tag-proc">✓ Procede</span>'
@@ -4215,7 +4205,7 @@ window.jalarMeta = jalarMeta;
 window.cargarMetasData = cargarMetasData;
 
 // === Panel de monitoreo del control (metas programadas + reportes reales) ===
-// Solo para riesgos nivel 4 con control. Se inserta dentro del panel de seguimiento.
+// Para riesgos nivel 3-4 con control. Se inserta dentro del panel de seguimiento.
 function _fmtNum(x){ if(x===''||x==null) return ''; const n=parseFloat(x); return isNaN(n)?'':(''+n); }
 async function renderPanelMonitoreo(riesgoId, r){
   const cont = document.getElementById('monitoreo-panel-'+riesgoId);
@@ -5267,8 +5257,8 @@ function _editarRiesgoInterno(riesgoId){
       <input type="hidden" id="ed_ctrl" value="${cur('¿Existen controles?')||''}">
       <div class="hint" style="font-size:12px;margin-top:6px">Si <strong>ya hay un control</strong>, definirás su indicador y sistema de monitoreo. Si <strong>aún no lo hay</strong>, el riesgo se tratará con respuesta y medidas.</div>
     </div>
-    <div class="ctrl-nota no solo-n4 hidden" id="ed_nota_no" style="margin-bottom:12px">🛠️ <strong>El riesgo se tratará con medidas de respuesta.</strong> Como no existe un control previo, indica la <strong>respuesta</strong> (eliminar, mitigar, trasladar o asumir) y describe la(s) <strong>medida(s)</strong> concretas que se implementarán.<br><span style="display:inline-block;margin-top:6px">📋 El avance de esas medidas se registra desde el botón «Reporte de acciones» en la pestaña <strong>Seguimiento</strong>.</span><br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar cambios»</strong> para conservar esta elección.</span></div>
-    <div class="ctrl-nota si solo-n4 hidden" id="ed_nota_si" style="margin-bottom:12px">🛡️ <strong>Control existente.</strong> Aquí defines el control, indicador, fórmula y frecuencias (la <em>planificación</em>). El <strong>monitoreo, metas y certificación</strong> se gestionan con el botón 🎯 «Control y Seguimiento» en Seguimiento, cuando las medidas estén al <strong>100%</strong> y el último estado se encuentre en <strong>Culminado/Ejecutado</strong>.<br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar cambios»</strong> para que quede registrado el cambio en «¿Existen controles?».</span></div>
+    <div class="ctrl-nota no hidden" id="ed_nota_no" style="margin-bottom:12px">🛠️ <strong>El riesgo se tratará con medidas de respuesta.</strong> Como no existe un control previo, indica la <strong>respuesta</strong> (eliminar, mitigar, trasladar o asumir) y describe la(s) <strong>medida(s)</strong> concretas que se implementarán.<br><span style="display:inline-block;margin-top:6px">📋 El avance de esas medidas se registra desde el botón «Reporte de acciones» en la pestaña <strong>Seguimiento</strong>.</span><br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar cambios»</strong> para conservar esta elección.</span></div>
+    <div class="ctrl-nota si hidden" id="ed_nota_si" style="margin-bottom:12px">🛡️ <strong>Control existente.</strong> Describe el control que ya está implementado para este riesgo.<span class="solo-n4"> Al ser un riesgo de nivel alto, define también su <strong>indicador, fórmula y frecuencias</strong>; el monitoreo, metas y certificación se gestionan con el botón 🎯 «Control y Seguimiento» en Seguimiento, cuando las medidas estén al <strong>100%</strong> y el estado sea <strong>Culminado/Ejecutado</strong>.</span><br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar cambios»</strong> para conservar esta elección.</span></div>
     <div class="grid">
       <!-- Respuesta + Medida: visibles salvo cuando hay control "Sí" -->
       <div class="field oculta-si-control" id="ed_wrap_respuesta"><label>Respuesta</label><select id="ed_resp">${opt(['Eliminar','Mitigar','Trasladar','Asumir'],cur('Respuesta al riesgo u oportunidad'))}</select></div>
@@ -5545,16 +5535,22 @@ async function guardarEdit(){
   const _edConControl = /^s[ií]$/i.test(_edRaw);
   const _edNorm = _edConControl ? 'Sí' : (/^no$/i.test(_edRaw) ? 'No' : '');
   if(_edNorm) set(F.existen_controles, _edNorm);
-  if(!_edConControl){
+  const _edMonFormal = (window._edNivelInherente||0)>=3;
+  if(_edConControl){
+    set(F.control_establecido, limpiar(g('ed_control')));
+    if(_edMonFormal){
+      set(F.indicador, limpiar(g('ed_indicador')));
+      if(F.tipo_indicador && g('ed_tipo_ind')) set(F.tipo_indicador, g('ed_tipo_ind'));
+      set(F.formula_indicador, limpiar(g('ed_formula')));
+      if(g('ed_frec_med')) set(F.frecuencia_medicion, g('ed_frec_med'));
+      if(g('ed_frec_calc')) set(F.frecuencia_calculo, g('ed_frec_calc'));
+    } else {
+      if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
+      set(F.medida_respuesta, limpiar(g('ed_medida')));
+    }
+  } else {
     if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
     set(F.medida_respuesta, limpiar(g('ed_medida')));
-  } else {
-    set(F.control_establecido, limpiar(g('ed_control')));
-    set(F.indicador, limpiar(g('ed_indicador')));
-    if(F.tipo_indicador && g('ed_tipo_ind')) set(F.tipo_indicador, g('ed_tipo_ind'));
-    set(F.formula_indicador, limpiar(g('ed_formula')));
-    if(g('ed_frec_med')) set(F.frecuencia_medicion, g('ed_frec_med'));
-    if(g('ed_frec_calc')) set(F.frecuencia_calculo, g('ed_frec_calc'));
   }
   // La certificación ya NO se edita aquí: se gestiona en el modal "Control y Seguimiento" (🎯).
   // Solo se escribe si por alguna razón el campo existiera en este formulario.
@@ -5681,14 +5677,18 @@ async function puedeReevaluar(r){
   }
   const medidas100 = (pctMedidas===100);
   const culminado = /culmin|ejecut/i.test(String(estado));
-  if(nivel===4){
-    // Nivel 4: requiere cumplimiento de monitoreo al 100%
+  // Los niveles 3-4 CON control tienen monitoreo formal: su reevaluación depende
+  // del cumplimiento del plan de monitoreo. El resto, del avance de las medidas.
+  const _conControl = (typeof tieneControlSi==='function') ? tieneControlSi(r) : false;
+  const viaMonitoreo = (nivel>=3 && _conControl);
+  if(viaMonitoreo){
     const pctMon = await _cumplimientoMonitoreo(r);
-    if(pctMon==null) return {procede:false, motivo:'Nivel 4: aún sin reportes de monitoreo del control.'};
+    const etq = 'Nivel '+nivel+' con control:';
+    if(pctMon==null) return {procede:false, motivo:etq+' aún sin reportes de monitoreo del control.'};
     if(pctMon>=100) return {procede:true};
-    return {procede:false, motivo:'Nivel 4: el cumplimiento de monitoreo ('+pctMon+'%) debe llegar al 100%.'};
+    return {procede:false, motivo:etq+' el cumplimiento de monitoreo ('+pctMon+'%) debe llegar al 100%.'};
   } else {
-    // Nivel < 4: medidas al 100% + estado culminado
+    // Tratamiento por medidas: 100% + estado culminado
     if(medidas100 && culminado) return {procede:true};
     if(!subIds.length) return {procede:false, motivo:'Aún sin reportes de avance de las medidas de respuesta.'};
     if(!medidas100) return {procede:false, motivo:'Las medidas de respuesta deben estar al 100% (actual: '+(isNaN(pctMedidas)?'—':pctMedidas+'%')+').'};
