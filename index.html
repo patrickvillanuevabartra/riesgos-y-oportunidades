@@ -4137,11 +4137,12 @@ function refrescarPanelTrasGuardar(riesgoId, rr){
   const modalMon = document.getElementById('modalMon');
   if(modalMon && !modalMon.classList.contains('hidden')){
     try{ renderMonPaneMetas(riesgoId, rr); renderMonPaneRep(riesgoId, rr); }catch(_){}
-    return;
-  }
-  if(document.getElementById('ed_monitoreo_cont')){
+  } else if(document.getElementById('ed_monitoreo_cont')){
     try{ renderPanelMonitoreoEdit(riesgoId, rr); }catch(_){}
   }
+  // Refrescar la tabla de Seguimiento detrás del modal para que los porcentajes
+  // de monitoreo y de medidas se actualicen en vivo, sin recargar la página.
+  if(typeof renderSeguimiento==='function'){ try{ renderSeguimiento(); }catch(_){} }
 }
 window.refrescarPanelTrasGuardar = refrescarPanelTrasGuardar;
 
