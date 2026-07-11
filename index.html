@@ -1476,6 +1476,9 @@ function actualizarDescEval(){
   set('f_desc_imp_r', descImpacto(g('f_imp_r_inh'), false));
   set('f_desc_prob_o', descProbabilidad(g('f_prob_o_inh')));
   set('f_desc_imp_o', descImpacto(g('f_imp_o_inh'), true));
+  // Recalcular índice/nivel: esto refresca el badge Y la visibilidad del interruptor
+  // de controles (que solo debe verse en nivel 4).
+  if(typeof calcIndice==='function') calcIndice();
 }
 window.actualizarDescEval = actualizarDescEval;
 
