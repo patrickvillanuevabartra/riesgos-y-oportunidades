@@ -1623,10 +1623,10 @@ function toggleControles(pref){
     if(el.id===pref+'_nota_si') mostrar = esSi;
     el.classList.toggle('hidden', !mostrar);
   });
-  // Respuesta y Medida(s): se ocultan solo cuando hay control "Sí" CON monitoreo formal
-  // (nivel 3-4). En niveles 1-2 con control, se documenta el control y además se
-  // definen medidas, porque no hay indicadores que sustituyan al tratamiento.
-  const ocultarTratam = (monitoreoFormal && esSi);
+  // Respuesta y Medida(s) se ocultan siempre que haya control "Sí", en cualquier
+  // nivel: si ya existe un control, ESE es el tratamiento; pedir respuesta y medidas
+  // duplicaría la información con la pestaña "No". Con "No", se muestran.
+  const ocultarTratam = esSi;
   document.querySelectorAll('.'+'oculta-si-control').forEach(el=>{
     const idOk = !el.id || el.id.startsWith(pref+'_');
     if(el.id && !idOk) return;
@@ -1643,7 +1643,7 @@ function toggleControles(pref){
   if(ayuda){
     ayuda.innerHTML = monitoreoFormal
       ? 'Si <strong>ya hay un control</strong>, lo describes y defines su indicador y sistema de monitoreo. Si <strong>aún no lo hay</strong>, el riesgo se trata con respuesta y medidas.'
-      : 'Si <strong>ya hay un control</strong>, lo describes (sin indicadores, por ser un nivel bajo/medio). En ambos casos defines la respuesta y las medidas.';
+      : 'Si <strong>ya hay un control</strong>, lo describes (ese es el tratamiento). Si <strong>aún no lo hay</strong>, defines la respuesta y las medidas.';
   }
 }
 window.toggleControles = toggleControles;
@@ -2259,7 +2259,7 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   if(_existeNorm) campos[F.existen_controles.id] = _existeNorm;
   const _monFormal = nivelInherenteForm()>=3; // indicadores/monitoreo solo en 3-4
   if(_conControl){
-    // Documentar el control (en todos los niveles)
+    // Con control "Sí": el control ES el tratamiento (no se piden respuesta/medidas).
     put(F.control_establecido, v('f_control'));
     if(_monFormal){
       // Nivel alto/intolerable: además, sistema de monitoreo con indicadores
@@ -2268,10 +2268,6 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
       put(F.formula_indicador, v('f_formula'));
       put(F.frecuencia_medicion, v('f_frec_med'));
       put(F.frecuencia_calculo, v('f_frec_calc'));
-    } else {
-      // Nivel bajo/medio con control: se documenta el control y también las medidas
-      put(F.respuesta, v('f_respuesta'));
-      put(F.medida_respuesta, v('f_medida'));
     }
   } else {
     // Sin control: respuesta + medida de tratamiento
@@ -5176,6 +5172,11 @@ function editarRiesgo(riesgoId){
   }catch(err){
     console.error('[editarRiesgo] ERROR:', err);
     toast('Error al abrir el formulario: '+err.message, true);
+    // Mostrar el error en el cuerpo del modal en vez de dejarlo cortado
+    const body = document.getElementById('editBody');
+    if(body) body.innerHTML = '<div style="padding:20px;color:var(--danger,#c0392b)"><strong>No se pudo cargar el formulario de este registro.</strong><br><br>Detalle técnico: '+String(err.message||err).replace(/</g,'&lt;')+'<br><br>Por favor, toma una captura de este mensaje.</div>';
+    const modal=document.getElementById('editModal');
+    if(modal) modal.classList.remove('hidden');
   }
 }
 function _editarRiesgoInterno(riesgoId){
@@ -5551,9 +5552,6 @@ async function guardarEdit(){
       set(F.formula_indicador, limpiar(g('ed_formula')));
       if(g('ed_frec_med')) set(F.frecuencia_medicion, g('ed_frec_med'));
       if(g('ed_frec_calc')) set(F.frecuencia_calculo, g('ed_frec_calc'));
-    } else {
-      if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
-      set(F.medida_respuesta, limpiar(g('ed_medida')));
     }
   } else {
     if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
