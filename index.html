@@ -258,7 +258,8 @@
   .modal-close{background:none;border:0;font-size:28px;line-height:1;color:var(--mist);cursor:pointer;padding:0 4px}
   .modal-close:hover{color:var(--ink)}
   .modal-body{padding:22px 24px}
-  .rep-item{border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-bottom:10px}
+  .rep-item{border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-bottom:10px;transition:opacity .28s ease, transform .28s ease, max-height .3s ease, margin .3s ease, padding .3s ease}
+  .rep-item.removing{opacity:0;transform:translateX(12px);max-height:0;margin:0;padding-top:0;padding-bottom:0;overflow:hidden;border-width:0}
   .rep-item .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
   .rep-item .fecha{font-size:12px;color:var(--mist);font-family:'IBM Plex Mono',monospace}
   .rep-item .acc{font-size:14px;color:var(--ink)}
@@ -5003,6 +5004,7 @@ window.guardarEdicionReporte = guardarEdicionReporte;
 async function eliminarReporte(repId){
   if(!confirm('¿Eliminar este reporte de avance? Esta acción no se puede deshacer.')) return;
   const rid = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
+  const tarjeta = document.getElementById('repitem-'+repId);
   try{
     let ok = false;
     // Método 1: DELETE directo del subregistro (funciona en la mayoría de casos).
@@ -5012,8 +5014,7 @@ async function eliminarReporte(repId){
     }catch(e1){
       console.warn('[eliminarReporte] DELETE directo falló, intento vía subformulario:', e1.message);
     }
-    // Método 2 (respaldo): si el directo falla, quitar el subregistro del riesgo
-    // padre marcándolo con _destroy en json_subforms_values.
+    // Método 2 (respaldo): quitar el subregistro del riesgo padre con _destroy.
     if(!ok && rid){
       const subforms = {};
       subforms[SUBFORM_FIELD_ID] = { entity_id: CONFIG.ENTITIES.REPORTES };
@@ -5023,17 +5024,38 @@ async function eliminarReporte(repId){
       ok = true;
     }
     if(!ok) throw new Error('No se pudo eliminar el reporte.');
+
+    // 1) Desvanecer la tarjeta en el acto (respuesta visual inmediata, sin parpadeo)
+    if(tarjeta){
+      tarjeta.classList.add('removing');
+      setTimeout(()=>{ tarjeta.remove(); actualizarConteoReportes(rid); }, 300);
+    }
     toast('Reporte eliminado.');
+
+    // 2) Sincronizar datos en SEGUNDO PLANO, sin cerrar ni reabrir el modal.
     invalidarSubcache(); STATE.matriz=[];
-    await loadMatriz(true);
-    await renderSeguimiento();
-    if(rid) reabrirReporteAcciones(rid);
+    loadMatriz(true).then(()=>{ try{ renderSeguimiento(); }catch(_){ } }).catch(()=>{});
   }catch(err){
     console.error('[eliminarReporte] ERROR:', err);
     toast('Error al eliminar el reporte: '+err.message, true);
   }
 }
 window.eliminarReporte = eliminarReporte;
+
+// Actualiza el contador "N reportes" del modal tras quitar una tarjeta, sin recargar.
+function actualizarConteoReportes(rid){
+  const cont = document.getElementById('histlist-'+rid);
+  if(!cont) return;
+  const quedan = cont.querySelectorAll('.rep-item:not(.removing)').length;
+  const head = cont.parentElement && cont.parentElement.querySelector('.grupo-count');
+  if(head) head.textContent = quedan + ' reporte' + (quedan!==1?'s':'');
+  if(quedan===0) cont.innerHTML = '<p class="hint">Sin reportes aún.</p>';
+  // Mantener sincronizado el estado del riesgo activo
+  if(SEG_RIESGO_ACTUAL && Array.isArray(SEG_RIESGO_ACTUAL.subIds)){
+    SEG_RIESGO_ACTUAL.subIds = SEG_RIESGO_ACTUAL.subIds.filter(()=>true);
+  }
+}
+window.actualizarConteoReportes = actualizarConteoReportes;
 
 
 // === Ícono de ojo → modal con el detalle completo del riesgo ===
