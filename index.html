@@ -3656,10 +3656,11 @@ function barraAvance(pct){
 // === Render del historial de reportes (HTML) para un riesgo ===
 async function renderHistorialHTML(subIds){
   if(!subIds.length) return '<p class="hint">Este riesgo aún no tiene reportes.</p>';
-  await precargarSubcache();
+  // Intentar usar el caché; si la precarga falla, seguimos con lectura individual.
+  try{ await precargarSubcache(); }catch(e){ console.warn('[renderHistorialHTML] precarga falló, se usará lectura individual:', e.message); }
   const reps = await Promise.all(subIds.map(id =>
     getSub('reportes', id)
-      .then(s=> s ? {values:s.values, created_at:s.created_at} : null).catch(()=>null)
+      .then(s=> s ? {values:s.values, created_at:s.created_at, id} : null).catch(()=>null)
   ));
   const RF = CONFIG.REPORTE_FIELDS;
   const val=(rec,col)=> rec && rec.values ? (rec.values[col]||'') : '';
@@ -3917,8 +3918,18 @@ async function abrirReporteAcciones(riesgoId){
     </details>
   </div>`;
   if(subIds.length){
-    try { document.getElementById('histlist-'+riesgoId).innerHTML = await renderHistorialHTML(subIds); }
-    catch(e){ document.getElementById('histlist-'+riesgoId).innerHTML = '<p class="hint">Error: '+e.message+'</p>'; }
+    const cont = document.getElementById('histlist-'+riesgoId);
+    try {
+      const html = await Promise.race([
+        renderHistorialHTML(subIds),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error('La lectura tardó demasiado. Recarga la página e inténtalo de nuevo.')), 20000))
+      ]);
+      if(cont) cont.innerHTML = html;
+    }
+    catch(e){
+      console.error('[abrirReporteAcciones] error cargando reportes:', e);
+      if(cont) cont.innerHTML = '<p class="hint" style="color:#c0392b">No se pudieron cargar los reportes: '+(e.message||e)+'</p>';
+    }
   }
 }
 window.abrirReporteAcciones = abrirReporteAcciones;
