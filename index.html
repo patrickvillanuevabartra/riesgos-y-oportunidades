@@ -4992,9 +4992,7 @@ window.guardarEdicionReporte = guardarEdicionReporte;
 async function eliminarReporte(repId){
   if(!confirm('¿Eliminar este reporte de avance? Esta acción no se puede deshacer.')) return;
   try{
-    const borrar = API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+repId+'.json','DELETE',{});
-    const timeout = new Promise((_,rej)=>setTimeout(()=>rej(new Error('Tardó demasiado. Recarga para verificar.')),25000));
-    await Promise.race([borrar, timeout]);
+    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+repId+'.json','DELETE');
     toast('Reporte eliminado.');
     invalidarSubcache(); STATE.matriz=[];
     await loadMatriz(true);
@@ -5002,6 +5000,7 @@ async function eliminarReporte(repId){
     const rid = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
     if(rid) reabrirReporteAcciones(rid);
   }catch(err){
+    console.error('[eliminarReporte] ERROR:', err);
     toast('Error al eliminar el reporte: '+err.message, true);
   }
 }
