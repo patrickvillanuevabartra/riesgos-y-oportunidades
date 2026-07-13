@@ -5002,13 +5002,31 @@ window.guardarEdicionReporte = guardarEdicionReporte;
 // === Eliminar un reporte de avance ===
 async function eliminarReporte(repId){
   if(!confirm('¿Eliminar este reporte de avance? Esta acción no se puede deshacer.')) return;
+  const rid = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
   try{
-    await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+repId+'.json','DELETE');
+    let ok = false;
+    // Método 1: DELETE directo del subregistro (funciona en la mayoría de casos).
+    try{
+      await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+repId+'.json','DELETE');
+      ok = true;
+    }catch(e1){
+      console.warn('[eliminarReporte] DELETE directo falló, intento vía subformulario:', e1.message);
+    }
+    // Método 2 (respaldo): si el directo falla, quitar el subregistro del riesgo
+    // padre marcándolo con _destroy en json_subforms_values.
+    if(!ok && rid){
+      const subforms = {};
+      subforms[SUBFORM_FIELD_ID] = { entity_id: CONFIG.ENTITIES.REPORTES };
+      subforms[SUBFORM_FIELD_ID][repId] = { _destroy: '1' };
+      await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+rid+'.json','PUT',
+        { json_subforms_values: JSON.stringify(subforms) });
+      ok = true;
+    }
+    if(!ok) throw new Error('No se pudo eliminar el reporte.');
     toast('Reporte eliminado.');
     invalidarSubcache(); STATE.matriz=[];
     await loadMatriz(true);
     await renderSeguimiento();
-    const rid = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
     if(rid) reabrirReporteAcciones(rid);
   }catch(err){
     console.error('[eliminarReporte] ERROR:', err);
