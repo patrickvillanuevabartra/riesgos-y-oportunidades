@@ -55,7 +55,7 @@ const CONFIG = {
     riesgo_u_oportunidad:    { id: "ajW5fNsv5cSOkUcb_dRZOw", type: "select", options: ["Riesgo","Oportunidad"] },
     actividad:               { id: "bHWPVcM1HdRikFWPpcHSom", type: "string" },
     riesgo_desc:             { id: "aEW7vppbrdS4oXv0VcLSoh", type: "text" },
-    oportunidad_desc:        { id: "c6W5CsWQ5kFykQWRWxaSoV", type: "text", col: "Oportunidad - text" },
+    oportunidad_desc:        { id: "c6W5CsWQ5kFykQWRWxaSoV", type: "text", col: "Oportunidad" },
     causas:                  { id: "dcHXqRWOrcK4kbW4NcUHKS", type: "text" },
     consecuencias:           { id: "cOWOTHWObcMyzZrmotrJ9W", type: "text" },
 
