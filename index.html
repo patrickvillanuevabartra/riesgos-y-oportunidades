@@ -2484,10 +2484,14 @@ window.limpiarPillsResponsable = limpiarPillsResponsable;
 
 // Reinicia el interruptor "¿Existen controles?" de Registrar (sin selección)
 function limpiarInterruptorCtrl(){
-  const hid=document.getElementById('f_existe_ctrl'); if(hid) hid.value='';
-  document.querySelectorAll('#f_ctrl_switch button').forEach(b=>b.classList.remove('on-si','on-no'));
+  // Por defecto "No" (aún no hay control): así la columna muestra "No" y no "—".
+  const hid=document.getElementById('f_existe_ctrl'); if(hid) hid.value='No';
+  document.querySelectorAll('#f_ctrl_switch button').forEach(b=>{
+    b.classList.remove('on-si','on-no');
+    if(b.dataset.v==='No') b.classList.add('on-no');
+  });
   const nNo=document.getElementById('f_nota_no'), nSi=document.getElementById('f_nota_si');
-  if(nNo) nNo.classList.add('hidden'); if(nSi) nSi.classList.add('hidden');
+  if(nNo) nNo.classList.remove('hidden'); if(nSi) nSi.classList.add('hidden');
 }
 window.limpiarInterruptorCtrl = limpiarInterruptorCtrl;
 document.getElementById('btnReset').onclick = () => {
@@ -3213,8 +3217,11 @@ function nivelOportInherenteDe(r){
 // Descripción del registro, sea riesgo u oportunidad (con la columna correcta).
 function descripcionDe(r){
   const v=r.values||{};
-  const ri = v['Riesgo']; if(ri && ri!=='Riesgo') var dR=ri;
-  const op = v['Oportunidad - text']; if(op && op!=='Oportunidad - text') var dO=op;
+  const F=CONFIG.MATRIZ_FIELDS;
+  const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
+  // Leer por NOMBRE de columna y también por ID (por si la columna se llama distinto).
+  const dR = limpio(v['Riesgo']!=='Riesgo'?v['Riesgo']:'') || limpio(F.riesgo_desc && v[F.riesgo_desc.id]);
+  const dO = limpio(v['Oportunidad']!=='Oportunidad'?v['Oportunidad']:'') || limpio(F.oportunidad_desc && v[F.oportunidad_desc.id]);
   if(esOportunidad(r)) return dO || dR || '(sin descripción)';
   return dR || dO || '(sin descripción)';
 }
@@ -3478,7 +3485,8 @@ async function renderSeguimiento() {
       const tieneMonitoreo = (ni.nivel===4 && _esSi);
       // Columna "¿Tiene control?": ahora se documenta en TODOS los niveles.
       //  Sí / No según la elección; "—" si aún no se registró.
-      const ctrlTxt = _esSi ? 'Sí' : (/^no$/i.test(existeCtrl) ? 'No' : '');
+      // Vacío se interpreta como "No" (aún no hay control), no como indefinido.
+      const ctrlTxt = _esSi ? 'Sí' : 'No';
       const monIds = subIdsDe(r, CONFIG.MATRIZ_FIELDS.reporte_monitoreo.id);
       // Estado de certificación del control (para destacar cuando procede certificar)
       const _certRaw = vR['Certificación de Implementación del Control'] || vR[CONFIG.MATRIZ_FIELDS.certificacion_control.id] || '';
@@ -5220,7 +5228,7 @@ function verDetalle(riesgoId){
     ['Fuente de identificación','Fuente de identificación del riesgo u oportunidad'],
     ['¿Riesgo u oportunidad?','¿Riesgo u oportunidad?'],
     ['Riesgo','Riesgo'],
-    ['Oportunidad','Oportunidad - text'],
+    ['Oportunidad','Oportunidad'],
     ['Causas','Causas'],
     ['Consecuencias','Consecuencias'],
     ['Ruta del proceso','__proceso__'],
@@ -5376,7 +5384,7 @@ function duplicarRiesgo(riesgoId){
     const tipoRO = cur('¿Riesgo u oportunidad?') || 'Riesgo';
     set('f_tipo_ro', tipoRO); if(typeof showEval==='function') showEval(tipoRO);
     set('f_riesgo_desc', cur('Riesgo'));
-    set('f_oport_desc', cur('Oportunidad - text'));
+    set('f_oport_desc', cur('Oportunidad'));
     set('f_causas', cur('Causas'));
     set('f_consec', cur('Consecuencias'));
     // Evaluación inherente
@@ -5406,7 +5414,7 @@ async function eliminarRiesgo(riesgoId){
   const r = STATE.matriz.find(x=>x.id===riesgoId);
   const F=CONFIG.MATRIZ_FIELDS;
   const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
-  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad - text')||'este riesgo';
+  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'este riesgo';
   const corto = desc.length>60?desc.slice(0,60)+'…':desc;
   if(!confirm('¿Eliminar permanentemente este registro?\n\n"'+corto+'"\n\nEsta acción NO se puede deshacer.')) return;
   try {
@@ -5466,7 +5474,7 @@ function _editarRiesgoInterno(riesgoId){
   const opt = (arr,sel)=>'<option value="">Seleccione…</option>'+arr.map(o=>`<option ${o===sel?'selected':''}>${o}</option>`).join('');
   const fRaw=cur('Fecha de evaluación');
   const fechaISO=fechaParaInput(fRaw);
-  const tipoRO = cur('¿Riesgo u oportunidad?') || (cur('Riesgo')?'Riesgo':(cur('Oportunidad - text')?'Oportunidad':''));
+  const tipoRO = cur('¿Riesgo u oportunidad?') || (cur('Riesgo')?'Riesgo':(cur('Oportunidad')?'Oportunidad':''));
   // Fuente: leer con el nombre de columna REAL. Si viene vacía, inferir según
   // qué relaciones tienen ID (los nombres por columna a veces vienen vacíos).
   let fuenteAct = cur('Fuente de identificación del riesgo u oportunidad') || cur('Fuente de identificación');
@@ -5486,7 +5494,7 @@ function _editarRiesgoInterno(riesgoId){
     else if(tieneContexto) fuenteAct='Contexto';
   }
 
-  document.getElementById('editTitulo').textContent = (cur('Riesgo')||cur('Oportunidad - text')||'Riesgo').slice(0,70);
+  document.getElementById('editTitulo').textContent = (cur('Riesgo')||cur('Oportunidad')||'Riesgo').slice(0,70);
   document.getElementById('editBody').innerHTML = `
     <div class="edit-sec"><div class="edit-sec-tit">1 · Identificación</div>
     <div class="grid">
@@ -5515,7 +5523,7 @@ function _editarRiesgoInterno(riesgoId){
     <div class="edit-sec"><div class="edit-sec-tit">2 · Naturaleza y descripción</div>
     <div class="grid">
       <div class="field full"><label>Descripción del riesgo</label><textarea id="ed_riesgo">${cur('Riesgo')}</textarea></div>
-      <div class="field full"><label>Descripción de la oportunidad</label><textarea id="ed_oport_desc">${cur('Oportunidad - text')}</textarea></div>
+      <div class="field full"><label>Descripción de la oportunidad</label><textarea id="ed_oport_desc">${cur('Oportunidad')}</textarea></div>
       <div class="field full"><label>Causas</label><textarea id="ed_causas">${cur('Causas')}</textarea></div>
       <div class="field full"><label>Consecuencias</label><textarea id="ed_consec">${cur('Consecuencias')}</textarea></div>
     </div></div>
@@ -6003,7 +6011,7 @@ function abrirReeval(riesgoId){
   REEVAL_ACTUAL = riesgoId;
   const F=CONFIG.MATRIZ_FIELDS;
   const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
-  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad - text')||'(sin descripción)';
+  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
   const esRiesgo = (get(r,F.riesgo_u_oportunidad,'¿Riesgo u oportunidad?')||'Riesgo')!=='Oportunidad';
 
   document.getElementById('reevalTitulo').textContent = desc.length>70?desc.slice(0,70)+'…':desc;
