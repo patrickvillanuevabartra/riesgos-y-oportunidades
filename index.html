@@ -177,7 +177,7 @@
   table.tabla-cards > tbody > tr:not(.grupo-row):not(.hist-row) > td{padding:6px 4px;vertical-align:middle}
   table.tabla-cards td.cards-main{width:210px;max-width:210px;line-height:1.28}
   /* Anchos ajustados para evitar el scroll horizontal */
-  table.tabla-cards td[data-label="Proceso"]{width:110px;max-width:110px}
+  table.tabla-cards td[data-label="Origen"]{width:120px;max-width:120px}
   /* Etiquetas y textos secundarios más compactos */
   table.tabla-cards td .tag{padding:3px 6px;font-size:11px;white-space:nowrap}
   table.tabla-cards td .hint{font-size:11.5px}
@@ -607,7 +607,7 @@
       <thead><tr>
         <th style="width:30px;text-align:center">#</th>
         <th id="thSegPrimera">Riesgo</th>
-        <th>Proceso</th>
+        <th style="cursor:help" title="Origen del riesgo u oportunidad según su fuente de identificación: la ruta del proceso, la amenaza/oportunidad del contexto, o la parte interesada y su requisito.">Origen<br><span style="font-weight:400;font-size:10.5px">proceso / contexto / partes</span></th>
         <th style="white-space:nowrap" title="Nivel de riesgo/oportunidad inherente (antes del tratamiento)">Nivel inherente</th>
         <th style="white-space:nowrap;cursor:help" title="¿El registro cuenta con un control ya establecido? Se documenta en todos los niveles; el monitoreo formal con indicadores aplica solo al nivel 4.">¿Tiene control?</th>
         <th style="white-space:nowrap;cursor:help" title="Reportes generados. Izquierda: reportes de avance de las medidas de respuesta (botón 📋). Derecha: reportes de monitoreo del control (botón 🎯). El guion indica que no aplica.">N° reportes<br><span style="font-weight:400;font-size:10.5px">medidas / monitoreo</span></th>
@@ -3107,6 +3107,40 @@ function rutaProcesoDe(r){
   return partes.join(' › ');
 }
 
+// Devuelve el ORIGEN del riesgo/oportunidad según su fuente de identificación.
+// {fuente, dato}: Proceso→ruta del proceso; Contexto→amenaza u oportunidad;
+// Partes interesadas→parte + su requisito/expectativa.
+function origenDe(r){
+  const v = r.values || {};
+  const F = CONFIG.MATRIZ_FIELDS;
+  const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x)) && String(x).length>1) ? String(x).trim() : '';
+  // Leer un campo por nombre de columna o por id, descartando el nombre del campo como basura.
+  const leer = (col, id) => {
+    const cands = [v[col], id?v[id]:''];
+    return cands.map(x=> (x && x!==col) ? limpio(x) : '').find(Boolean) || '';
+  };
+  const fuente = leer('Fuente de identificación del riesgo u oportunidad', F.fuente && F.fuente.id);
+  const esOp = esOportunidad(r);
+  if(/proceso/i.test(fuente)){
+    return { fuente:'Proceso', dato: rutaProcesoDe(r) || '' };
+  }
+  if(/contexto/i.test(fuente)){
+    const dato = esOp ? leer('Oportunidad relacionada','cgBSoSWODdRPRcJdazW7eO')
+                      : leer('Amenaza','cMWRZdJLjcPzT8WQpdNmox');
+    return { fuente:'Contexto', dato };
+  }
+  if(/partes/i.test(fuente)){
+    const parte = leer('Parte interesada ','cpWRGkWRfhAi8sW45VjHzi') || leer('Parte interesada','cpWRGkWRfhAi8sW45VjHzi');
+    const reqExp = esOp ? leer('Expectativas - texto', F.expectativas_txt && F.expectativas_txt.id)
+                        : leer('Requisitos - texto', F.requisitos_txt && F.requisitos_txt.id);
+    const dato = [parte, reqExp].filter(Boolean).join(' — ');
+    return { fuente:'Partes interesadas', dato };
+  }
+  // Sin fuente reconocida: intentar el proceso como respaldo
+  return { fuente: fuente||'', dato: rutaProcesoDe(r) || '' };
+}
+window.origenDe = origenDe;
+
 // Proceso de NIVEL 1 (para agrupar en el dashboard).
 function nivel1De(r){
   const F = CONFIG.MATRIZ_FIELDS;
@@ -3465,7 +3499,9 @@ async function renderSeguimiento() {
       .filter(pasaFiltros).map(r=>{
       const op = esOportunidad(r);
       const desc = descripcionDe(r);
-      const proc=rutaProcesoDe(r) || '—';
+      const _origen = origenDe(r);
+      const proc = _origen.dato || '—';
+      const procFuente = _origen.fuente || '';
       const oficina=oficinaDe(r);
       const sub=subIdsDe(r, SUBFORM_FIELD_ID);
       const pr=procedeReeval(r);
@@ -3491,7 +3527,7 @@ async function renderSeguimiento() {
       // Estado de certificación del control (para destacar cuando procede certificar)
       const _certRaw = vR['Certificación de Implementación del Control'] || vR[CONFIG.MATRIZ_FIELDS.certificacion_control.id] || '';
       const certificacion = (_certRaw && !String(_certRaw).includes('Certificación')) ? String(_certRaw).trim() : '';
-      return {id:r.id, op, desc, proc, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch, tieneMonitoreo, monIds, nMon:monIds.length, ctrlTxt, certificacion};
+      return {id:r.id, op, desc, proc, procFuente, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch, tieneMonitoreo, monIds, nMon:monIds.length, ctrlTxt, certificacion};
     })
     // Filtro por el selector Todos/Riesgos/Oportunidades
     .filter(f => SEG_TIPO==='todos' || (SEG_TIPO==='oportunidades'?f.op:!f.op))
@@ -3537,7 +3573,7 @@ async function renderSeguimiento() {
         <td class="cards-main" data-label="Descripción">
           ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>42?f.desc.slice(0,42)+'…':f.desc}</a>
         </td>
-        <td data-label="Proceso" title="${(f.proc||'').replace(/"/g,'&quot;')}" style="font-size:11.5px">${f.proc.length>18?f.proc.slice(0,18)+'…':f.proc}${f.desact?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
+        <td data-label="Origen" title="${((f.procFuente?f.procFuente+': ':'')+(f.proc||'')).replace(/"/g,'&quot;')}" style="font-size:11.5px">${f.procFuente?`<span style="display:block;font-size:9.5px;font-weight:600;color:var(--brand);text-transform:uppercase;letter-spacing:.02em;line-height:1.2">${f.procFuente==='Partes interesadas'?'Partes':f.procFuente}</span>`:''}<span>${f.proc.length>20?f.proc.slice(0,20)+'…':f.proc}</span>${(f.desact && f.procFuente==='Proceso')?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
         <td data-label="Nivel inherente" style="white-space:nowrap">${nivelBadge(f.nivel, f.op)}</td>
         <td data-label="¿Tiene control?" style="white-space:nowrap">${
           f.ctrlTxt==='Sí' ? '<span class="tag tag-proc" title="Cuenta con un control establecido">🛡️ Sí</span>'
