@@ -196,6 +196,10 @@
 
   .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;display:inline-block;animation:spin .7s linear infinite;vertical-align:-2px}
   @keyframes spin{to{transform:rotate(360deg)}}
+  #us_oficinas_lista .ofi-check{display:flex !important;flex-direction:row !important;align-items:center;gap:9px;font-size:13px;font-weight:500;color:var(--ink);cursor:pointer;padding:5px 6px;border-radius:7px;margin:0;text-align:left !important;width:100%}
+  #us_oficinas_lista .ofi-check:hover{background:var(--paper)}
+  #us_oficinas_lista .ofi-check input[type=checkbox]{width:16px;height:16px;margin:0;flex:0 0 auto;cursor:pointer}
+  #us_oficinas_lista .ofi-check span{flex:1 1 auto;line-height:1.3}
   /* Pulso para destacar el botón 🎯 cuando procede confirmar la implementación del control */
   @keyframes btnpulse{0%,100%{box-shadow:0 0 0 0 rgba(15,143,94,.5)}50%{box-shadow:0 0 0 5px rgba(15,143,94,0)}}
   .btn-pulse{animation:btnpulse 1.6s ease-in-out infinite;border-color:var(--brand)!important}
@@ -888,10 +892,17 @@
       </div>
       <div class="modal-body">
         <div class="grid">
+          <div class="field full"><label>Nombre completo</label><input id="us_nombre" placeholder="ej. Ricardo Yamashiro Torres"></div>
           <div class="field full"><label>Usuario</label><input id="us_usuario" placeholder="ej. ind.industrial"></div>
           <div class="field full"><label>Contraseña</label><input id="us_password" placeholder="clave de acceso"></div>
           <div class="field full"><label>Rol</label><select id="us_rol" onchange="toggleOficinaUsuario()"><option value="">Seleccione…</option><option>Administrador</option><option>Gestor</option><option>Oficina</option></select></div>
-          <div class="field full" id="us_wrap_oficina"><label>Oficina asignada</label><select id="us_oficina"><option value="">Seleccione…</option></select></div>
+          <div class="field full" id="us_wrap_oficina">
+            <label>Oficinas asignadas <span class="hint" style="font-weight:400">· puede marcar más de una</span></label>
+            <div style="position:relative">
+              <input id="us_oficina_buscar" placeholder="Filtrar oficinas…" oninput="filtrarOficinasUsuario()" style="margin-bottom:6px">
+              <div id="us_oficinas_lista" style="max-height:180px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;gap:6px"></div>
+            </div>
+          </div>
           <div class="field full"><label>Activo</label><select id="us_activo"><option>Sí</option><option>No</option></select></div>
         </div>
       </div>
@@ -1113,16 +1124,36 @@ async function hacerLogin(){
     const data = await API.records(CONFIG.ENTITIES.USUARIOS);
     const recs = data.records||[];
     const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
-    const encontrado = recs.find(r=>{
+    // Puede haber VARIOS registros con el mismo usuario+contraseña (uno por oficina, forma
+    // antigua de asignar multi-oficina). Se recogen TODOS para sumar sus oficinas.
+    const coincidencias = recs.filter(r=>{
       const v=r.values||{};
       return limpio(v['Usuario'])===u && limpio(v['Contraseña'])===p;
     });
-    if(!encontrado){ mostrarError('Usuario o contraseña incorrectos.'); btn.disabled=false; btn.textContent='Iniciar sesión'; return; }
+    if(!coincidencias.length){ mostrarError('Usuario o contraseña incorrectos.'); btn.disabled=false; btn.textContent='Iniciar sesión'; return; }
+    // Registro principal: el primero ACTIVO; si ninguno está activo, se bloquea el acceso.
+    const activos = coincidencias.filter(r=>limpio((r.values||{})['Activo'])==='Sí');
+    if(!activos.length){ mostrarError('Este usuario está desactivado. Contacta al administrador.'); btn.disabled=false; btn.textContent='Iniciar sesión'; return; }
+    const encontrado = activos[0];
     const v = encontrado.values||{};
-    if(limpio(v['Activo'])!=='Sí'){ mostrarError('Este usuario está desactivado. Contacta al administrador.'); btn.disabled=false; btn.textContent='Iniciar sesión'; return; }
     let rol = limpio(v['Rol']) || 'Oficina'; // por defecto, el más restrictivo
     if(!['Administrador','Gestor','Oficina'].includes(rol)) rol='Oficina';
-    SESION = { rol, usuario:limpio(v['Usuario']), oficina:limpio(v['Oficina asignada']), recordId: encontrado.id };
+    // Oficinas: unir las de TODOS los registros activos (duplicados + el propio campo, que
+    // puede traer varias separadas por ';'). Se deduplican por texto normalizado.
+    const norm=s=>String(s||'').replace(/\s+/g,' ').trim();
+    const setOfi=new Map();
+    activos.forEach(r=>{
+      _parseOficinas(limpio((r.values||{})['Oficina asignada'])).forEach(o=>{
+        const k=norm(o).toLowerCase(); if(k && !setOfi.has(k)) setOfi.set(k, norm(o));
+      });
+    });
+    const oficinas = [...setOfi.values()];
+    const nombre = _leerNombreUsuario(v);
+    SESION = { rol, usuario:limpio(v['Usuario']), nombre, oficina:oficinas[0]||'', oficinas, recordId: encontrado.id };
+    // Aviso SOLO para administradores cuando detecta registros duplicados que conviene unificar.
+    if(rol==='Administrador' && coincidencias.length>1){
+      setTimeout(()=>toast('Nota: el usuario "'+u+'" tiene '+coincidencias.length+' registros. Conviene unificarlo en uno solo con varias oficinas.', true), 1200);
+    }
     entrarApp();
   }catch(e){
     mostrarError('Error al verificar: '+e.message);
@@ -1162,8 +1193,13 @@ function mostrarBarraSesion(){
   const cont = document.createElement('div');
   cont.id='sesionInfo';
   cont.style.cssText='display:flex;align-items:center;gap:10px;margin-left:14px;font-size:12px;color:rgba(255,255,255,.9)';
-  const quien = puedeVerTodo() ? SESION.rol : (SESION.oficina||'Oficina');
-  cont.innerHTML = `<span title="${SESION.usuario} · ${SESION.rol}">👤 ${quien}</span>`
+  // Mostrar nombre (si existe) y, para rol Oficina, sus oficinas.
+  const nombre = SESION.nombre || SESION.usuario;
+  const listaOfi = (SESION.oficinas && SESION.oficinas.length) ? SESION.oficinas.join(' · ') : (SESION.oficina||'');
+  const sub = (SESION.rol==='Oficina') ? (listaOfi||'Oficina') : SESION.rol;
+  const tooltip = `${SESION.usuario} · ${SESION.rol}${listaOfi?(' · '+listaOfi):''}`;
+  cont.innerHTML = `<span title="${tooltip.replace(/"/g,'&quot;')}" style="line-height:1.2">👤 <strong>${nombre.replace(/</g,'&lt;')}</strong>`
+    + `<br><span style="opacity:.8;font-size:11px">${sub.replace(/</g,'&lt;')}</span></span>`
     + `<button onclick="abrirCambiarPass()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">🔑 Cambiar contraseña</button>`
     + `<button onclick="cerrarSesion()" style="background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer">Salir</button>`;
   nav.appendChild(cont);
@@ -1172,12 +1208,16 @@ function mostrarBarraSesion(){
 function cerrarSesion(){ SESION = null; location.reload(); }
 window.cerrarSesion = cerrarSesion;
 
-// ¿El registro pertenece a la oficina del usuario? (Administrador y Gestor ven todo)
+// ¿El registro pertenece a ALGUNA oficina del usuario? (Administrador y Gestor ven todo)
+// Un usuario puede tener varias oficinas (SESION.oficinas); basta que coincida con una.
 function _registroVisible(r){
   if(!SESION) return false;
   if(puedeVerTodo()) return true;
   const norm = s => String(s||'').replace(/\s+/g,' ').trim().toLowerCase();
-  return norm(oficinaDe(r))===norm(SESION.oficina);
+  const objetivo = norm(oficinaDe(r));
+  if(!objetivo) return false;
+  const mias = (SESION.oficinas && SESION.oficinas.length) ? SESION.oficinas : (SESION.oficina?[SESION.oficina]:[]);
+  return mias.some(o=>norm(o)===objetivo);
 }
 window._registroVisible = _registroVisible;
 
@@ -1186,6 +1226,11 @@ window._registroVisible = _registroVisible;
    ============================================================ */
 let _usuariosCache = [];
 let _editandoUsuarioId = null;
+// ⬇️ Field-id del campo "Nombre completo" de la tabla USUARIOS de RIESGOS en QuintaDB.
+//    La tabla de usuarios de Riesgos es distinta a la de Indicadores, así que hay que
+//    crear el campo aquí y pegar su id. Mientras esté en null, el nombre no se guarda
+//    (el resto del sistema funciona igual y la columna muestra "—").
+const NOMBRE_USUARIO_FIELD_ID = null;
 
 // Carga y muestra la lista de usuarios
 async function cargarUsuarios(){
@@ -1195,43 +1240,69 @@ async function cargarUsuarios(){
   try{
     const data = await API.records(CONFIG.ENTITIES.USUARIOS);
     _usuariosCache = data.records||[];
-    const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
     if(!_usuariosCache.length){ cont.innerHTML='<p class="hint">No hay usuarios. Crea el primero con "+ Crear usuario".</p>'; return; }
-    let html = '<div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="background:var(--paper);text-align:left">'
-      + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Usuario</th>'
-      + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Contraseña</th>'
-      + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Rol</th>'
-      + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Oficina</th>'
-      + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand);text-align:center">Activo</th>'
-      + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand);text-align:right">Acciones</th></tr></thead><tbody>';
-    _usuariosCache.forEach(r=>{
-      const v=r.values||{};
-      const usuario=limpio(v['Usuario']), pass=limpio(v['Contraseña']), rol=limpio(v['Rol'])||'Oficina', oficina=limpio(v['Oficina asignada'])||'—', activo=limpio(v['Activo']);
-      const activoBadge = activo==='Sí'
-        ? '<span style="color:#0f8f5e;font-weight:600">● Sí</span>'
-        : '<span style="color:#c0392b;font-weight:600">● No</span>';
-      const passEsc = (pass||'').replace(/"/g,'&quot;').replace(/'/g,"\\'");
-      html += `<tr style="border-bottom:1px solid var(--line)">
-        <td style="padding:10px 12px"><strong>${usuario}</strong></td>
-        <td style="padding:10px 12px;white-space:nowrap">
-          <span id="pw-${r.id}" data-pw="${passEsc}" data-shown="0" style="font-family:monospace">••••••</span>
-          <button class="icon-btn" title="Mostrar/ocultar contraseña" onclick="togglePassVista('${r.id}')" style="margin-left:4px">👁️</button>
-        </td>
-        <td style="padding:10px 12px">${rol}</td>
-        <td style="padding:10px 12px">${rol==='Oficina'?oficina:'<span style=\"color:var(--mist)\">(ve todo)</span>'}</td>
-        <td style="padding:10px 12px;text-align:center">${activoBadge}</td>
-        <td style="padding:10px 12px;text-align:right;white-space:nowrap">
-          <button class="icon-btn" title="Editar" onclick="editarUsuario('${r.id}')">✏️</button>
-          <button class="icon-btn" title="${activo==='Sí'?'Desactivar':'Activar'}" onclick="toggleActivoUsuario('${r.id}')">${activo==='Sí'?'🔒':'🔓'}</button>
-          <button class="icon-btn" title="Eliminar" onclick="eliminarUsuario('${r.id}')">🗑️</button>
-        </td>
-      </tr>`;
-    });
-    html += '</tbody></table></div>';
-    cont.innerHTML = html;
+    // Buscador de usuarios (filtra en vivo sobre la caché ya cargada)
+    const buscador = `<div style="margin-bottom:12px"><input id="usBuscar" placeholder="Buscar por nombre, usuario, rol u oficina…" oninput="renderUsuariosTabla()" style="width:100%"></div>`;
+    cont.innerHTML = buscador + '<div id="usuariosTablaCont"></div>';
+    renderUsuariosTabla();
   }catch(e){ cont.innerHTML = '<p class="hint">Error al cargar usuarios: '+e.message+'</p>'; }
 }
 window.cargarUsuarios = cargarUsuarios;
+
+// Pinta la tabla de usuarios aplicando el filtro del buscador (sobre la caché ya cargada).
+function renderUsuariosTabla(){
+  const cont=document.getElementById('usuariosTablaCont');
+  if(!cont) return;
+  const q = (document.getElementById('usBuscar')?.value||'').toLowerCase().trim();
+  const norm=s=>String(s||'').toLowerCase();
+  const filtrados = _usuariosCache.filter(r=>{
+    if(!q) return true;
+    const v=r.values||{};
+    const campos=[ _leerNombreUsuario(v), _limpioU(v['Usuario']), _limpioU(v['Rol']), _limpioU(v['Oficina asignada']) ].map(norm).join(' ');
+    return campos.includes(q);
+  });
+  if(!filtrados.length){ cont.innerHTML='<p class="hint">Ningún usuario coincide con la búsqueda.</p>'; return; }
+  let html = '<div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="background:var(--paper);text-align:left">'
+    + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Nombre</th>'
+    + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Usuario</th>'
+    + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Contraseña</th>'
+    + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Rol</th>'
+    + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand)">Oficina(s)</th>'
+    + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand);text-align:center">Activo</th>'
+    + '<th style="padding:10px 12px;border-bottom:2px solid var(--brand);text-align:right">Acciones</th></tr></thead><tbody>';
+  filtrados.forEach(r=>{
+    const v=r.values||{};
+    // El nombre se ESCAPA solo cuando es texto real; el placeholder "—" se aplica
+    // aparte, después del escape, para no mostrar el <span> crudo (bug conocido).
+    const nombreReal = _leerNombreUsuario(v);
+    const nombreCelda = nombreReal ? nombreReal.replace(/</g,'&lt;') : '<span style="color:var(--mist)">—</span>';
+    const usuario=_limpioU(v['Usuario']), pass=_limpioU(v['Contraseña']), rol=_limpioU(v['Rol'])||'Oficina';
+    const oficinaTxt=_limpioU(v['Oficina asignada'])||'—';
+    const oficinaVista=(rol==='Oficina')? (_parseOficinas(oficinaTxt).join(' · ')||'—') : '<span style="color:var(--mist)">(ve todo)</span>';
+    const activo=_limpioU(v['Activo']);
+    const activoBadge = activo==='Sí' ? '<span style="color:#0f8f5e;font-weight:600">● Sí</span>' : '<span style="color:#c0392b;font-weight:600">● No</span>';
+    const passEsc = (pass||'').replace(/"/g,'&quot;').replace(/'/g,"\\'");
+    html += `<tr style="border-bottom:1px solid var(--line)">
+      <td style="padding:10px 12px">${nombreCelda}</td>
+      <td style="padding:10px 12px"><strong>${usuario}</strong></td>
+      <td style="padding:10px 12px;white-space:nowrap">
+        <span id="pw-${r.id}" data-pw="${passEsc}" data-shown="0" style="font-family:monospace">••••••</span>
+        <button class="icon-btn" title="Mostrar/ocultar contraseña" onclick="togglePassVista('${r.id}')" style="margin-left:4px">👁️</button>
+      </td>
+      <td style="padding:10px 12px">${rol}</td>
+      <td style="padding:10px 12px">${oficinaVista}</td>
+      <td style="padding:10px 12px;text-align:center">${activoBadge}</td>
+      <td style="padding:10px 12px;text-align:right;white-space:nowrap">
+        <button class="icon-btn" title="Editar" onclick="editarUsuario('${r.id}')">✏️</button>
+        <button class="icon-btn" title="${activo==='Sí'?'Desactivar':'Activar'}" onclick="toggleActivoUsuario('${r.id}')">${activo==='Sí'?'🔒':'🔓'}</button>
+        <button class="icon-btn" title="Eliminar" onclick="eliminarUsuario('${r.id}')">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  cont.innerHTML = html;
+}
+window.renderUsuariosTabla = renderUsuariosTabla;
 
 // Mostrar/ocultar la contraseña de un usuario en la lista
 function togglePassVista(id){
@@ -1243,36 +1314,65 @@ function togglePassVista(id){
 }
 window.togglePassVista = togglePassVista;
 
-// Puebla el desplegable de oficinas con las oficinas reales
-async function poblarOficinasUsuario(){
-  const sel = document.getElementById('us_oficina');
-  if(!sel) return;
-  // Repoblar siempre (limpiar primero), por si cambió la lista
+// Lee el "Nombre completo" del usuario (por field-id o por nombre de columna).
+function _leerNombreUsuario(v){
+  if(!v) return '';
+  const basura = x => !x || /^[a-zA-Z0-9_\-]{22}$/.test(String(x));
+  const cand=[ NOMBRE_USUARIO_FIELD_ID?v[NOMBRE_USUARIO_FIELD_ID]:'', v['Nombre completo'], v['Nombre'] ]
+    .find(x=> x && !basura(x) && x!=='Nombre completo' && x!=='Nombre');
+  return cand?String(cand).trim():'';
+}
+window._leerNombreUsuario=_leerNombreUsuario;
+
+// Limpieza estándar de valores de QuintaDB (descarta IDs de 22 chars)
+function _limpioU(x){ return (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : ''; }
+window._limpioU=_limpioU;
+
+// Separa "Oficina asignada" en arreglo. Acepta ';', salto de línea o ' · ' (la coma no,
+// porque un nombre de oficina puede contenerla).
+function _parseOficinas(txt){
+  return String(txt||'').split(/;|\n|\r|\s·\s/).map(s=>s.trim()).filter(Boolean);
+}
+window._parseOficinas=_parseOficinas;
+
+let _oficinasDisponibles=[]; // cache de oficinas para los checkboxes
+
+// Pinta la lista de oficinas como CHECKBOXES (selección múltiple). `marcadas` es un arreglo.
+async function poblarOficinasUsuario(marcadas){
+  const cont = document.getElementById('us_oficinas_lista');
+  if(!cont) return;
+  marcadas=(marcadas||[]).map(s=>String(s).trim().toLowerCase());
   try{
     const oficinas = await loadMaestra('RESPONSABLES');
-    sel.innerHTML = '<option value="">Seleccione…</option>';
-    (oficinas||[]).forEach(o=>{
-      // Usamos el NOMBRE (label) tanto en value como en texto, porque la oficina se guarda como texto
-      const nombre = (typeof o==='string') ? o : (o.label || o.value || '');
-      if(nombre && !/^[a-zA-Z0-9_\-]{22}$/.test(nombre)){
-        const op=document.createElement('option');
-        op.value=nombre; op.textContent=nombre;
-        sel.appendChild(op);
-      }
-    });
-    if(sel.options.length<=1){
-      console.warn('No se cargaron oficinas. Respuesta de loadMaestra:', oficinas);
-    }
-  }catch(e){
-    console.error('Error al poblar oficinas:', e);
-    toast('No se pudieron cargar las oficinas: '+e.message, true);
-  }
+    _oficinasDisponibles = (oficinas||[]).map(o=> (typeof o==='string')?o:(o.label||o.value||'') )
+      .filter(n=> n && !/^[a-zA-Z0-9_\-]{22}$/.test(n));
+    if(!_oficinasDisponibles.length){ cont.innerHTML='<p class="hint">No hay oficinas registradas.</p>'; return; }
+    cont.innerHTML = _oficinasDisponibles.map(n=>{
+      const ck = marcadas.includes(n.toLowerCase()) ? 'checked' : '';
+      return `<label class="ofi-check" data-ofi="${n.toLowerCase().replace(/"/g,'')}">
+        <input type="checkbox" value="${n.replace(/"/g,'&quot;')}" ${ck}>
+        <span>${n.replace(/</g,'&lt;')}</span></label>`;
+    }).join('');
+  }catch(e){ toast('No se pudieron cargar las oficinas: '+e.message, true); }
+}
+
+// Filtra los checkboxes de oficina por el texto tecleado.
+function filtrarOficinasUsuario(){
+  const q=(document.getElementById('us_oficina_buscar')?.value||'').toLowerCase().trim();
+  document.querySelectorAll('#us_oficinas_lista label[data-ofi]').forEach(l=>{
+    l.style.display = (!q || l.getAttribute('data-ofi').includes(q)) ? 'flex' : 'none';
+  });
+}
+window.filtrarOficinasUsuario=filtrarOficinasUsuario;
+
+// Devuelve las oficinas marcadas como arreglo de nombres.
+function _oficinasMarcadas(){
+  return [...document.querySelectorAll('#us_oficinas_lista input[type=checkbox]:checked')].map(c=>c.value);
 }
 
 function toggleOficinaUsuario(){
   const rol = document.getElementById('us_rol').value;
   const wrap = document.getElementById('us_wrap_oficina');
-  // La oficina solo aplica al rol "Oficina"
   if(wrap) wrap.style.display = (rol==='Oficina') ? '' : 'none';
 }
 window.toggleOficinaUsuario = toggleOficinaUsuario;
@@ -1280,14 +1380,14 @@ window.toggleOficinaUsuario = toggleOficinaUsuario;
 async function abrirFormUsuario(){
   _editandoUsuarioId = null;
   document.getElementById('modalUsuarioTitulo').textContent = 'Crear usuario';
+  document.getElementById('us_nombre').value='';
   document.getElementById('us_usuario').value='';
   document.getElementById('us_password').value='';
   document.getElementById('us_rol').value='';
   document.getElementById('us_activo').value='Sí';
-  await poblarOficinasUsuario();
-  document.getElementById('us_oficina').value='';
+  const bq=document.getElementById('us_oficina_buscar'); if(bq) bq.value='';
+  await poblarOficinasUsuario([]);
   toggleOficinaUsuario();
-  // Restablecer el botón Guardar (por si quedó en "Guardando…" de un guardado anterior)
   const bg=document.getElementById('us_guardar'); if(bg){ bg.disabled=false; bg.textContent='Guardar usuario'; }
   document.getElementById('modalUsuario').classList.remove('hidden');
 }
@@ -1299,15 +1399,16 @@ window.cerrarFormUsuario = cerrarFormUsuario;
 async function editarUsuario(id){
   const r = _usuariosCache.find(x=>x.id===id); if(!r) return;
   const v=r.values||{};
-  const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
   _editandoUsuarioId = id;
   document.getElementById('modalUsuarioTitulo').textContent = 'Editar usuario';
-  document.getElementById('us_usuario').value = limpio(v['Usuario']);
-  document.getElementById('us_password').value = limpio(v['Contraseña']);
-  document.getElementById('us_rol').value = limpio(v['Rol'])||'';
-  document.getElementById('us_activo').value = limpio(v['Activo'])==='No'?'No':'Sí';
-  await poblarOficinasUsuario();
-  document.getElementById('us_oficina').value = limpio(v['Oficina asignada'])||'';
+  document.getElementById('us_nombre').value = _leerNombreUsuario(v);
+  document.getElementById('us_usuario').value = _limpioU(v['Usuario']);
+  document.getElementById('us_password').value = _limpioU(v['Contraseña']);
+  document.getElementById('us_rol').value = _limpioU(v['Rol'])||'';
+  document.getElementById('us_activo').value = _limpioU(v['Activo'])==='No'?'No':'Sí';
+  const bq=document.getElementById('us_oficina_buscar'); if(bq) bq.value='';
+  const marcadas = _parseOficinas(_limpioU(v['Oficina asignada']));
+  await poblarOficinasUsuario(marcadas);
   toggleOficinaUsuario();
   const bg=document.getElementById('us_guardar'); if(bg){ bg.disabled=false; bg.textContent='Guardar usuario'; }
   document.getElementById('modalUsuario').classList.remove('hidden');
@@ -1317,20 +1418,28 @@ window.editarUsuario = editarUsuario;
 async function guardarUsuario(){
   const U = CONFIG.USUARIOS_FIELDS;
   const g = id => document.getElementById(id).value.trim();
-  const usuario=g('us_usuario'), pass=g('us_password'), rol=g('us_rol'), activo=g('us_activo');
-  let oficina = g('us_oficina');
+  const nombre=g('us_nombre'), usuario=g('us_usuario'), pass=g('us_password'), rol=g('us_rol'), activo=g('us_activo');
+  // Oficinas múltiples: checkboxes marcados, guardadas separadas por ';'
+  let oficinasArr = (rol==='Oficina') ? _oficinasMarcadas() : [];
+  let oficina = oficinasArr.join('; ');
   if(!usuario || !pass){ toast('Usuario y contraseña son obligatorios.', true); return; }
   if(!rol){ toast('Selecciona un rol.', true); return; }
-  if(rol==='Oficina' && !oficina){ toast('El rol Oficina requiere una oficina asignada.', true); return; }
-  if(rol!=='Oficina') oficina=''; // admin y gestor ven todo, no necesitan oficina
+  if(rol==='Oficina' && !oficinasArr.length){ toast('El rol Oficina requiere al menos una oficina asignada.', true); return; }
+  if(rol!=='Oficina') oficina='';
   const btn=document.getElementById('us_guardar');
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
   const campos = {};
   campos[U.usuario.id]=usuario; campos[U.password.id]=pass; campos[U.rol.id]=rol;
   campos[U.oficina.id]=oficina; campos[U.activo.id]=activo;
+  // Nombre completo: solo si el field-id está configurado en QuintaDB
+  if(NOMBRE_USUARIO_FIELD_ID) campos[NOMBRE_USUARIO_FIELD_ID]=nombre;
+  else if(U.nombre && U.nombre.id) campos[U.nombre.id]=nombre;
   try{
     if(_editandoUsuarioId){ await API.saveForm(_editandoUsuarioId, campos, CONFIG.ENTITIES.USUARIOS); toast('Usuario actualizado.'); }
     else { await API.saveForm(null, campos, CONFIG.ENTITIES.USUARIOS); toast('Usuario creado.'); }
+    if(nombre && !NOMBRE_USUARIO_FIELD_ID && !(U.nombre&&U.nombre.id)){
+      toast('Nota: el campo "Nombre completo" aún no está configurado en QuintaDB; el nombre no se guardó.', true);
+    }
     btn.disabled=false; btn.textContent='Guardar usuario';
     cerrarFormUsuario();
     cargarUsuarios();
