@@ -5007,14 +5007,29 @@ window.actualizarMonitoreo = actualizarMonitoreo;
 // === Guardar reporte (desde el acordeón) ===
 async function guardarReporte(riesgoId){
   const RF=CONFIG.REPORTE_FIELDS;
-  const g=id=>document.getElementById(id+'_'+riesgoId).value;
+  // Puede haber DOS formularios de reporte en el DOM con el mismo id (el del historial
+  // en la tabla y el del modal de acciones). Para leer el correcto, buscamos los campos
+  // DENTRO del contenedor del botón que se pulsó (el formulario que el usuario ve).
+  const btnPulsado = document.activeElement;
+  let ambito = null;
+  if(btnPulsado && btnPulsado.id==='addbtn-'+riesgoId){ ambito = btnPulsado.closest('.hist-panel') || document; }
+  // Respaldo: el formulario visible (details abierto) que contenga el textarea
+  const g = id=>{
+    const nombre = id+'_'+riesgoId;
+    let el = ambito ? ambito.querySelector('#'+CSS.escape(nombre)) : null;
+    if(!el){
+      // Elegir, entre los duplicados, el que esté visible en pantalla
+      const todos = [...document.querySelectorAll('[id="'+nombre+'"]')];
+      el = todos.find(e=> e.offsetParent!==null) || todos[0] || document.getElementById(nombre);
+    }
+    return el ? el.value : '';
+  };
   if(!g('add_estado') && !g('add_accion')){ toast('Indica al menos la acción o el estado.',true); return; }
   const btn=document.getElementById('addbtn-'+riesgoId);
 
   const repVals={};
   if(g('add_fecha'))  repVals[RF.fecha_reporte.id]=g('add_fecha');
   if(g('add_accion')) repVals[RF.accion.id]=g('add_accion');
-  console.log('[DIAG guardarReporte] Acción a enviar:', JSON.stringify({campo:RF.accion.id, valor:g('add_accion')}));
   if(g('add_obs'))    repVals[RF.observacion.id]=g('add_obs');
   if(g('add_evid'))   repVals[RF.evidencia2.id]=g('add_evid');
   if(g('add_estado')) repVals[RF.estado.id]=g('add_estado');
