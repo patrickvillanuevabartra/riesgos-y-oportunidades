@@ -5030,6 +5030,9 @@ async function guardarReporte(riesgoId){
   const repVals={};
   if(g('add_fecha'))  repVals[RF.fecha_reporte.id]=g('add_fecha');
   if(g('add_accion')) repVals[RF.accion.id]=g('add_accion');
+  // DIAGNÓSTICO TEMPORAL: verificar que el valor de acción se está incluyendo
+  console.log('[DIAG] valor acción leído:', JSON.stringify(g('add_accion')));
+  console.log('[DIAG] repVals completo a enviar:', JSON.stringify(repVals));
   if(g('add_obs'))    repVals[RF.observacion.id]=g('add_obs');
   if(g('add_evid'))   repVals[RF.evidencia2.id]=g('add_evid');
   if(g('add_estado')) repVals[RF.estado.id]=g('add_estado');
@@ -5061,6 +5064,24 @@ async function guardarReporte(riesgoId){
   }
 }
 window.guardarReporte = guardarReporte;
+
+// DIAGNÓSTICO TEMPORAL: ejecuta en consola  diagReporte('ID_DE_UN_RIESGO_CON_REPORTES')
+// para ver los IDs reales de campo que devuelve QuintaDB en sus reportes de avance.
+async function diagReporte(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  if(!r){ console.log('No encontré ese riesgo. Usa un id de STATE.matriz'); return; }
+  const subIds = subIdsDe(r, SUBFORM_FIELD_ID);
+  console.log('Reportes del riesgo:', subIds);
+  if(!subIds.length){ console.log('Este riesgo no tiene reportes.'); return; }
+  const d = await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+subIds[0]+'.json','GET',{name_value:1});
+  const rec = d.record||{};
+  console.log('=== Campos REALES del reporte en QuintaDB (nombre → valor) ===');
+  console.log(JSON.stringify(rec.values, null, 2));
+  console.log('=== IDs que el aplicativo espera ===');
+  const RF=CONFIG.REPORTE_FIELDS;
+  Object.keys(RF).forEach(k=>console.log('  '+k+':', RF[k].id, '·', RF[k].col));
+}
+window.diagReporte = diagReporte;
 
 // Tras EDITAR o ELIMINAR un reporte: si el modal está abierto, lo recarga para
 // reflejar el cambio; si la vía era el acordeón, lo reabre.
