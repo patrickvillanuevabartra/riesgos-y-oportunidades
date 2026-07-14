@@ -516,7 +516,7 @@
         <div class="ctrl-nota si hidden" id="f_nota_si" style="margin-bottom:14px">🛡️ <strong>Control existente.</strong> Describe el control que ya está implementado para este riesgo.<span class="solo-n4"> Al ser un riesgo de nivel intolerable (4), define también su <strong>indicador, fórmula y frecuencias</strong>; el monitoreo (metas, mediciones y certificación) se gestiona luego con el botón 🎯 «Control y Seguimiento» en Seguimiento, cuando las medidas estén al <strong>100%</strong> y el estado sea <strong>Culminado/Ejecutado</strong>.</span><br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar registro»</strong> para conservar esta elección.</span></div>
         <div class="grid">
           <!-- Respuesta + Medida: visibles salvo cuando hay control "Sí" (nivel 4) -->
-          <div class="field oculta-si-control" id="f_wrap_respuesta"><label>Respuesta</label><select id="f_respuesta"><option value="">Seleccione…</option><option>Eliminar</option><option>Mitigar</option><option>Trasladar</option><option>Asumir</option></select></div>
+          <div class="field oculta-si-control" id="f_wrap_respuesta"><label id="f_lbl_respuesta">Respuesta</label><select id="f_respuesta"><option value="">Seleccione…</option><option>Eliminar</option><option>Mitigar</option><option>Trasladar</option><option>Asumir</option></select></div>
           <div class="field oculta-si-control"></div>
           <div class="field full oculta-si-control" id="f_wrap_medida"><label>Medida(s) de respuesta</label><textarea id="f_medida"></textarea></div>
           <!-- Control e indicadores: SOLO nivel 4 con "Sí" -->
@@ -1537,12 +1537,33 @@ function actualizarContextoTipo(){
   document.querySelectorAll('.ctx-riesgo').forEach(e=>e.classList.toggle('hidden', !esR));
   document.querySelectorAll('.ctx-oport').forEach(e=>e.classList.toggle('hidden', !esO));
 }
+// Estrategias de respuesta según ISO 31000: los riesgos (amenazas) y las oportunidades
+// tienen estrategias distintas (casi especulares). Se guardan en el MISMO campo de texto.
+const RESPUESTAS_RIESGO = ['Eliminar','Mitigar','Trasladar','Asumir'];
+const RESPUESTAS_OPORTUNIDAD = ['Explotar','Mejorar','Compartir','Aceptar'];
+
+// Reppuebla un <select> de respuesta con las opciones que correspondan al tipo,
+// conservando el valor actual si sigue siendo válido.
+function poblarRespuestaSegunTipo(selectId, tipo, valorActual){
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  const opciones = (tipo==='Oportunidad') ? RESPUESTAS_OPORTUNIDAD : RESPUESTAS_RIESGO;
+  const prev = (valorActual!=null) ? valorActual : sel.value;
+  sel.innerHTML = '<option value="">Seleccione…</option>' +
+    opciones.map(o=>`<option ${o===prev?'selected':''}>${o}</option>`).join('');
+  // Actualizar la etiqueta con una pista del tipo
+  const lbl = document.getElementById('f_lbl_respuesta');
+  if(lbl && selectId==='f_respuesta') lbl.textContent = (tipo==='Oportunidad') ? 'Respuesta (estrategia de la oportunidad)' : 'Respuesta (estrategia ante el riesgo)';
+}
+window.poblarRespuestaSegunTipo = poblarRespuestaSegunTipo;
+
 function showEval(tipo) {
   const esR = tipo === 'Riesgo', esO = tipo === 'Oportunidad';
   document.querySelectorAll('.ro-riesgo').forEach(e=>e.classList.toggle('hidden',!esR));
   document.querySelectorAll('.ro-oport').forEach(e=>e.classList.toggle('hidden',!esO));
   document.querySelectorAll('.eval-riesgo').forEach(e=>e.classList.toggle('hidden',!esR));
   document.querySelectorAll('.eval-oport').forEach(e=>e.classList.toggle('hidden',!esO));
+  poblarRespuestaSegunTipo('f_respuesta', tipo); // opciones de respuesta según el tipo
   actualizarContextoTipo(); // actualizar la tabla de contexto según el nuevo tipo
   actualizarDescEval();
   calcIndice();
@@ -3207,7 +3228,7 @@ const FILTRO_CAMPOS = {
   procede:      { label:'¿Procede reevaluación?',get:r=>procedeReeval(r).procede?'Sí':'No', opciones:['Sí','No'] },
   tipo:         { label:'Tipo de proceso',       get:r=>{const x=(r.values||{})['Tipo de proceso'];return (x&&x!=='Tipo de proceso')?x:'';} },
   ro:           { label:'¿Riesgo u oportunidad?',get:r=>{const x=(r.values||{})['¿Riesgo u oportunidad?'];return (x&&x!=='¿Riesgo u oportunidad?')?x:'';}, opciones:['Riesgo','Oportunidad'] },
-  respuesta:    { label:'Respuesta',             get:r=>{const x=(r.values||{})['Respuesta al riesgo u oportunidad'];return (x&&!x.includes('Respuesta'))?x:'';}, opciones:['Eliminar','Mitigar','Trasladar','Asumir'] },
+  respuesta:    { label:'Respuesta',             get:r=>{const x=(r.values||{})['Respuesta al riesgo u oportunidad'];return (x&&!x.includes('Respuesta'))?x:'';}, opciones:['Eliminar','Mitigar','Trasladar','Asumir','Explotar','Mejorar','Compartir','Aceptar'] },
   certificacion:{ label:'Certificación control', get:r=>{const x=(r.values||{})['Certificación de Implementación del Control'];return (x&&!x.includes('Certificación'))?x:'';}, opciones:['No Implementado','Implementado sin validar','Certificado/Operativo'] },
   fecha:        { label:'Fecha de evaluación', get:r=>fechaParaInput((r.values||{})['Fecha de evaluación'])||'', esFecha:true }
 };
@@ -4993,6 +5014,7 @@ async function guardarReporte(riesgoId){
   const repVals={};
   if(g('add_fecha'))  repVals[RF.fecha_reporte.id]=g('add_fecha');
   if(g('add_accion')) repVals[RF.accion.id]=g('add_accion');
+  console.log('[DIAG guardarReporte] Acción a enviar:', JSON.stringify({campo:RF.accion.id, valor:g('add_accion')}));
   if(g('add_obs'))    repVals[RF.observacion.id]=g('add_obs');
   if(g('add_evid'))   repVals[RF.evidencia2.id]=g('add_evid');
   if(g('add_estado')) repVals[RF.estado.id]=g('add_estado');
@@ -5502,7 +5524,7 @@ function _editarRiesgoInterno(riesgoId){
     <div class="ctrl-nota si hidden" id="ed_nota_si" style="margin-bottom:12px">🛡️ <strong>Control existente.</strong> Describe el control que ya está implementado para este riesgo.<span class="solo-n4"> Al ser un riesgo de nivel intolerable (4), define también su <strong>indicador, fórmula y frecuencias</strong>; el monitoreo, metas y certificación se gestionan con el botón 🎯 «Control y Seguimiento» en Seguimiento, cuando las medidas estén al <strong>100%</strong> y el estado sea <strong>Culminado/Ejecutado</strong>.</span><br><span style="display:inline-block;margin-top:6px">💾 <strong>Recuerda pulsar «Guardar cambios»</strong> para conservar esta elección.</span></div>
     <div class="grid">
       <!-- Respuesta + Medida: visibles salvo cuando hay control "Sí" -->
-      <div class="field oculta-si-control" id="ed_wrap_respuesta"><label>Respuesta</label><select id="ed_resp">${opt(['Eliminar','Mitigar','Trasladar','Asumir'],cur('Respuesta al riesgo u oportunidad'))}</select></div>
+      <div class="field oculta-si-control" id="ed_wrap_respuesta"><label>Respuesta</label><select id="ed_resp">${opt(tipoRO==='Oportunidad'?RESPUESTAS_OPORTUNIDAD:RESPUESTAS_RIESGO, cur('Respuesta al riesgo u oportunidad'))}</select></div>
       <div class="field oculta-si-control"></div>
       <div class="field full oculta-si-control" id="ed_wrap_medida"><label>Medida(s) de respuesta</label><textarea id="ed_medida">${cur('Medida(s) de respuesta')}</textarea></div>
       <!-- Control e indicadores: SOLO nivel 4 con "Sí" -->
@@ -5593,6 +5615,14 @@ window.actualizarContextoTipoEdit = actualizarContextoTipoEdit;
 // Al cambiar el tipo en edición: actualiza descripción, evaluación y contexto
 function showEvalEdit(tipo){
   actualizarContextoTipoEdit();
+  // Opciones de respuesta según el tipo (conservando el valor actual si sigue siendo válido)
+  const sel=document.getElementById('ed_resp');
+  if(sel){
+    const opciones = (tipo==='Oportunidad') ? RESPUESTAS_OPORTUNIDAD : RESPUESTAS_RIESGO;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">Seleccione…</option>' +
+      opciones.map(o=>`<option ${o===prev?'selected':''}>${o}</option>`).join('');
+  }
 }
 window.showEvalEdit = showEvalEdit;
 
