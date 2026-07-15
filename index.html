@@ -741,7 +741,7 @@
       <div class="modal-head">
         <div>
           <div class="eyebrow">Editar riesgo</div>
-          <h2 id="editTitulo" style="font-size:18px">Riesgo</h2>
+          <h2 id="editTitulo" style="font-size:18px;line-height:1.35;margin:2px 0 0;word-break:break-word">Riesgo</h2>
         </div>
         <button class="modal-close" onclick="cerrarEdit()">&times;</button>
       </div>
@@ -5530,7 +5530,8 @@ function _editarRiesgoInterno(riesgoId){
     else if(tieneContexto) fuenteAct='Contexto';
   }
 
-  document.getElementById('editTitulo').textContent = (cur('Riesgo')||cur('Oportunidad')||'Riesgo').slice(0,70);
+  const _tit = (cur('Riesgo')||cur('Oportunidad')||'Riesgo').trim();
+  document.getElementById('editTitulo').textContent = _tit.length>120 ? _tit.slice(0,120).trim()+'…' : _tit;
   document.getElementById('editBody').innerHTML = `
     <div class="edit-sec"><div class="edit-sec-tit">1 · Identificación</div>
     <div class="grid">
