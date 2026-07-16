@@ -2889,15 +2889,25 @@ async function renderEstadoPorOficina(recs){
       +'<th style="padding:9px 10px;text-align:center" title="Ya tiene definidas la estrategia de respuesta y las medidas, pero sin avance reportado">🟠 Con respuesta</th>'
       +'<th style="padding:9px 10px;text-align:center" title="Con reportes de avance de las medidas, aún sin cerrar">🟡 En ejecución</th>'
       +'<th style="padding:9px 10px;text-align:center" title="Medidas al 100% culminadas (y en nivel 4, control certificado)">🟢 Controlado</th>'
+      +'<th style="padding:9px 10px;text-align:center" title="Reparto visual de las etapas en esta oficina">Progreso</th>'
       +'</tr></thead><tbody>';
     filas.forEach(([ofi,g])=>{
       const tt=`${g.nR} riesgo${g.nR!==1?'s':''} · ${g.nO} oportunidad${g.nO!==1?'es':''}`;
+      const sinTratar = g.e1; // registros sin respuesta/medidas (no tienen columna propia)
+      // Barra de progreso proporcional: naranja (con respuesta) → amarillo (en ejecución) → verde (controlado)
+      const seg=(n,color,label)=> n>0 ? `<span title="${label}: ${n}" style="display:inline-block;height:100%;width:${(n/g.total*100).toFixed(1)}%;background:${color}"></span>`:'';
+      const barra = g.total>0 ? `<div style="display:flex;height:9px;border-radius:5px;overflow:hidden;background:#eee;min-width:90px" title="${sinTratar>0?sinTratar+' sin respuesta aún · ':''}${g.e2} con respuesta · ${g.e3} en ejecución · ${g.e4} controlado">
+        ${seg(g.e2,'#e08e0b','Con respuesta')}${seg(g.e3,'#e9c000','En ejecución')}${seg(g.e4,'#2fa26a','Controlado')}
+      </div>`:'—';
+      // Celdas con detalle explicativo al pasar el mouse
+      const celTip = (n,txt)=> n>0 ? `<span title="${txt}"><strong>${n}</strong></span>` : '<span style="color:var(--mist)">—</span>';
       html+=`<tr style="border-top:1px solid var(--line)">
         <td style="padding:9px 10px;font-weight:600">${ofi.replace(/</g,'&lt;')}</td>
-        <td style="padding:9px 10px;text-align:center" title="${tt}"><span style="cursor:help;border-bottom:1px dotted var(--mist)">${g.total}</span></td>
-        <td style="padding:9px 10px;text-align:center">${cel(g.e2)}</td>
-        <td style="padding:9px 10px;text-align:center">${cel(g.e3)}</td>
-        <td style="padding:9px 10px;text-align:center">${cel(g.e4)}</td>
+        <td style="padding:9px 10px;text-align:center" title="${tt}${sinTratar>0?' · '+sinTratar+' aún sin respuesta':''}"><span style="cursor:help;border-bottom:1px dotted var(--mist)">${g.total}</span></td>
+        <td style="padding:9px 10px;text-align:center">${celTip(g.e2,'Con la estrategia de respuesta y las medidas definidas, pero sin avance reportado')}</td>
+        <td style="padding:9px 10px;text-align:center">${celTip(g.e3,'Con reportes de avance de las medidas en curso, aún sin llegar al 100%')}</td>
+        <td style="padding:9px 10px;text-align:center">${celTip(g.e4,'Medidas al 100% + culminado/ejecutado (y en nivel 4, control certificado). Ya completó su ciclo.')}</td>
+        <td style="padding:9px 10px">${barra}</td>
       </tr>`;
     });
     html+=`<tr style="border-top:2px solid var(--brand);font-weight:700;background:var(--paper)">
@@ -2906,6 +2916,9 @@ async function renderEstadoPorOficina(recs){
       <td style="padding:9px 10px;text-align:center">${tot.e2||'—'}</td>
       <td style="padding:9px 10px;text-align:center">${tot.e3||'—'}</td>
       <td style="padding:9px 10px;text-align:center">${tot.e4||'—'}</td>
+      <td style="padding:9px 10px">${tot.total>0?`<div style="display:flex;height:9px;border-radius:5px;overflow:hidden;background:#eee;min-width:90px">
+        ${tot.e2>0?`<span style="width:${(tot.e2/tot.total*100).toFixed(1)}%;background:#e08e0b"></span>`:''}${tot.e3>0?`<span style="width:${(tot.e3/tot.total*100).toFixed(1)}%;background:#e9c000"></span>`:''}${tot.e4>0?`<span style="width:${(tot.e4/tot.total*100).toFixed(1)}%;background:#2fa26a"></span>`:''}
+      </div>`:'—'}</td>
     </tr>`;
     html+='</tbody></table></div>';
     html+=`<div style="margin-top:14px;padding:12px 14px;background:var(--paper);border-radius:9px;font-size:12.5px;line-height:1.7">
