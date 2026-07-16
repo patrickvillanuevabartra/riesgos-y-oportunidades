@@ -2886,8 +2886,7 @@ async function renderEstadoPorOficina(recs){
       +'<thead><tr style="text-align:left;color:var(--mist);font-size:11px;text-transform:uppercase;letter-spacing:.03em">'
       +'<th style="padding:9px 10px">Oficina</th>'
       +'<th style="padding:9px 10px;text-align:center">Total</th>'
-      +'<th style="padding:9px 10px;text-align:center" title="Registrado, sin respuesta ni medidas definidas">🔴 Sin tratar</th>'
-      +'<th style="padding:9px 10px;text-align:center" title="Con estrategia de respuesta y/o medidas, pero sin avance reportado">🟠 Con respuesta</th>'
+      +'<th style="padding:9px 10px;text-align:center" title="Ya tiene definidas la estrategia de respuesta y las medidas, pero sin avance reportado">🟠 Con respuesta</th>'
       +'<th style="padding:9px 10px;text-align:center" title="Con reportes de avance de las medidas, aún sin cerrar">🟡 En ejecución</th>'
       +'<th style="padding:9px 10px;text-align:center" title="Medidas al 100% culminadas (y en nivel 4, control certificado)">🟢 Controlado</th>'
       +'</tr></thead><tbody>';
@@ -2896,7 +2895,6 @@ async function renderEstadoPorOficina(recs){
       html+=`<tr style="border-top:1px solid var(--line)">
         <td style="padding:9px 10px;font-weight:600">${ofi.replace(/</g,'&lt;')}</td>
         <td style="padding:9px 10px;text-align:center" title="${tt}"><span style="cursor:help;border-bottom:1px dotted var(--mist)">${g.total}</span></td>
-        <td style="padding:9px 10px;text-align:center">${cel(g.e1)}</td>
         <td style="padding:9px 10px;text-align:center">${cel(g.e2)}</td>
         <td style="padding:9px 10px;text-align:center">${cel(g.e3)}</td>
         <td style="padding:9px 10px;text-align:center">${cel(g.e4)}</td>
@@ -2905,7 +2903,6 @@ async function renderEstadoPorOficina(recs){
     html+=`<tr style="border-top:2px solid var(--brand);font-weight:700;background:var(--paper)">
       <td style="padding:9px 10px">TOTAL</td>
       <td style="padding:9px 10px;text-align:center">${tot.total}</td>
-      <td style="padding:9px 10px;text-align:center">${tot.e1||'—'}</td>
       <td style="padding:9px 10px;text-align:center">${tot.e2||'—'}</td>
       <td style="padding:9px 10px;text-align:center">${tot.e3||'—'}</td>
       <td style="padding:9px 10px;text-align:center">${tot.e4||'—'}</td>
@@ -2913,10 +2910,10 @@ async function renderEstadoPorOficina(recs){
     html+='</tbody></table></div>';
     html+=`<div style="margin-top:14px;padding:12px 14px;background:var(--paper);border-radius:9px;font-size:12.5px;line-height:1.7">
       <strong style="display:block;margin-bottom:6px">¿Qué significa cada etapa?</strong>
-      <div><span style="color:#c0392b">🔴 Sin tratar:</span> el riesgo/oportunidad está identificado, pero aún le falta definir la estrategia de respuesta o las medidas. El tratamiento está incompleto.</div>
       <div><span style="color:#e08e0b">🟠 Con respuesta:</span> ya tiene definidas tanto la estrategia de respuesta (Mitigar, Explotar…) como las medidas concretas, pero todavía no se ha reportado ningún avance de su ejecución.</div>
       <div><span style="color:#c9a800">🟡 En ejecución:</span> hay reportes de avance reales de las medidas en curso, pero aún no se ha completado el tratamiento.</div>
       <div><span style="color:#0f8f5e">🟢 Controlado:</span> las medidas están al 100% y culminadas. En los riesgos de nivel intolerable (4) se exige además que el control esté certificado/operativo.</div>
+      <div style="margin-top:6px;color:var(--mist)">El <strong>Total</strong> incluye todos los registros de la oficina. La diferencia entre el total y la suma de estas tres etapas son los que aún no tienen respuesta ni medidas definidas.</div>
     </div>`;
     cont.innerHTML=html;
   }catch(e){
