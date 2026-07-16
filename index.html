@@ -371,7 +371,9 @@
     </div>
     <div class="kpis" id="kpis"></div>
 
-    <!-- Filtros del tablero (afectan a los mapas de calor) -->
+    <div class="panel" style="margin-bottom:20px"><h3>Estado de riesgos y oportunidades por oficina</h3><p class="hint" style="margin:-4px 0 10px">Cuántos riesgos/oportunidades tiene cada oficina y en qué etapa del tratamiento se encuentran.</p><div id="estadoPorOficina"><p class="hint">Cargando…</p></div></div>
+
+    <!-- Filtros del tablero (afectan a los mapas de calor y a los paneles siguientes) -->
     <div class="filtros-card" style="margin-bottom:20px">
       <div class="filtros-head" style="margin-bottom:0">
         <span>Filtrar mapas de calor</span>
@@ -388,8 +390,6 @@
         </div>
       </div>
     </div>
-
-    <div class="panel" style="margin-bottom:16px"><h3>Estado de riesgos y oportunidades por oficina</h3><p class="hint" style="margin:-4px 0 10px">Cuántos riesgos/oportunidades tiene cada oficina y en qué etapa del tratamiento se encuentran.</p><div id="estadoPorOficina"><p class="hint">Cargando…</p></div></div>
 
     <div class="dash-grid">
       <div class="panel"><h3>Mapa de calor · riesgo inherente</h3><div id="heatmap"></div></div>
@@ -2666,6 +2666,7 @@ async function renderDashboard() {
     // ── Aplicar los filtros ──
     const recs = recsAll.filter(r=>{
       if(esArchivado(r)) return false; // los archivados no cuentan en el tablero
+      if(SESION && !puedeVerTodo() && !_registroVisible(r)) return false; // rol Oficina: solo su(s) oficina(s)
       if(fResp && oficinaDe(r)!==fResp) return false;
       if(fProc && nivel1De(r)!==fProc) return false;
       if(fDesde){ const f=fechaReg(r); if(!f || f<fDesde) return false; }
@@ -2844,7 +2845,8 @@ async function renderEstadoPorOficina(recs){
         if(/culmin|ejecut/i.test(limpio(sv['Estado medida(s) de respuesta']))) culminado=true;
       });
       const nivel=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel;
-      // 4 Controlado: medidas 100% culminadas; en nivel 4 además exige certificación
+      // 4 Controlado: medidas 100% culminadas; en nivel 4 además exige certificación.
+      // (El control "Sí" automático nace justo de llegar aquí, así que encaja solo.)
       if(pct>=100 && culminado){
         if(nivel===4){
           const cert=lee(r,'Certificación de Implementación del Control', F.certificacion_control&&F.certificacion_control.id);
@@ -2853,10 +2855,12 @@ async function renderEstadoPorOficina(recs){
         }
         return 4;
       }
-      // 3 En ejecución: hay reportes de avance (o control ya implementado)
-      if(hayReporte || esSiCtrl) return 3;
-      // 2 Con respuesta: definió estrategia y/o medidas, pero sin avance
-      if(respuesta || medidas) return 2;
+      // 3 En ejecución: hay reportes de avance REALES en curso (no basta el control "Sí"
+      // preexistente; un control documentado sin avances es "Con respuesta").
+      if(hayReporte) return 3;
+      // 2 Con respuesta: definió estrategia, medidas o ya tiene un control documentado,
+      // pero sin ejecución en curso.
+      if(respuesta || medidas || esSiCtrl) return 2;
       // 1 Sin tratar
       return 1;
     };
@@ -2906,6 +2910,13 @@ async function renderEstadoPorOficina(recs){
       <td style="padding:9px 10px;text-align:center">${tot.e4||'—'}</td>
     </tr>`;
     html+='</tbody></table></div>';
+    html+=`<div style="margin-top:14px;padding:12px 14px;background:var(--paper);border-radius:9px;font-size:12.5px;line-height:1.7">
+      <strong style="display:block;margin-bottom:6px">¿Qué significa cada etapa?</strong>
+      <div><span style="color:#c0392b">🔴 Sin tratar:</span> el riesgo/oportunidad está identificado, pero aún no se ha definido ninguna estrategia de respuesta, medida ni control. Falta decidir qué hacer.</div>
+      <div><span style="color:#e08e0b">🟠 Con respuesta:</span> ya se definió la estrategia (Mitigar, Explotar…), se escribieron las medidas, o ya existe un control documentado, pero todavía no se ha reportado ningún avance de su ejecución.</div>
+      <div><span style="color:#c9a800">🟡 En ejecución:</span> hay reportes de avance reales de las medidas en curso, pero aún no se ha completado el tratamiento.</div>
+      <div><span style="color:#0f8f5e">🟢 Controlado:</span> las medidas están al 100% y culminadas. En los riesgos de nivel intolerable (4) se exige además que el control esté certificado/operativo.</div>
+    </div>`;
     cont.innerHTML=html;
   }catch(e){
     cont.innerHTML='<p class="hint" style="color:#c0392b">No se pudo calcular: '+(e.message||e)+'</p>';
@@ -3773,10 +3784,11 @@ async function cargarUltimosEstados(filasConReportes) {
       } else if (pctRaw !== '' && pctRaw != null) {
         pctMedidas = Math.max(0, Math.min(100, parseInt(pctRaw)||0));
       }
-      // AUTO: riesgo NIVEL 4 con medidas 100% + Culminado pero control aún "No"/vacío
-      // → marcar "Sí" automáticamente (el control quedó implementado) y guardar.
-      const _culm4 = /culmin|ejecut/i.test(String(est));
-      if (f.nivel===4 && pctMedidas===100 && _culm4 && f.ctrlTxt!=='Sí') {
+      // AUTO: cualquier riesgo con medidas 100% + Culminado pero control aún "No"/vacío
+      // → marcar "Sí" automáticamente (las medidas cumplidas implican control implementado).
+      // Aplica a TODOS los niveles (1-4). En nivel 4 esto además revela el botón 🎯.
+      const _culmAuto = /culmin|ejecut/i.test(String(est));
+      if (pctMedidas===100 && _culmAuto && f.ctrlTxt!=='Sí') {
         autoMarcarControlSi(f.id);
         continue; // renderSeguimiento se reejecutará tras el guardado
       }
