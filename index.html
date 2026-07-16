@@ -389,6 +389,8 @@
       </div>
     </div>
 
+    <div class="panel" style="margin-bottom:16px"><h3>Estado de riesgos y oportunidades por oficina</h3><p class="hint" style="margin:-4px 0 10px">Cuántos riesgos/oportunidades tiene cada oficina y en qué etapa del tratamiento se encuentran.</p><div id="estadoPorOficina"><p class="hint">Cargando…</p></div></div>
+
     <div class="dash-grid">
       <div class="panel"><h3>Mapa de calor · riesgo inherente</h3><div id="heatmap"></div></div>
       <div class="panel"><h3>Mapa de calor · riesgo residual</h3><div id="heatmapRes"></div></div>
@@ -2805,13 +2807,113 @@ async function renderDashboard() {
     const contRangos=document.getElementById('avancePorRangos');
     if(contRangos){ contRangos.innerHTML='<p class="hint">Calculando avances por rangos…</p>'; renderAvancePorRangos(recs); }
 
+    // Estado de riesgos/oportunidades por oficina (etapas del tratamiento)
+    const contEPO=document.getElementById('estadoPorOficina');
+    if(contEPO){ contEPO.innerHTML='<p class="hint">Clasificando por etapa…</p>'; renderEstadoPorOficina(recs); }
+
     setConn(true);
   } catch(e){ setConn(false, e.message); 
     document.getElementById('kpis').innerHTML = emptyCard('No se pudo cargar el tablero', e.message); }
 }
 
-// Cuenta RIESGOS por estado derivado: sin reportes = Pendiente;
-// con reportes = estado del último reporte.
+// Clasifica cada registro en una de 4 etapas del tratamiento y arma el tablero por oficina.
+// Etapas: 1 Sin tratar · 2 Con respuesta · 3 En ejecución · 4 Controlado.
+async function renderEstadoPorOficina(recs){
+  const cont=document.getElementById('estadoPorOficina');
+  if(!cont) return;
+  try{
+    await precargarSubcache();
+    const F=CONFIG.MATRIZ_FIELDS;
+    const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
+    const lee=(r,col,id)=>{ const v=r.values||{}; const a=v[col], b=id?v[id]:''; return limpio((a&&a!==col)?a:'')||limpio(b); };
+
+    // Determina la etapa (1..4) de un registro
+    const etapaDe = (r)=>{
+      const v=r.values||{};
+      const op=esOportunidad(r);
+      const respuesta = lee(r,'Respuesta al riesgo u oportunidad', F.respuesta&&F.respuesta.id);
+      const medidas   = lee(r,'Medida(s) de respuesta', F.medida_respuesta&&F.medida_respuesta.id);
+      const esSiCtrl  = /^s[ií]$/i.test(lee(r,'¿Existen controles?', F.existen_controles&&F.existen_controles.id));
+      const subIds = subIdsDe(r, SUBFORM_FIELD_ID)||[];
+      // Último estado + % de los reportes de medidas (desde el subcache)
+      let pct=0, culminado=false, hayReporte=subIds.length>0;
+      subIds.forEach(id=>{
+        const s=(STATE.subCache&&STATE.subCache.reportes&&STATE.subCache.reportes[id]);
+        const sv=s&&s.values; if(!sv) return;
+        const p=parseInt(limpio(sv['% completado']))||0; if(p>pct) pct=p;
+        if(/culmin|ejecut/i.test(limpio(sv['Estado medida(s) de respuesta']))) culminado=true;
+      });
+      const nivel=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel;
+      // 4 Controlado: medidas 100% culminadas; en nivel 4 además exige certificación
+      if(pct>=100 && culminado){
+        if(nivel===4){
+          const cert=lee(r,'Certificación de Implementación del Control', F.certificacion_control&&F.certificacion_control.id);
+          if(/certificad|operativ/i.test(cert)) return 4;
+          return 3; // llegó al 100% pero falta certificar el control
+        }
+        return 4;
+      }
+      // 3 En ejecución: hay reportes de avance (o control ya implementado)
+      if(hayReporte || esSiCtrl) return 3;
+      // 2 Con respuesta: definió estrategia y/o medidas, pero sin avance
+      if(respuesta || medidas) return 2;
+      // 1 Sin tratar
+      return 1;
+    };
+
+    // Agrupar por oficina
+    const porOfi={}; // ofi -> {total, e1,e2,e3,e4, nR, nO}
+    recs.forEach(r=>{
+      const ofi=oficinaDe(r)||'Sin oficina asignada';
+      const e=etapaDe(r);
+      const g=porOfi[ofi]||(porOfi[ofi]={total:0,e1:0,e2:0,e3:0,e4:0,nR:0,nO:0});
+      g.total++; g['e'+e]++;
+      if(esOportunidad(r)) g.nO++; else g.nR++;
+    });
+    const filas=Object.entries(porOfi).sort((a,b)=>a[0].localeCompare(b[0]));
+    if(!filas.length){ cont.innerHTML='<p class="hint">No hay registros para mostrar.</p>'; return; }
+
+    // Totales generales (fila de resumen)
+    const tot=filas.reduce((a,[,g])=>{a.total+=g.total;a.e1+=g.e1;a.e2+=g.e2;a.e3+=g.e3;a.e4+=g.e4;return a;},{total:0,e1:0,e2:0,e3:0,e4:0});
+    const cel = n => n>0 ? `<strong>${n}</strong>` : '<span style="color:var(--mist)">—</span>';
+
+    let html='<div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:13.5px">'
+      +'<thead><tr style="text-align:left;color:var(--mist);font-size:11px;text-transform:uppercase;letter-spacing:.03em">'
+      +'<th style="padding:9px 10px">Oficina</th>'
+      +'<th style="padding:9px 10px;text-align:center">Total</th>'
+      +'<th style="padding:9px 10px;text-align:center" title="Registrado, sin respuesta ni medidas definidas">🔴 Sin tratar</th>'
+      +'<th style="padding:9px 10px;text-align:center" title="Con estrategia de respuesta y/o medidas, pero sin avance reportado">🟠 Con respuesta</th>'
+      +'<th style="padding:9px 10px;text-align:center" title="Con reportes de avance de las medidas, aún sin cerrar">🟡 En ejecución</th>'
+      +'<th style="padding:9px 10px;text-align:center" title="Medidas al 100% culminadas (y en nivel 4, control certificado)">🟢 Controlado</th>'
+      +'</tr></thead><tbody>';
+    filas.forEach(([ofi,g])=>{
+      const tt=`${g.nR} riesgo${g.nR!==1?'s':''} · ${g.nO} oportunidad${g.nO!==1?'es':''}`;
+      html+=`<tr style="border-top:1px solid var(--line)">
+        <td style="padding:9px 10px;font-weight:600">${ofi.replace(/</g,'&lt;')}</td>
+        <td style="padding:9px 10px;text-align:center" title="${tt}"><span style="cursor:help;border-bottom:1px dotted var(--mist)">${g.total}</span></td>
+        <td style="padding:9px 10px;text-align:center">${cel(g.e1)}</td>
+        <td style="padding:9px 10px;text-align:center">${cel(g.e2)}</td>
+        <td style="padding:9px 10px;text-align:center">${cel(g.e3)}</td>
+        <td style="padding:9px 10px;text-align:center">${cel(g.e4)}</td>
+      </tr>`;
+    });
+    html+=`<tr style="border-top:2px solid var(--brand);font-weight:700;background:var(--paper)">
+      <td style="padding:9px 10px">TOTAL</td>
+      <td style="padding:9px 10px;text-align:center">${tot.total}</td>
+      <td style="padding:9px 10px;text-align:center">${tot.e1||'—'}</td>
+      <td style="padding:9px 10px;text-align:center">${tot.e2||'—'}</td>
+      <td style="padding:9px 10px;text-align:center">${tot.e3||'—'}</td>
+      <td style="padding:9px 10px;text-align:center">${tot.e4||'—'}</td>
+    </tr>`;
+    html+='</tbody></table></div>';
+    cont.innerHTML=html;
+  }catch(e){
+    cont.innerHTML='<p class="hint" style="color:#c0392b">No se pudo calcular: '+(e.message||e)+'</p>';
+  }
+}
+window.renderEstadoPorOficina=renderEstadoPorOficina;
+
+// Cuenta RIESGOS por estado derivado: sin reportes = Pendiente;// con reportes = estado del último reporte.
 async function cargarAvanceMedidas(){
   try {
     const recs = STATE.matriz.length ? STATE.matriz : (await loadMatriz());
