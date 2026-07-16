@@ -2834,7 +2834,9 @@ async function renderEstadoPorOficina(recs){
       const op=esOportunidad(r);
       const respuesta = lee(r,'Respuesta al riesgo u oportunidad', F.respuesta&&F.respuesta.id);
       const medidas   = lee(r,'Medida(s) de respuesta', F.medida_respuesta&&F.medida_respuesta.id);
-      const esSiCtrl  = /^s[ií]$/i.test(lee(r,'¿Existen controles?', F.existen_controles&&F.existen_controles.id));
+      // "Seleccione" (valor inicial del desplegable) NO cuenta como respuesta real.
+      const tieneRespuesta = respuesta && !/^seleccione/i.test(respuesta);
+      const tieneMedidas   = medidas && medidas.length>1;
       const subIds = subIdsDe(r, SUBFORM_FIELD_ID)||[];
       // Último estado + % de los reportes de medidas (desde el subcache)
       let pct=0, culminado=false, hayReporte=subIds.length>0;
@@ -2855,13 +2857,12 @@ async function renderEstadoPorOficina(recs){
         }
         return 4;
       }
-      // 3 En ejecución: hay reportes de avance REALES en curso (no basta el control "Sí"
-      // preexistente; un control documentado sin avances es "Con respuesta").
+      // 3 En ejecución: hay reportes de avance REALES en curso.
       if(hayReporte) return 3;
-      // 2 Con respuesta: definió estrategia, medidas o ya tiene un control documentado,
-      // pero sin ejecución en curso.
-      if(respuesta || medidas || esSiCtrl) return 2;
-      // 1 Sin tratar
+      // 2 Con respuesta: tiene la estrategia de respuesta Y las medidas definidas
+      // (tratamiento completo), pero sin ejecución en curso.
+      if(tieneRespuesta && tieneMedidas) return 2;
+      // 1 Sin tratar: le falta la respuesta o las medidas (tratamiento incompleto).
       return 1;
     };
 
@@ -2912,8 +2913,8 @@ async function renderEstadoPorOficina(recs){
     html+='</tbody></table></div>';
     html+=`<div style="margin-top:14px;padding:12px 14px;background:var(--paper);border-radius:9px;font-size:12.5px;line-height:1.7">
       <strong style="display:block;margin-bottom:6px">¿Qué significa cada etapa?</strong>
-      <div><span style="color:#c0392b">🔴 Sin tratar:</span> el riesgo/oportunidad está identificado, pero aún no se ha definido ninguna estrategia de respuesta, medida ni control. Falta decidir qué hacer.</div>
-      <div><span style="color:#e08e0b">🟠 Con respuesta:</span> ya se definió la estrategia (Mitigar, Explotar…), se escribieron las medidas, o ya existe un control documentado, pero todavía no se ha reportado ningún avance de su ejecución.</div>
+      <div><span style="color:#c0392b">🔴 Sin tratar:</span> el riesgo/oportunidad está identificado, pero aún le falta definir la estrategia de respuesta o las medidas. El tratamiento está incompleto.</div>
+      <div><span style="color:#e08e0b">🟠 Con respuesta:</span> ya tiene definidas tanto la estrategia de respuesta (Mitigar, Explotar…) como las medidas concretas, pero todavía no se ha reportado ningún avance de su ejecución.</div>
       <div><span style="color:#c9a800">🟡 En ejecución:</span> hay reportes de avance reales de las medidas en curso, pero aún no se ha completado el tratamiento.</div>
       <div><span style="color:#0f8f5e">🟢 Controlado:</span> las medidas están al 100% y culminadas. En los riesgos de nivel intolerable (4) se exige además que el control esté certificado/operativo.</div>
     </div>`;
