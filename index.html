@@ -2847,84 +2847,87 @@ async function renderEstadoPorOficina(recs){
         if(/culmin|ejecut/i.test(limpio(sv['Estado medida(s) de respuesta']))) culminado=true;
       });
       const nivel=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel;
+      let etapa;
       // 4 Controlado: medidas 100% culminadas; en nivel 4 además exige certificación.
-      // (El control "Sí" automático nace justo de llegar aquí, así que encaja solo.)
       if(pct>=100 && culminado){
         if(nivel===4){
           const cert=lee(r,'Certificación de Implementación del Control', F.certificacion_control&&F.certificacion_control.id);
-          if(/certificad|operativ/i.test(cert)) return 4;
-          return 3; // llegó al 100% pero falta certificar el control
-        }
-        return 4;
+          etapa = /certificad|operativ/i.test(cert) ? 4 : 3; // 100% pero falta certificar
+        } else etapa = 4;
       }
-      // 3 En ejecución: hay reportes de avance REALES en curso.
-      if(hayReporte) return 3;
-      // 2 Con respuesta: tiene la estrategia de respuesta Y las medidas definidas
-      // (tratamiento completo), pero sin ejecución en curso.
-      if(tieneRespuesta && tieneMedidas) return 2;
-      // 1 Sin tratar: le falta la respuesta o las medidas (tratamiento incompleto).
-      return 1;
+      else if(hayReporte) etapa = 3;                          // en ejecución
+      else if(tieneRespuesta && tieneMedidas) etapa = 2;      // con respuesta
+      else etapa = 1;                                          // sin tratar
+      // El % de avance es 100 cuando ya está controlado; si no, el mayor reportado.
+      const pctAvance = etapa===4 ? 100 : pct;
+      return { etapa, pct: pctAvance, conTratamiento: (tieneRespuesta && tieneMedidas) || hayReporte };
     };
 
     // Agrupar por oficina
-    const porOfi={}; // ofi -> {total, e1,e2,e3,e4, nR, nO}
+    const porOfi={}; // ofi -> {total, e1..e4, nR, nO, sumaPct, nConTrat}
     recs.forEach(r=>{
       const ofi=oficinaDe(r)||'Sin oficina asignada';
-      const e=etapaDe(r);
-      const g=porOfi[ofi]||(porOfi[ofi]={total:0,e1:0,e2:0,e3:0,e4:0,nR:0,nO:0});
-      g.total++; g['e'+e]++;
+      const {etapa,pct,conTratamiento}=etapaDe(r);
+      const g=porOfi[ofi]||(porOfi[ofi]={total:0,e1:0,e2:0,e3:0,e4:0,nR:0,nO:0,sumaPct:0,nConTrat:0});
+      g.total++; g['e'+etapa]++;
       if(esOportunidad(r)) g.nO++; else g.nR++;
+      // Promedio de avance: sobre los registros que ya tienen tratamiento definido
+      if(conTratamiento){ g.sumaPct+=pct; g.nConTrat++; }
     });
     const filas=Object.entries(porOfi).sort((a,b)=>a[0].localeCompare(b[0]));
     if(!filas.length){ cont.innerHTML='<p class="hint">No hay registros para mostrar.</p>'; return; }
 
     // Totales generales (fila de resumen)
     const tot=filas.reduce((a,[,g])=>{a.total+=g.total;a.e1+=g.e1;a.e2+=g.e2;a.e3+=g.e3;a.e4+=g.e4;return a;},{total:0,e1:0,e2:0,e3:0,e4:0});
-    const cel = n => n>0 ? `<strong>${n}</strong>` : '<span style="color:var(--mist)">—</span>';
 
     let html='<div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:13.5px">'
       +'<thead><tr style="text-align:left;color:var(--mist);font-size:11px;text-transform:uppercase;letter-spacing:.03em">'
       +'<th style="padding:9px 10px">Oficina</th>'
       +'<th style="padding:9px 10px;text-align:center">Total</th>'
       +'<th style="padding:9px 10px;text-align:center" title="Ya tiene definidas la estrategia de respuesta y las medidas, pero sin avance reportado">🟠 Con respuesta</th>'
-      +'<th style="padding:9px 10px;text-align:center" title="Con reportes de avance de las medidas, aún sin cerrar">🟡 En ejecución</th>'
+      +'<th style="padding:9px 10px;text-align:center;min-width:150px" title="Avance promedio de las medidas de la oficina (los controlados cuentan como 100%)">🟡 Nivel de ejecución</th>'
       +'<th style="padding:9px 10px;text-align:center" title="Medidas al 100% culminadas (y en nivel 4, control certificado)">🟢 Controlado</th>'
-      +'<th style="padding:9px 10px;text-align:center" title="Reparto visual de las etapas en esta oficina">Progreso</th>'
       +'</tr></thead><tbody>';
+    // Barra de % de avance dentro de la celda: color según el nivel alcanzado
+    const barraPct = (pct)=>{
+      const p=Math.round(pct);
+      const color = p>=100 ? '#2fa26a' : p>=50 ? '#e9c000' : '#e08e0b';
+      return `<div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;height:9px;border-radius:5px;background:#eee;overflow:hidden;min-width:70px">
+          <div style="height:100%;width:${p}%;background:${color};border-radius:5px"></div>
+        </div>
+        <span style="font-size:12px;font-weight:600;color:${color};min-width:34px;text-align:right">${p}%</span>
+      </div>`;
+    };
+    const celN = (n,txt)=> n>0 ? `<span title="${txt}"><strong>${n}</strong></span>` : '<span style="color:var(--mist)">—</span>';
     filas.forEach(([ofi,g])=>{
       const tt=`${g.nR} riesgo${g.nR!==1?'s':''} · ${g.nO} oportunidad${g.nO!==1?'es':''}`;
-      const sinTratar = g.e1; // registros sin respuesta/medidas (no tienen columna propia)
-      // Barra de progreso proporcional: naranja (con respuesta) → amarillo (en ejecución) → verde (controlado)
-      const seg=(n,color,label)=> n>0 ? `<span title="${label}: ${n}" style="display:inline-block;height:100%;width:${(n/g.total*100).toFixed(1)}%;background:${color}"></span>`:'';
-      const barra = g.total>0 ? `<div style="display:flex;height:9px;border-radius:5px;overflow:hidden;background:#eee;min-width:90px" title="${sinTratar>0?sinTratar+' sin respuesta aún · ':''}${g.e2} con respuesta · ${g.e3} en ejecución · ${g.e4} controlado">
-        ${seg(g.e2,'#e08e0b','Con respuesta')}${seg(g.e3,'#e9c000','En ejecución')}${seg(g.e4,'#2fa26a','Controlado')}
-      </div>`:'—';
-      // Celdas con detalle explicativo al pasar el mouse
-      const celTip = (n,txt)=> n>0 ? `<span title="${txt}"><strong>${n}</strong></span>` : '<span style="color:var(--mist)">—</span>';
+      const sinTratar = g.e1;
+      const avance = g.nConTrat>0 ? g.sumaPct/g.nConTrat : 0; // promedio sobre los que tienen tratamiento
       html+=`<tr style="border-top:1px solid var(--line)">
         <td style="padding:9px 10px;font-weight:600">${ofi.replace(/</g,'&lt;')}</td>
         <td style="padding:9px 10px;text-align:center" title="${tt}${sinTratar>0?' · '+sinTratar+' aún sin respuesta':''}"><span style="cursor:help;border-bottom:1px dotted var(--mist)">${g.total}</span></td>
-        <td style="padding:9px 10px;text-align:center">${celTip(g.e2,'Con la estrategia de respuesta y las medidas definidas, pero sin avance reportado')}</td>
-        <td style="padding:9px 10px;text-align:center">${celTip(g.e3,'Con reportes de avance de las medidas en curso, aún sin llegar al 100%')}</td>
-        <td style="padding:9px 10px;text-align:center">${celTip(g.e4,'Medidas al 100% + culminado/ejecutado (y en nivel 4, control certificado). Ya completó su ciclo.')}</td>
-        <td style="padding:9px 10px">${barra}</td>
+        <td style="padding:9px 10px;text-align:center">${celN(g.e2,'Con la estrategia de respuesta y las medidas definidas, pero sin avance reportado')}</td>
+        <td style="padding:9px 10px" title="Avance promedio de las medidas de esta oficina">${g.nConTrat>0?barraPct(avance):'<span style=\"color:var(--mist)\">sin datos</span>'}</td>
+        <td style="padding:9px 10px;text-align:center">${celN(g.e4,'Medidas al 100% + culminado/ejecutado (y en nivel 4, control certificado). Ya completó su ciclo.')}</td>
       </tr>`;
     });
+    // Promedio global de avance
+    const totNConTrat=filas.reduce((a,[,g])=>a+g.nConTrat,0);
+    const totSumaPct=filas.reduce((a,[,g])=>a+g.sumaPct,0);
+    const avanceGlobal = totNConTrat>0 ? totSumaPct/totNConTrat : 0;
     html+=`<tr style="border-top:2px solid var(--brand);font-weight:700;background:var(--paper)">
       <td style="padding:9px 10px">TOTAL</td>
       <td style="padding:9px 10px;text-align:center">${tot.total}</td>
       <td style="padding:9px 10px;text-align:center">${tot.e2||'—'}</td>
-      <td style="padding:9px 10px;text-align:center">${tot.e3||'—'}</td>
+      <td style="padding:9px 10px">${totNConTrat>0?barraPct(avanceGlobal):'—'}</td>
       <td style="padding:9px 10px;text-align:center">${tot.e4||'—'}</td>
-      <td style="padding:9px 10px">${tot.total>0?`<div style="display:flex;height:9px;border-radius:5px;overflow:hidden;background:#eee;min-width:90px">
-        ${tot.e2>0?`<span style="width:${(tot.e2/tot.total*100).toFixed(1)}%;background:#e08e0b"></span>`:''}${tot.e3>0?`<span style="width:${(tot.e3/tot.total*100).toFixed(1)}%;background:#e9c000"></span>`:''}${tot.e4>0?`<span style="width:${(tot.e4/tot.total*100).toFixed(1)}%;background:#2fa26a"></span>`:''}
-      </div>`:'—'}</td>
     </tr>`;
     html+='</tbody></table></div>';
     html+=`<div style="margin-top:14px;padding:12px 14px;background:var(--paper);border-radius:9px;font-size:12.5px;line-height:1.7">
       <strong style="display:block;margin-bottom:6px">¿Qué significa cada etapa?</strong>
       <div><span style="color:#e08e0b">🟠 Con respuesta:</span> ya tiene definidas tanto la estrategia de respuesta (Mitigar, Explotar…) como las medidas concretas, pero todavía no se ha reportado ningún avance de su ejecución.</div>
-      <div><span style="color:#c9a800">🟡 En ejecución:</span> hay reportes de avance reales de las medidas en curso, pero aún no se ha completado el tratamiento.</div>
+      <div><span style="color:#c9a800">🟡 Nivel de ejecución:</span> el avance promedio de las medidas de la oficina (% completado). Los riesgos ya controlados cuentan como 100%. La barra y el porcentaje muestran qué tan avanzada está la oficina en ejecutar sus tratamientos.</div>
       <div><span style="color:#0f8f5e">🟢 Controlado:</span> las medidas están al 100% y culminadas. En los riesgos de nivel intolerable (4) se exige además que el control esté certificado/operativo.</div>
       <div style="margin-top:6px;color:var(--mist)">El <strong>Total</strong> incluye todos los registros de la oficina. La diferencia entre el total y la suma de estas tres etapas son los que aún no tienen respuesta ni medidas definidas.</div>
     </div>`;
