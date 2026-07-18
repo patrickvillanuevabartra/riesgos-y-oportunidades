@@ -2666,7 +2666,8 @@ async function renderDashboard() {
     // ── Aplicar los filtros ──
     const recs = recsAll.filter(r=>{
       if(esArchivado(r)) return false; // los archivados no cuentan en el tablero
-      if(SESION && !puedeVerTodo() && !_registroVisible(r)) return false; // rol Oficina: solo su(s) oficina(s)
+      // El Tablero es GLOBAL para todos los usuarios (transparencia institucional y presión
+      // sana de pares). El trabajo acotado a cada oficina se controla en la vista Seguimiento.
       if(fResp && oficinaDe(r)!==fResp) return false;
       if(fProc && nivel1De(r)!==fProc) return false;
       if(fDesde){ const f=fechaReg(r); if(!f || f<fDesde) return false; }
