@@ -1432,6 +1432,21 @@ async function guardarUsuario(){
   if(rol!=='Oficina') oficina='';
   const btn=document.getElementById('us_guardar');
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
+  // Evitar USUARIOS DUPLICADOS: no permitir dos registros con el mismo nombre de usuario.
+  // Un usuario multi-oficina debe ser UN registro con varias oficinas, no varias filas.
+  try{
+    const existentes = (_usuariosCache && _usuariosCache.length) ? _usuariosCache : ((await API.records(CONFIG.ENTITIES.USUARIOS)).records||[]);
+    const nu = usuario.toLowerCase();
+    const choque = existentes.find(r=>{
+      if(_editandoUsuarioId && r.id===_editandoUsuarioId) return false; // al editar, ignorar el propio
+      return _limpioU((r.values||{})['Usuario']).toLowerCase()===nu;
+    });
+    if(choque){
+      toast('Ya existe un usuario con el nombre "'+usuario+'". Si necesita varias oficinas, edítalo y marca todas sus oficinas en un solo registro.', true);
+      btn.disabled=false; btn.textContent='Guardar usuario';
+      return;
+    }
+  }catch(_){ /* si falla la verificación, continúa (no bloquea por un error de red) */ }
   const campos = {};
   campos[U.usuario.id]=usuario; campos[U.password.id]=pass; campos[U.rol.id]=rol;
   campos[U.oficina.id]=oficina; campos[U.activo.id]=activo;
