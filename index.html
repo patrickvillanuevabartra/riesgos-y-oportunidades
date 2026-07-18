@@ -2915,7 +2915,6 @@ async function renderEstadoPorOficina(recs){
 
     let html='<div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:13.5px">'
       +'<thead><tr style="text-align:left;color:var(--mist);font-size:11px;text-transform:uppercase;letter-spacing:.03em">'
-      +'<th style="padding:9px 10px;text-align:center;width:34px">#</th>'
       +'<th style="padding:9px 10px">Oficina</th>'
       +'<th style="padding:9px 10px;text-align:center">Total</th>'
       +'<th style="padding:9px 10px;text-align:center" title="Ya tiene definidas la estrategia de respuesta y las medidas, pero sin avance reportado">🟠 Con respuesta</th>'
@@ -2944,10 +2943,7 @@ async function renderEstadoPorOficina(recs){
       // Cumplimiento de control (solo nivel 4 con monitoreo)
       const ctrl = g.nCtrl>0 ? g.sumaCtrl/g.nCtrl : null;
       const desgCtrl = g.nCtrl>0 ? `Promedio de ${g.nCtrl} riesgo${g.nCtrl!==1?'s':''} nivel 4 con monitoreo` : 'No hay riesgos nivel 4 con monitoreo en esta oficina';
-      // Medalla para el podio del ranking
-      const medalla = i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1);
       html+=`<tr style="border-top:1px solid var(--line)">
-        <td style="padding:9px 10px;text-align:center;font-weight:700;color:var(--mist)">${medalla}</td>
         <td style="padding:9px 10px;font-weight:600">${ofi.replace(/</g,'&lt;')}</td>
         <td style="padding:9px 10px;text-align:center" title="${tt}${sinTratar>0?' · '+sinTratar+' aún sin respuesta':''}"><span style="cursor:help;border-bottom:1px dotted var(--mist)">${g.total}</span></td>
         <td style="padding:9px 10px;text-align:center">${celN(g.e2,'Con la estrategia de respuesta y las medidas definidas, pero sin avance reportado')}</td>
@@ -2964,7 +2960,6 @@ async function renderEstadoPorOficina(recs){
     const totSumaCtrl=filas.reduce((a,[,g])=>a+g.sumaCtrl,0);
     const ctrlGlobal = totNCtrl>0 ? totSumaCtrl/totNCtrl : null;
     html+=`<tr style="border-top:2px solid var(--brand);font-weight:700;background:var(--paper)">
-      <td style="padding:9px 10px"></td>
       <td style="padding:9px 10px">TOTAL</td>
       <td style="padding:9px 10px;text-align:center">${tot.total}</td>
       <td style="padding:9px 10px;text-align:center">${tot.e2||'—'}</td>
@@ -2978,7 +2973,7 @@ async function renderEstadoPorOficina(recs){
       <div><span style="color:#e08e0b">🟠 Con respuesta:</span> ya tiene definidas tanto la estrategia de respuesta (Mitigar, Explotar…) como las medidas concretas, pero todavía no se ha reportado ningún avance de su ejecución.</div>
       <div><span style="color:#c9a800">🟡 Nivel de ejecución:</span> el avance promedio de las medidas de la oficina (% completado). Los riesgos ya controlados cuentan como 100%. La barra y el porcentaje muestran qué tan avanzada está la oficina en ejecutar sus tratamientos.</div>
       <div><span style="color:#2b7fc9">🔵 Cumplim. de control:</span> % de cumplimiento del monitoreo del control. Solo aplica a los riesgos de nivel intolerable (4) con monitoreo; en las oficinas sin riesgos de ese tipo aparece "n/a" (no aplica).</div>
-      <div style="margin-top:4px;color:var(--mist)">Las oficinas están ordenadas por nivel de ejecución, de mayor a menor (🥇 la más avanzada). Pasa el mouse por cualquier barra para ver el desglose.</div>
+      <div style="margin-top:4px;color:var(--mist)">Las oficinas se ordenan por nivel de ejecución (de mayor a menor). Lee siempre el porcentaje junto a la columna <strong>Total</strong>: no es lo mismo un 80% sobre 11 riesgos que un 100% sobre 1. Pasa el mouse por cualquier barra para ver el desglose.</div>
       <div><span style="color:#0f8f5e">🟢 Controlado:</span> las medidas están al 100% y culminadas. En los riesgos de nivel intolerable (4) se exige además que el control esté certificado/operativo.</div>
       <div style="margin-top:6px;color:var(--mist)">El <strong>Total</strong> incluye todos los registros de la oficina. La diferencia entre el total y la suma de estas tres etapas son los que aún no tienen respuesta ni medidas definidas.</div>
     </div>`;
