@@ -2618,12 +2618,9 @@ window.descNivel = descNivel; window.badgeNivel = badgeNivel;
 async function loadMatriz(forzar) {
   if (!forzar && STATE.matriz.length) return STATE.matriz;
   const data = await API.records(CONFIG.ENTITIES.MATRIZ);
-  let recs = data.records || [];
-  // Control de acceso: el editor solo ve los registros de su oficina
-  if(SESION && !puedeVerTodo()){
-    recs = recs.filter(r=>_registroVisible(r));
-  }
-  STATE.matriz = recs;
+  // Se devuelven TODOS los registros. El control de acceso por oficina se aplica en
+  // cada vista: Seguimiento filtra por oficina del usuario; el Tablero es global.
+  STATE.matriz = data.records || [];
   return STATE.matriz;
 }
 
@@ -3575,7 +3572,9 @@ function pasaFiltros(r){
 // respetando el filtro de tipo (Todos/Riesgos/Oportunidades), estado y filtros avanzados.
 async function descargarExcel(){
   try{
-    const recs = await loadMatriz();
+    let recs = await loadMatriz();
+    // Respetar el control de acceso por oficina (igual que la vista Seguimiento).
+    if(SESION && !puedeVerTodo()) recs = recs.filter(r=>_registroVisible(r));
     const F = CONFIG.MATRIZ_FIELDS;
     const g = (r,nombre,id) => { const v=r.values||{}; const x=v[nombre]; if(x && x!==nombre) return x; return v[id]||''; };
     // Mismo filtrado que la vista
@@ -3681,7 +3680,9 @@ window.descargarExcel = descargarExcel;
 async function renderSeguimiento() {
   const tb = document.getElementById('tablaSeguimiento');
   try {
-    const recs = await loadMatriz();
+    let recs = await loadMatriz();
+    // Control de acceso: en Seguimiento el usuario solo ve/trabaja los registros de su oficina.
+    if(SESION && !puedeVerTodo()) recs = recs.filter(r=>_registroVisible(r));
     // Precargar en paralelo el diccionario de procesos y el índice de subregistros
     await Promise.allSettled([ precargarMaestrasProceso(), precargarSubcache() ]);
     const F = CONFIG.MATRIZ_FIELDS;
@@ -6132,7 +6133,9 @@ function genId22(){
 async function renderReeval() {
   const tb = document.getElementById('tablaReeval');
   try {
-    const recs = (await loadMatriz()).filter(r=>!esArchivado(r));
+    let recs = (await loadMatriz()).filter(r=>!esArchivado(r));
+    // Control de acceso: en Reevaluación el usuario solo ve los registros de su oficina.
+    if(SESION && !puedeVerTodo()) recs = recs.filter(r=>_registroVisible(r));
     await precargarMaestrasProceso(); // garantizar diccionario id→nombre
     const F = CONFIG.MATRIZ_FIELDS;
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
