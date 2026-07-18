@@ -371,7 +371,9 @@
     </div>
     <div class="kpis" id="kpis"></div>
 
-    <div class="panel" style="margin-bottom:20px"><h3>Estado de riesgos y oportunidades por oficina</h3><p class="hint" style="margin:-4px 0 10px">Cuántos riesgos/oportunidades tiene cada oficina y en qué etapa del tratamiento se encuentran.</p><div id="estadoPorOficina"><p class="hint">Cargando…</p></div></div>
+    <div class="panel" style="margin-bottom:20px"><h3>Estado de riesgos y oportunidades por oficina</h3><p class="hint" style="margin:-4px 0 10px">Cuántos riesgos/oportunidades tiene cada oficina y en qué etapa del tratamiento se encuentran.</p>
+      <div style="margin-bottom:10px"><input id="buscarOficinaEPO" placeholder="🔍 Buscar mi oficina (la resalta sin ocultar las demás)…" oninput="resaltarOficinaEPO()" style="width:100%;max-width:420px;padding:7px 11px;font-size:13px;border:1px solid var(--line);border-radius:8px"></div>
+      <div id="estadoPorOficina"><p class="hint">Cargando…</p></div></div>
 
     <!-- Filtros del tablero (afectan a los mapas de calor y a los paneles siguientes) -->
     <div class="filtros-card" style="margin-bottom:20px">
@@ -2944,7 +2946,7 @@ async function renderEstadoPorOficina(recs){
       // Cumplimiento de control (solo nivel 4 con monitoreo)
       const ctrl = g.nCtrl>0 ? g.sumaCtrl/g.nCtrl : null;
       const desgCtrl = g.nCtrl>0 ? `Promedio de ${g.nCtrl} riesgo${g.nCtrl!==1?'s':''} nivel 4 con monitoreo` : 'No hay riesgos nivel 4 con monitoreo en esta oficina';
-      html+=`<tr style="border-top:1px solid var(--line)">
+      html+=`<tr class="epo-fila" data-oficina="${ofi.toLowerCase().replace(/"/g,'')}" style="border-top:1px solid var(--line)">
         <td style="padding:9px 10px;font-weight:600">${ofi.replace(/</g,'&lt;')}</td>
         <td style="padding:9px 10px;text-align:center" title="${tt}${sinTratar>0?' · '+sinTratar+' aún sin respuesta':''}"><span style="cursor:help;border-bottom:1px dotted var(--mist)">${g.total}</span></td>
         <td style="padding:9px 10px;text-align:center">${celN(g.e2,'Con la estrategia de respuesta y las medidas definidas, pero sin avance reportado')}</td>
@@ -2984,6 +2986,29 @@ async function renderEstadoPorOficina(recs){
   }
 }
 window.renderEstadoPorOficina=renderEstadoPorOficina;
+
+// Resalta la fila de la oficina buscada (sin ocultar las demás) y hace scroll hasta ella.
+function resaltarOficinaEPO(){
+  const q=(document.getElementById('buscarOficinaEPO')?.value||'').toLowerCase().trim();
+  const filas=document.querySelectorAll('#estadoPorOficina tr.epo-fila');
+  let primera=null;
+  filas.forEach(tr=>{
+    const ofi=tr.getAttribute('data-oficina')||'';
+    const match = q && ofi.includes(q);
+    if(match){
+      tr.style.background='#fff7d6';
+      tr.style.boxShadow='inset 3px 0 0 var(--brand)';
+      if(!primera) primera=tr;
+    } else {
+      tr.style.background='';
+      tr.style.boxShadow='';
+      // Atenuar levemente las que no coinciden cuando hay búsqueda activa
+      tr.style.opacity = q ? '0.55' : '';
+    }
+  });
+  if(primera) primera.scrollIntoView({behavior:'smooth', block:'center'});
+}
+window.resaltarOficinaEPO=resaltarOficinaEPO;
 
 // Cuenta RIESGOS por estado derivado: sin reportes = Pendiente;// con reportes = estado del último reporte.
 async function cargarAvanceMedidas(){
