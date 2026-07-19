@@ -2904,6 +2904,7 @@ async function renderEstadoPorOficina(recs){
         const real=numOf(v['Valor real obtenido']), meta=numOf(v['Valor meta']);
         if(!isNaN(real)&&!isNaN(meta)&&meta!==0) pct=(real/meta)*100;
       }
+      console.log('[EPO ctrl]', (descripcionDe(r)||'').slice(0,40), '| nivel4 monIds:', monIds.length, '| último rep:', mejor?Object.keys(v).length+' campos':'no leído', '| pct:', isNaN(pct)?'NaN':pct);
       return isNaN(pct)?null:Math.max(0,Math.min(100,pct));
     };
 
