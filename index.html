@@ -2875,27 +2875,29 @@ async function renderEstadoPorOficina(recs){
       else etapa = 1;                                          // sin tratar
       // El % de avance es 100 cuando ya está controlado; si no, el mayor reportado.
       const pctAvance = etapa===4 ? 100 : pct;
-      return { etapa, pct: pctAvance, conTratamiento: (tieneRespuesta && tieneMedidas) || hayReporte };
+      return { etapa, pct: pctAvance, conTratamiento: (tieneRespuesta && tieneMedidas) || hayReporte,
+               conRespuesta: (tieneRespuesta && tieneMedidas) };
     };
 
     // Lee el % de cumplimiento del monitoreo del control de un registro (nivel 4 con monitoreo).
     // Devuelve null si no aplica (no es nivel 4 o no tiene reportes de monitoreo).
-    const cumplimientoControlDe = (r)=>{
+    const cumplimientoControlDe = async (r)=>{
       const op=esOportunidad(r);
       const nivel=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel;
       if(nivel!==4) return null;
       const monIds = subIdsDe(r, F.reporte_monitoreo.id)||[];
       if(!monIds.length) return null;
       const numOf = x => { if(x===''||x==null) return NaN; const n=parseFloat(String(x).replace('%','').replace(',','.').trim()); return isNaN(n)?NaN:n; };
-      // Tomar el último reporte de monitoreo (por created_at)
+      // Tomar el último reporte de monitoreo (por created_at), leyendo con getSub
+      // (usa el caché y, si el reporte no está indexado, hace lectura individual).
       let mejor=null, mejorFecha=-1;
-      monIds.forEach(id=>{
-        const s=(STATE.subCache&&STATE.subCache.monitoreo&&STATE.subCache.monitoreo[id]);
-        if(!s) return;
+      for(const id of monIds){
+        const s = await getSub('monitoreo', id);
+        if(!s) continue;
         const m=String(s.created_at||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/);
         const ts=m?new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+m[6]).getTime():0;
         if(ts>=mejorFecha){ mejorFecha=ts; mejor=s; }
-      });
+      }
       const v=(mejor&&mejor.values)||{};
       let pct=numOf(v['% cumplimiento']);
       if(isNaN(pct)){
@@ -2907,16 +2909,17 @@ async function renderEstadoPorOficina(recs){
 
     // Agrupar por oficina
     const porOfi={}; // ofi -> {total, e1..e4, nR, nO, sumaPct, nConTrat, sumaCtrl, nCtrl}
-    recs.forEach(r=>{
+    for(const r of recs){
       const ofi=oficinaDe(r)||'Sin oficina asignada';
-      const {etapa,pct,conTratamiento}=etapaDe(r);
-      const g=porOfi[ofi]||(porOfi[ofi]={total:0,e1:0,e2:0,e3:0,e4:0,nR:0,nO:0,sumaPct:0,nConTrat:0,sumaCtrl:0,nCtrl:0});
+      const {etapa,pct,conTratamiento,conRespuesta}=etapaDe(r);
+      const g=porOfi[ofi]||(porOfi[ofi]={total:0,e1:0,e2:0,e3:0,e4:0,nR:0,nO:0,sumaPct:0,nConTrat:0,sumaCtrl:0,nCtrl:0,conResp:0});
       g.total++; g['e'+etapa]++;
+      if(conRespuesta) g.conResp++; // todos los que YA definieron respuesta + medidas (sin importar su avance)
       if(esOportunidad(r)) g.nO++; else g.nR++;
       if(conTratamiento){ g.sumaPct+=pct; g.nConTrat++; }
-      const cc=cumplimientoControlDe(r);
+      const cc=await cumplimientoControlDe(r);
       if(cc!==null){ g.sumaCtrl+=cc; g.nCtrl++; }
-    });
+    }
     // Ranking: ordenar oficinas por nivel de ejecución (avance de medidas), de mayor a menor.
     const filas=Object.entries(porOfi).sort((a,b)=>{
       const av=a[1].nConTrat>0?a[1].sumaPct/a[1].nConTrat:-1;
@@ -2961,7 +2964,7 @@ async function renderEstadoPorOficina(recs){
       html+=`<tr class="epo-fila" data-oficina="${ofi.toLowerCase().replace(/"/g,'')}" style="border-top:1px solid var(--line)">
         <td style="padding:9px 10px;font-weight:600">${ofi.replace(/</g,'&lt;')}</td>
         <td style="padding:9px 10px;text-align:center" title="${tt}${sinTratar>0?' · '+sinTratar+' aún sin respuesta':''}"><span style="cursor:help;border-bottom:1px dotted var(--mist)">${g.total}</span></td>
-        <td style="padding:9px 10px;text-align:center">${celN(g.e2,'Con la estrategia de respuesta y las medidas definidas, pero sin avance reportado')}</td>
+        <td style="padding:9px 10px;text-align:center">${celN(g.conResp,'Ya definieron su estrategia de respuesta y sus medidas (incluye los que están en ejecución o controlados)')}</td>
         <td style="padding:9px 10px" title="${desg}">${g.nConTrat>0?barraPct(avance):'<span style=\"color:var(--mist)\">sin datos</span>'}</td>
         <td style="padding:9px 10px" title="${desgCtrl}">${ctrl!==null?barraPct(ctrl):'<span style=\"color:var(--mist);font-size:12px\">n/a</span>'}</td>
         <td style="padding:9px 10px;text-align:center">${celN(g.e4,'Medidas al 100% + culminado/ejecutado (y en nivel 4, control certificado). Ya completó su ciclo.')}</td>
@@ -2977,7 +2980,7 @@ async function renderEstadoPorOficina(recs){
     html+=`<tr style="border-top:2px solid var(--brand);font-weight:700;background:var(--paper)">
       <td style="padding:9px 10px">TOTAL</td>
       <td style="padding:9px 10px;text-align:center">${tot.total}</td>
-      <td style="padding:9px 10px;text-align:center">${tot.e2||'—'}</td>
+      <td style="padding:9px 10px;text-align:center">${filas.reduce((a,[,g])=>a+g.conResp,0)||'—'}</td>
       <td style="padding:9px 10px">${totNConTrat>0?barraPct(avanceGlobal):'—'}</td>
       <td style="padding:9px 10px">${ctrlGlobal!==null?barraPct(ctrlGlobal):'<span style=\"color:var(--mist);font-size:12px\">n/a</span>'}</td>
       <td style="padding:9px 10px;text-align:center">${tot.e4||'—'}</td>
@@ -2985,12 +2988,12 @@ async function renderEstadoPorOficina(recs){
     html+='</tbody></table></div>';
     html+=`<div style="margin-top:14px;padding:12px 14px;background:var(--paper);border-radius:9px;font-size:12.5px;line-height:1.7">
       <strong style="display:block;margin-bottom:6px">¿Qué significa cada etapa?</strong>
-      <div><span style="color:#e08e0b">🟠 Con respuesta:</span> ya tiene definidas tanto la estrategia de respuesta (Mitigar, Explotar…) como las medidas concretas, pero todavía no se ha reportado ningún avance de su ejecución.</div>
+      <div><span style="color:#e08e0b">🟠 Con respuesta:</span> ya tiene definidas tanto la estrategia de respuesta (Mitigar, Explotar…) como las medidas concretas. Incluye también los que están en ejecución o ya controlados.</div>
       <div><span style="color:#c9a800">🟡 Nivel de ejecución:</span> el avance promedio de las medidas de la oficina (% completado). Los riesgos ya controlados cuentan como 100%. La barra y el porcentaje muestran qué tan avanzada está la oficina en ejecutar sus tratamientos.</div>
       <div><span style="color:#2b7fc9">🔵 Cumplim. de control:</span> % de cumplimiento del monitoreo del control. Solo aplica a los riesgos de nivel intolerable (4) con monitoreo; en las oficinas sin riesgos de ese tipo aparece "n/a" (no aplica).</div>
       <div style="margin-top:4px;color:var(--mist)">Las oficinas se ordenan por nivel de ejecución (de mayor a menor). Lee siempre el porcentaje junto a la columna <strong>Total</strong>: no es lo mismo un 80% sobre 11 riesgos que un 100% sobre 1. Pasa el mouse por cualquier barra para ver el desglose.</div>
       <div><span style="color:#0f8f5e">🟢 Controlado:</span> las medidas están al 100% y culminadas. En los riesgos de nivel intolerable (4) se exige además que el control esté certificado/operativo.</div>
-      <div style="margin-top:6px;color:var(--mist)">El <strong>Total</strong> incluye todos los registros de la oficina. La diferencia entre el total y la suma de estas tres etapas son los que aún no tienen respuesta ni medidas definidas.</div>
+      <div style="margin-top:6px;color:var(--mist)">El <strong>Total</strong> incluye todos los registros de la oficina. La diferencia entre el total y "Con respuesta" son los que aún no tienen definido su tratamiento (respuesta y medidas).</div>
     </div>`;
     cont.innerHTML=html;
   }catch(e){
