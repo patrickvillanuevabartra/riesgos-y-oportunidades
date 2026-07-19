@@ -2884,9 +2884,11 @@ async function renderEstadoPorOficina(recs){
     const cumplimientoControlDe = async (r)=>{
       const op=esOportunidad(r);
       const nivel=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel;
-      if(nivel!==4) return null;
+      if(nivel!==4) return null; // n/a solo cuando NO hay riesgos nivel 4
       const monIds = subIdsDe(r, F.reporte_monitoreo.id)||[];
-      if(!monIds.length) return null;
+      // Nivel 4 SIN reportes de monitoreo: cuenta como 0% (monitoreo pendiente),
+      // no como "n/a" — la oficina sí tiene un riesgo que requiere monitorear.
+      if(!monIds.length) return 0;
       const numOf = x => { if(x===''||x==null) return NaN; const n=parseFloat(String(x).replace('%','').replace(',','.').trim()); return isNaN(n)?NaN:n; };
       // Tomar el último reporte de monitoreo (por created_at), leyendo con getSub
       // (usa el caché y, si el reporte no está indexado, hace lectura individual).
@@ -2904,8 +2906,7 @@ async function renderEstadoPorOficina(recs){
         const real=numOf(v['Valor real obtenido']), meta=numOf(v['Valor meta']);
         if(!isNaN(real)&&!isNaN(meta)&&meta!==0) pct=(real/meta)*100;
       }
-      console.log('[EPO ctrl]', (descripcionDe(r)||'').slice(0,40), '| nivel4 monIds:', monIds.length, '| último rep:', mejor?Object.keys(v).length+' campos':'no leído', '| pct:', isNaN(pct)?'NaN':pct);
-      return isNaN(pct)?null:Math.max(0,Math.min(100,pct));
+      return isNaN(pct)?0:Math.max(0,Math.min(100,pct));
     };
 
     // Agrupar por oficina
@@ -2961,7 +2962,7 @@ async function renderEstadoPorOficina(recs){
       const desg = `Promedio de ${g.nConTrat} registro${g.nConTrat!==1?'s':''} con tratamiento · ${g.e4} al 100% · ${g.e3} en curso · ${g.e2} sin iniciar avance`;
       // Cumplimiento de control (solo nivel 4 con monitoreo)
       const ctrl = g.nCtrl>0 ? g.sumaCtrl/g.nCtrl : null;
-      const desgCtrl = g.nCtrl>0 ? `Promedio de ${g.nCtrl} riesgo${g.nCtrl!==1?'s':''} nivel 4 con monitoreo` : 'No hay riesgos nivel 4 con monitoreo en esta oficina';
+      const desgCtrl = g.nCtrl>0 ? `Promedio de ${g.nCtrl} riesgo${g.nCtrl!==1?'s':''} nivel 4 (un 0% puede indicar monitoreo aún sin reportar)` : 'No hay riesgos de nivel 4 en esta oficina';
       html+=`<tr class="epo-fila" data-oficina="${ofi.toLowerCase().replace(/"/g,'')}" style="border-top:1px solid var(--line)">
         <td style="padding:9px 10px;font-weight:600">${ofi.replace(/</g,'&lt;')}</td>
         <td style="padding:9px 10px;text-align:center" title="${tt}${sinTratar>0?' · '+sinTratar+' aún sin respuesta':''}"><span style="cursor:help;border-bottom:1px dotted var(--mist)">${g.total}</span></td>
@@ -2991,7 +2992,7 @@ async function renderEstadoPorOficina(recs){
       <strong style="display:block;margin-bottom:6px">¿Qué significa cada etapa?</strong>
       <div><span style="color:#e08e0b">🟠 Con respuesta:</span> ya tiene definidas tanto la estrategia de respuesta (Mitigar, Explotar…) como las medidas concretas. Incluye también los que están en ejecución o ya controlados.</div>
       <div><span style="color:#c9a800">🟡 Nivel de ejecución:</span> el avance promedio de las medidas de la oficina (% completado). Los riesgos ya controlados cuentan como 100%. La barra y el porcentaje muestran qué tan avanzada está la oficina en ejecutar sus tratamientos.</div>
-      <div><span style="color:#2b7fc9">🔵 Cumplim. de control:</span> % de cumplimiento del monitoreo del control. Solo aplica a los riesgos de nivel intolerable (4) con monitoreo; en las oficinas sin riesgos de ese tipo aparece "n/a" (no aplica).</div>
+      <div><span style="color:#2b7fc9">🔵 Cumplim. de control:</span> % de cumplimiento del monitoreo del control en los riesgos de nivel intolerable (4). Si el riesgo aún no tiene reportes de monitoreo, cuenta como 0% (monitoreo pendiente). "n/a" aparece solo en oficinas sin riesgos de nivel 4.</div>
       <div style="margin-top:4px;color:var(--mist)">Las oficinas se ordenan por nivel de ejecución (de mayor a menor). Lee siempre el porcentaje junto a la columna <strong>Total</strong>: no es lo mismo un 80% sobre 11 riesgos que un 100% sobre 1. Pasa el mouse por cualquier barra para ver el desglose.</div>
       <div><span style="color:#0f8f5e">🟢 Controlado:</span> las medidas están al 100% y culminadas. En los riesgos de nivel intolerable (4) se exige además que el control esté certificado/operativo.</div>
       <div style="margin-top:6px;color:var(--mist)">El <strong>Total</strong> incluye todos los registros de la oficina. La diferencia entre el total y "Con respuesta" son los que aún no tienen definido su tratamiento (respuesta y medidas).</div>
