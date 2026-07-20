@@ -5876,6 +5876,8 @@ function _editarRiesgoInterno(riesgoId){
     if(w){ w.classList.remove('hidden'); w.style.setProperty('display','flex','important'); }
     const sw = document.getElementById('ed_ctrl_switch');
     if(sw){ sw.classList.remove('hidden'); sw.style.setProperty('display','inline-flex','important'); }
+    // Bloquear el botón «Sí» hasta que las medidas estén al 100% + Culminado/Ejecutado
+    bloquearSiSegunAvance(EDIT_ACTUAL);
   }, 0);
 }
 window.editarRiesgo = editarRiesgo;
@@ -6237,11 +6239,11 @@ async function puedeReevaluar(r){
   const viaMonitoreo = (nivel===4 && _conControl);
 
   if(viaMonitoreo){
-    // NIVEL 3-4 CON CONTROL: monitoreo al 100% Y control certificado.
+    // NIVEL 4 CON CONTROL: al menos un reporte de monitoreo Y control certificado.
+    // La certificación («Certificado/Operativo») es la validación final que habilita
+    // la reevaluación; el % de monitoreo informa el avance pero no bloquea.
     const pctMon = await _cumplimientoMonitoreo(r);
     if(pctMon==null) return {procede:false, motivo:'Nivel '+nivel+' con control: aún sin reportes de monitoreo del control.'};
-    if(pctMon<100) return {procede:false, motivo:'Nivel '+nivel+' con control: el cumplimiento de monitoreo ('+pctMon+'%) debe llegar al 100%.'};
-    // Verificar certificación del control
     const certRaw = String((r.values||{})['Certificación de Implementación del Control']||'');
     const certificado = /certificad|operativ/i.test(certRaw);
     if(!certificado) return {procede:false, motivo:'Nivel '+nivel+' con control: falta certificar el control (marca «Certificado/Operativo» en la pestaña Certificación).'};
@@ -6255,14 +6257,44 @@ async function puedeReevaluar(r){
       if(!medidas100) return {procede:false, motivo:'Las medidas de respuesta deben estar al 100% (actual: '+(isNaN(pctMedidas)?'—':pctMedidas+'%')+').'};
       return {procede:false, motivo:'El último estado debe ser «Culminado/Ejecutado» (actual: '+(estado||'—')+').'};
     }
-    // Medidas completas: para nivel 1-2 se exige además el control en "Sí"
-    if(nivel<=2 && !_conControl){
+    // Medidas completas: para nivel 1-3 se exige además el control en "Sí"
+    // (el interruptor confirma que el control quedó implementado y da el pase).
+    if(nivel<=3 && !_conControl){
       return {procede:false, motivo:'Medidas completas. Marca «Sí, ya existe un control» en el interruptor para confirmar que el control quedó implementado y habilitar la reevaluación.'};
     }
     return {procede:true};
   }
 }
 window.puedeReevaluar = puedeReevaluar;
+
+// En el modal de EDICIÓN: el botón «Sí, ya existe un control» permanece visible pero
+// INACTIVO hasta que las medidas estén al 100% y el último estado sea Culminado/Ejecutado.
+// (Si el registro ya está en "Sí", no se bloquea.)
+async function bloquearSiSegunAvance(riesgoId){
+  try{
+    const btnSi = document.querySelector('#ed_ctrl_switch button[data-v="Sí"]');
+    if(!btnSi) return;
+    const r = STATE.matriz.find(x=>x.id===riesgoId);
+    if(!r) return;
+    const actual = String((document.getElementById('ed_ctrl')||{}).value||'').trim();
+    if(/^s[ií]$/i.test(actual)) return; // ya está en Sí: no bloquear
+    // Bloquear mientras se verifica el avance
+    btnSi.disabled = true; btnSi.style.opacity='.5'; btnSi.style.cursor='not-allowed';
+    btnSi.title = 'Verificando el avance de las medidas…';
+    const av = await _avanceUltimoReporte(r);
+    const pct = parseInt(av.avance); const culminado = /culmin|ejecut/i.test(String(av.ultimo_estado||''));
+    if(pct===100 && culminado){
+      btnSi.disabled=false; btnSi.style.opacity=''; btnSi.style.cursor='';
+      btnSi.title='Medidas completas: ya puedes confirmar que el control quedó implementado.';
+    } else {
+      btnSi.title = 'Se habilita cuando las medidas estén al 100% y el estado sea «Culminado/Ejecutado» (actual: '+(isNaN(pct)?'—':pct+'%')+' · '+(av.ultimo_estado||'—')+').';
+    }
+  }catch(_){ /* si falla la verificación, no bloquear */ 
+    const btnSi = document.querySelector('#ed_ctrl_switch button[data-v="Sí"]');
+    if(btnSi){ btnSi.disabled=false; btnSi.style.opacity=''; btnSi.style.cursor=''; }
+  }
+}
+window.bloquearSiSegunAvance = bloquearSiSegunAvance;
 
 // === Modal de reevaluación (capturar riesgo residual) ===
 function abrirReeval(riesgoId){
