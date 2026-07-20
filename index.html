@@ -1716,6 +1716,14 @@ window.setExisteCtrl = setExisteCtrl;
 
 // Interruptor "¿Existen controles?" en Editar (hidden ed_ctrl + botones + notas).
 function setExisteCtrlEd(val){
+  // Si el botón "Sí" está bloqueado (medidas aún no al 100%+Culminado), no permitir marcarlo.
+  if(val==='Sí'){
+    const btnSi = document.querySelector('#ed_ctrl_switch button[data-v="Sí"]');
+    if((btnSi && btnSi.disabled) || window._edSiBloqueado){
+      toast('El control solo puede marcarse como "Sí" cuando las medidas estén al 100% y el estado sea «Culminado/Ejecutado».', true);
+      return;
+    }
+  }
   const hid = document.getElementById('ed_ctrl');
   if(hid) hid.value = val;
   document.querySelectorAll('#ed_ctrl_switch button').forEach(b=>{
@@ -6278,19 +6286,24 @@ async function bloquearSiSegunAvance(riesgoId){
     const r = STATE.matriz.find(x=>x.id===riesgoId);
     if(!r) return;
     const actual = String((document.getElementById('ed_ctrl')||{}).value||'').trim();
-    if(/^s[ií]$/i.test(actual)) return; // ya está en Sí: no bloquear
-    // Bloquear mientras se verifica el avance
+    if(/^s[ií]$/i.test(actual)){ window._edSiBloqueado=false; return; } // ya está en Sí: no bloquear
+    // Bloquear mientras se verifica el avance (bandera global + disabled, por si un
+    // re-render del nivel 4 re-habilitara el botón)
+    window._edSiBloqueado = true;
     btnSi.disabled = true; btnSi.style.opacity='.5'; btnSi.style.cursor='not-allowed';
     btnSi.title = 'Verificando el avance de las medidas…';
     const av = await _avanceUltimoReporte(r);
     const pct = parseInt(av.avance); const culminado = /culmin|ejecut/i.test(String(av.ultimo_estado||''));
     if(pct===100 && culminado){
+      window._edSiBloqueado = false;
       btnSi.disabled=false; btnSi.style.opacity=''; btnSi.style.cursor='';
       btnSi.title='Medidas completas: ya puedes confirmar que el control quedó implementado.';
     } else {
+      window._edSiBloqueado = true;
       btnSi.title = 'Se habilita cuando las medidas estén al 100% y el estado sea «Culminado/Ejecutado» (actual: '+(isNaN(pct)?'—':pct+'%')+' · '+(av.ultimo_estado||'—')+').';
     }
-  }catch(_){ /* si falla la verificación, no bloquear */ 
+  }catch(_){ /* si falla la verificación, no bloquear */
+    window._edSiBloqueado = false;
     const btnSi = document.querySelector('#ed_ctrl_switch button[data-v="Sí"]');
     if(btnSi){ btnSi.disabled=false; btnSi.style.opacity=''; btnSi.style.cursor=''; }
   }
