@@ -3405,13 +3405,16 @@ function procedeReeval(r){
 // Oficina/dependencia responsable del riesgo.
 function oficinaDe(r){
   const F = CONFIG.MATRIZ_FIELDS;
+  // Normaliza el nombre para que variantes triviales (espacios al inicio/final, dobles
+  // espacios, saltos de línea) NO generen oficinas duplicadas al agrupar.
+  const norm = s => String(s||'').replace(/\s+/g,' ').trim();
   // 1) Campo de texto nuevo (Responsable - string). El nombre de columna ya NO
   //    colisiona con la relación, así que leemos por ID o por nombre.
   const txt = leerTexto(r, F.responsable_txt, true);
-  if (txt) return txt;
+  if (txt) return norm(txt);
   // 2) Respaldo: traducir la relación (registros antiguos).
   const x = leerRelacion(r, 'Responsable', F.responsable.id);
-  return x ? x : 'Sin oficina asignada';
+  return x ? norm(x) : 'Sin oficina asignada';
 }
 
 // Formatea una fecha a dd/mm/aaaa (acepta '2026-06-13', '13-06-2026', etc.)
@@ -3783,12 +3786,15 @@ async function renderSeguimiento() {
     if(cntCont) cntCont.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${totalesHTML}</div>`;
 
     // Agrupar por oficina; dentro de cada grupo ordenar por nivel inherente (mayor arriba)
-    const grupos = {};
-    filas.forEach(f => { (grupos[f.oficina] = grupos[f.oficina] || []).push(f); });
+    // Agrupar por CLAVE normalizada (sin tildes, minúsculas, espacios colapsados) para que
+    // variantes triviales del nombre no dupliquen la oficina; se muestra el primer nombre real.
+    const claveOfi = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+    const grupos = {}; const nombreGrupo = {};
+    filas.forEach(f => { const k=claveOfi(f.oficina); if(!grupos[k]){grupos[k]=[]; nombreGrupo[k]=f.oficina;} grupos[k].push(f); });
     // Ordenar por NIVEL descendente (4 arriba → 1 abajo). El índice solo desempata,
     // porque riesgos y oportunidades usan escalas distintas y no son comparables.
     Object.values(grupos).forEach(arr => arr.sort((a,b)=> (b.nivel-a.nivel) || (b.idx-a.idx)));
-    const oficinasOrdenadas = Object.keys(grupos).sort();
+    const oficinasOrdenadas = Object.keys(grupos).sort((a,b)=>nombreGrupo[a].localeCompare(nombreGrupo[b]));
 
     const nivelBadge = (n, esOport) => badgeNivel(n, esOport);
     // Etiqueta visual de tipo (solo se muestra en la vista "Todos" para distinguir)
@@ -3839,7 +3845,7 @@ async function renderSeguimiento() {
     let _n = 0; // contador continuo a lo largo de todos los grupos
     tb.innerHTML = oficinasOrdenadas.length ? oficinasOrdenadas.map(of => `
       <tr class="grupo-row"><td colspan="11">
-        <span class="grupo-nombre">${of}</span>
+        <span class="grupo-nombre">${(nombreGrupo[of]||of).replace(/</g,'&lt;')}</span>
         <span class="grupo-count">${grupos[of].length} ${palabra}${grupos[of].length!==1?'s':''}</span>
       </td></tr>
       ${grupos[of].map(f => filaHTML(f, ++_n)).join('')}
@@ -6217,16 +6223,19 @@ async function renderReeval() {
         <td id="reev-act-${r.id}"><span class="hint">…</span></td>
       </tr>`;
     };
-    // Agrupar por oficina (mismo criterio visual que Seguimiento)
-    const grupos = {};
-    recs.forEach(r=>{ const of=oficinaDe(r)||'Sin oficina asignada'; (grupos[of]||(grupos[of]=[])).push(r); });
-    const oficinasOrd = Object.keys(grupos).sort((a,b)=>a.localeCompare(b));
-    tb.innerHTML = oficinasOrd.map(of=>`
+    // Agrupar por oficina (mismo criterio visual que Seguimiento). Se agrupa por una
+    // CLAVE normalizada (sin tildes, minúsculas) para que "Ingeniería"/"Ingenieria" o
+    // diferencias de mayúsculas no dupliquen la oficina; se muestra el primer nombre real.
+    const claveOfi = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+    const grupos = {}; const nombreGrupo = {};
+    recs.forEach(r=>{ const of=oficinaDe(r)||'Sin oficina asignada'; const k=claveOfi(of); if(!grupos[k]){grupos[k]=[]; nombreGrupo[k]=of;} grupos[k].push(r); });
+    const clavesOrd = Object.keys(grupos).sort((a,b)=>nombreGrupo[a].localeCompare(nombreGrupo[b]));
+    tb.innerHTML = clavesOrd.map(k=>`
       <tr class="grupo-row"><td colspan="7">
-        <span class="grupo-nombre">${of.replace(/</g,'&lt;')}</span>
-        <span class="grupo-count">${grupos[of].length} registro${grupos[of].length!==1?'s':''}</span>
+        <span class="grupo-nombre">${nombreGrupo[k].replace(/</g,'&lt;')}</span>
+        <span class="grupo-count">${grupos[k].length} registro${grupos[k].length!==1?'s':''}</span>
       </td></tr>
-      ${grupos[of].map(filaReev).join('')}
+      ${grupos[k].map(filaReev).join('')}
     `).join('');
     setConn(true);
     // Resolver "procede" en vivo, diferenciado por nivel (async, secuencial para no saturar)
