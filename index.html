@@ -1442,7 +1442,8 @@ async function guardarUsuario(){
       return _limpioU((r.values||{})['Usuario']).toLowerCase()===nu;
     });
     if(choque){
-      toast('Ya existe un usuario con el nombre "'+usuario+'". Si necesita varias oficinas, edítalo y marca todas sus oficinas en un solo registro.', true);
+      const rolActual = _limpioU((choque.values||{})['Rol'])||'sin rol';
+      toast('Ya existe el usuario "'+usuario+'" (rol: '+rolActual+'). No lo dupliques: edítalo. Para varias oficinas, marca todas en su registro; para darle más permisos, cámbiale el rol a Administrador (que ya ve todo).', true);
       btn.disabled=false; btn.textContent='Guardar usuario';
       return;
     }
