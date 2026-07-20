@@ -791,7 +791,7 @@
     <div class="page-head">
       <div class="eyebrow">Riesgo residual</div>
       <h1>Reevaluación</h1>
-      <p>Solo procede cuando el control está <strong>Certificado/Operativo</strong> y al menos una acción de respuesta está <strong>Culminada/Ejecutada</strong>. El resto permanece bloqueado hasta cumplir ambas condiciones.</p>
+      <p>Un registro procede según su nivel. En <strong>nivel intolerable (4)</strong>: el monitoreo del control al <strong>100%</strong> y el control <strong>Certificado/Operativo</strong>. En <strong>niveles 1 a 3</strong>: las medidas al <strong>100%</strong> con estado <strong>Culminado/Ejecutado</strong> y el control confirmado como implementado («Sí»). El resto permanece bloqueado hasta cumplir sus condiciones.</p>
     </div>
 
     <details class="ayuda">
@@ -799,7 +799,7 @@
       <div class="ayuda-body">
         <p>La reevaluación mide el <strong>riesgo residual</strong>: cuánto riesgo queda <em>después</em> de aplicar el tratamiento. Es la última etapa del ciclo.</p>
         <ol>
-          <li><strong>Se desbloquea</strong> cuando se cumplen <strong>ambas</strong> condiciones: el control está <strong>Certificado/Operativo</strong> y al menos una acción de respuesta está <strong>Culminada/Ejecutada</strong>.</li>
+          <li><strong>Se desbloquea</strong> según el nivel del riesgo. <strong>Nivel 4 (intolerable):</strong> monitoreo del control al <strong>100%</strong> + control <strong>Certificado/Operativo</strong>. <strong>Niveles 1-3:</strong> medidas al <strong>100%</strong> con estado <strong>Culminado/Ejecutado</strong> + control confirmado como implementado («Sí»).</li>
           <li>Vuelves a calificar <strong>probabilidad × impacto</strong>, ahora considerando que el control ya opera. El sistema calcula el <strong>nivel residual</strong>.</li>
           <li>Comparando <strong>nivel inherente vs. residual</strong> demuestras la eficacia del tratamiento: lo esperado es que el riesgo haya bajado de nivel.</li>
         </ol>
@@ -6189,8 +6189,8 @@ async function renderReeval() {
     const F = CONFIG.MATRIZ_FIELDS;
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
     if(!recs.length){ tb.innerHTML='<tr><td colspan="7"><div class="empty"><h3>Sin riesgos</h3><p>Registra el primero en la pestaña Registrar.</p></div></td></tr>'; return; }
-    // Pinta primero las filas con estado "evaluando…" y luego resuelve el "procede" en vivo.
-    tb.innerHTML = recs.map(r=>{
+    // Construye el HTML de una fila de reevaluación
+    const filaReev = r => {
       const op = esOportunidad(r);
       const desc = descripcionDe(r);
       const proc=rutaProcesoDe(r) || '—';
@@ -6216,7 +6216,18 @@ async function renderReeval() {
         <td>${pillEstatus(nRes, op)}</td>
         <td id="reev-act-${r.id}"><span class="hint">…</span></td>
       </tr>`;
-    }).join('');
+    };
+    // Agrupar por oficina (mismo criterio visual que Seguimiento)
+    const grupos = {};
+    recs.forEach(r=>{ const of=oficinaDe(r)||'Sin oficina asignada'; (grupos[of]||(grupos[of]=[])).push(r); });
+    const oficinasOrd = Object.keys(grupos).sort((a,b)=>a.localeCompare(b));
+    tb.innerHTML = oficinasOrd.map(of=>`
+      <tr class="grupo-row"><td colspan="7">
+        <span class="grupo-nombre">${of.replace(/</g,'&lt;')}</span>
+        <span class="grupo-count">${grupos[of].length} registro${grupos[of].length!==1?'s':''}</span>
+      </td></tr>
+      ${grupos[of].map(filaReev).join('')}
+    `).join('');
     setConn(true);
     // Resolver "procede" en vivo, diferenciado por nivel (async, secuencial para no saturar)
     for(const r of recs){
