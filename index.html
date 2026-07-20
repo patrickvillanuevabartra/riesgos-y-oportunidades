@@ -3818,7 +3818,7 @@ async function renderSeguimiento() {
         </td>
         <td data-label="Estado de medidas" id="estado-${f.id}" style="font-size:12px">${f.nReportes?'<span class="hint">…</span>':estadoPill('Pendiente')}</td>
         <td data-label="% Avance de medidas" id="avance-${f.id}" style="min-width:82px">${f.nReportes?'<span class="hint">…</span>':'<span class="hint">—</span>'}</td>
-        <td data-label="% Cumplim. de monitoreo" id="moncumpl-${f.id}" style="min-width:82px">${f.tieneMonitoreo?'<span class="hint">…</span>':'<span class="hint" title="El monitoreo formal con indicadores y certificación aplica a riesgos de nivel intolerable (4) con control establecido. En los demás niveles, el control se documenta pero no requiere certificación formal.">n/a</span>'}</td>
+        <td data-label="% Cumplim. de monitoreo" id="moncumpl-${f.id}" style="min-width:82px">${f.nivel===4 ? '<span class="hint">…</span>' : '<span class="hint" title="El monitoreo formal con indicadores y certificación aplica a riesgos de nivel intolerable (4). En los demás niveles, el control se documenta pero no requiere certificación formal.">n/a</span>'}</td>
         <td data-label="¿Procede reevaluación?" id="procede-${f.id}" title="Evaluando condiciones…"><span class="hint" style="font-size:11.5px">…</span></td>
         <td class="cards-acciones" style="text-align:right;vertical-align:middle;padding:5px 4px">
           <div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;width:116px;margin-left:auto">
@@ -3852,8 +3852,11 @@ async function renderSeguimiento() {
     cargarUltimosEstados(filas.filter(f=>f.subIds.length));
     // Calcular "¿Procede reevaluación?" con la lógica real, para TODAS las filas.
     cargarProcedeReeval(filas);
-    // Riesgos nivel 4 con control pero SIN reportes de acciones aún: medidas = 0% → monitoreo bloqueado.
-    filas.filter(f=>f.tieneMonitoreo && !f.subIds.length).forEach(f=>{
+    // Riesgos NIVEL 4 cuyas medidas aún no llegan al 100%: mostrar candado 🔒 en la
+    // columna de monitoreo, con o sin control "Sí" (el monitoreo se habilita al 100%).
+    // Los que SÍ tienen reportes se recalculan en cargarUltimosEstados (que puede
+    // actualizar esta celda a %, "Certificar" o candado según su avance real).
+    filas.filter(f=>f.nivel===4 && !f.subIds.length).forEach(f=>{
       const btnMon=document.getElementById('btnmon-'+f.id);
       if(btnMon) btnMon.style.display='none';
       const celMon=document.getElementById('moncumpl-'+f.id);
@@ -3949,6 +3952,21 @@ async function cargarUltimosEstados(filasConReportes) {
             ? 'Disponible cuando las medidas de respuesta estén al 100%'
             : 'Las medidas están al 100%, pero el último estado debe ser Culminado/Ejecutado';
           if (celMon) celMon.innerHTML = `<span class="hint" title="${titulo}">${motivo}</span>`;
+        }
+      } else if (f.nivel===4) {
+        // Nivel 4 con control "No" pero con reportes: aún no hay monitoreo formal.
+        // Mostrar el candado según el avance de las medidas (mismo criterio visual).
+        const celMon = document.getElementById('moncumpl-'+f.id);
+        if (celMon) {
+          const culm = /culmin|ejecut/i.test(String(est));
+          if (pctMedidas===100 && culm) {
+            // Medidas completas sin control "Sí": el auto-marcado ya se encarga; entretanto, —
+            celMon.innerHTML = '<span class="hint">…</span>';
+          } else {
+            const motivo = (pctMedidas !== 100) ? '🔒 medidas &lt;100%' : '🔒 falta Culminado/Ejecutado';
+            const titulo = (pctMedidas !== 100) ? 'Disponible cuando las medidas de respuesta estén al 100%' : 'Las medidas están al 100%, pero el último estado debe ser Culminado/Ejecutado';
+            celMon.innerHTML = `<span class="hint" title="${titulo}">${motivo}</span>`;
+          }
         }
       }
     } catch(_) {
