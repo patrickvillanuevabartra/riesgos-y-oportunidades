@@ -6239,11 +6239,12 @@ async function puedeReevaluar(r){
   const viaMonitoreo = (nivel===4 && _conControl);
 
   if(viaMonitoreo){
-    // NIVEL 4 CON CONTROL: al menos un reporte de monitoreo Y control certificado.
-    // La certificación («Certificado/Operativo») es la validación final que habilita
-    // la reevaluación; el % de monitoreo informa el avance pero no bloquea.
+    // NIVEL 4 CON CONTROL: el plan de monitoreo debe estar CUMPLIDO AL 100% y el
+    // control CERTIFICADO. La certificación acredita que el control opera; el 100%
+    // de monitoreo acredita que se verificó durante todo el período previsto.
     const pctMon = await _cumplimientoMonitoreo(r);
     if(pctMon==null) return {procede:false, motivo:'Nivel '+nivel+' con control: aún sin reportes de monitoreo del control.'};
+    if(pctMon<100) return {procede:false, motivo:'Nivel '+nivel+' con control: el cumplimiento de monitoreo ('+pctMon+'%) debe llegar al 100% para reevaluar.'};
     const certRaw = String((r.values||{})['Certificación de Implementación del Control']||'');
     const certificado = /certificad|operativ/i.test(certRaw);
     if(!certificado) return {procede:false, motivo:'Nivel '+nivel+' con control: falta certificar el control (marca «Certificado/Operativo» en la pestaña Certificación).'};
