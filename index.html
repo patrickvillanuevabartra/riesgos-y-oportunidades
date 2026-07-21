@@ -372,6 +372,7 @@
     <div class="kpis" id="kpis"></div>
 
     <div class="panel" style="margin-bottom:20px"><h3>Estado de riesgos y oportunidades por oficina</h3><p class="hint" style="margin:-4px 0 10px">Cuántos riesgos/oportunidades tiene cada oficina y en qué etapa del tratamiento se encuentran.</p>
+      <div style="font-size:12px;color:var(--mist);margin-bottom:10px">Barra de % avance: <span style="color:#c0392b;font-weight:600">rojo &lt; 50%</span> · <span style="color:#b8860b;font-weight:600">ámbar 50–79%</span> · <span style="color:#1f7a3d;font-weight:600">verde ≥ 80%</span>.</div>
       <div style="margin-bottom:10px"><input id="buscarOficinaEPO" placeholder="🔍 Buscar mi oficina (la resalta sin ocultar las demás)…" oninput="resaltarOficinaEPO()" style="width:100%;max-width:420px;padding:7px 11px;font-size:13px;border:1px solid var(--line);border-radius:8px"></div>
       <div id="estadoPorOficina"><p class="hint">Cargando…</p></div></div>
 
@@ -2954,7 +2955,7 @@ async function renderEstadoPorOficina(recs){
     // Barra de % de avance dentro de la celda: color según el nivel alcanzado
     const barraPct = (pct)=>{
       const p=Math.round(pct);
-      const color = p>=100 ? '#2fa26a' : p>=50 ? '#e9c000' : '#e08e0b';
+      const color = p>=80 ? '#1f7a3d' : p>=50 ? '#b8860b' : '#c0392b'; // semáforo unificado: verde ≥80, ámbar 50-79, rojo <50
       return `<div style="display:flex;align-items:center;gap:8px">
         <div style="flex:1;height:9px;border-radius:5px;background:#eee;overflow:hidden;min-width:70px">
           <div style="height:100%;width:${p}%;background:${color};border-radius:5px"></div>
@@ -4074,10 +4075,10 @@ window.cargarCumplimientoMonitoreo = cargarCumplimientoMonitoreo;
 
 // Barra de avance compacta con porcentaje
 function barraAvance(pct){
-  const color = pct>=100?'var(--n1)':pct>=50?'var(--n2)':'var(--n3)';
+  const color = pct>=80?'#1f7a3d':pct>=50?'#b8860b':'#c0392b'; // semáforo unificado: verde ≥80, ámbar 50-79, rojo <50
   return `<div class="avance-wrap">
     <div class="avance-track"><div class="avance-fill" style="width:${pct}%;background:${color}"></div></div>
-    <span class="avance-num">${pct}%</span>
+    <span class="avance-num" style="color:${color}">${pct}%</span>
   </div>`;
 }
 
