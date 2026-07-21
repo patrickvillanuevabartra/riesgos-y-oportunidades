@@ -2924,10 +2924,13 @@ async function renderEstadoPorOficina(recs){
     for(const r of recs){
       const ofi=oficinaDe(r)||'Sin oficina asignada';
       const {etapa,pct,conTratamiento,conRespuesta}=etapaDe(r);
-      const g=porOfi[ofi]||(porOfi[ofi]={total:0,e1:0,e2:0,e3:0,e4:0,nR:0,nO:0,sumaPct:0,nConTrat:0,sumaCtrl:0,nCtrl:0,conResp:0});
+      const g=porOfi[ofi]||(porOfi[ofi]={total:0,e1:0,e2:0,e3:0,e4:0,nR:0,nO:0,sumaPct:0,nConTrat:0,sumaCtrl:0,nCtrl:0,conResp:0,niv:{1:0,2:0,3:0,4:0}});
       g.total++; g['e'+etapa]++;
       if(conRespuesta) g.conResp++; // todos los que YA definieron respuesta + medidas (sin importar su avance)
       if(esOportunidad(r)) g.nO++; else g.nR++;
+      // Reparto por NIVEL INHERENTE (gravedad original) para la columna "Nivel de riesgo".
+      const _niv = (esOportunidad(r) ? nivelOportInherenteDe(r) : nivelInherenteDe(r)).nivel;
+      if(_niv>=1 && _niv<=4) g.niv[_niv]++;
       if(conTratamiento){ g.sumaPct+=pct; g.nConTrat++; }
       const cc=await cumplimientoControlDe(r);
       if(cc!==null){ g.sumaCtrl+=cc; g.nCtrl++; }
@@ -2947,6 +2950,7 @@ async function renderEstadoPorOficina(recs){
       +'<thead><tr style="text-align:left;color:var(--mist);font-size:11px;text-transform:uppercase;letter-spacing:.03em">'
       +'<th style="padding:9px 10px">Oficina</th>'
       +'<th style="padding:9px 10px;text-align:center">Total</th>'
+      +'<th style="padding:9px 10px;text-align:center;min-width:130px" title="Reparto de los riesgos por nivel inherente (gravedad original): rojo intolerable (4) → verde bajo (1)">Nivel de riesgo</th>'
       +'<th style="padding:9px 10px;text-align:center" title="Ya tiene definidas la estrategia de respuesta y las medidas, pero sin avance reportado">🟠 Con respuesta</th>'
       +'<th style="padding:9px 10px;text-align:center;min-width:150px" title="Avance promedio de las medidas de la oficina (los controlados cuentan como 100%)">🟡 Nivel de ejecución</th>'
       +'<th style="padding:9px 10px;text-align:center;min-width:130px" title="% de cumplimiento del monitoreo del control. Solo aplica a riesgos de nivel 4 con monitoreo; en las demás oficinas aparece n/a.">🔵 Cumplim. de control</th>'
@@ -2963,6 +2967,21 @@ async function renderEstadoPorOficina(recs){
         <span style="font-size:12px;font-weight:600;color:${color};min-width:34px;text-align:right">${p}%</span>
       </div>`;
     };
+    // Mini-barra del reparto por nivel inherente, con el número dentro de cada segmento.
+    // Colores del semáforo de riesgo (4 rojo → 1 verde); solo se dibujan los niveles con riesgos.
+    const NIV_HEX = {4:'#c0392b',3:'#e08e0b',2:'#e9c000',1:'#1f7a3d'};
+    const NIV_LBL = {4:'Intolerable (4)',3:'Alto (3)',2:'Medio (2)',1:'Bajo (1)'};
+    const barraNivel = (niv)=>{
+      const tot = niv[1]+niv[2]+niv[3]+niv[4];
+      if(!tot) return '<span style="color:var(--mist);font-size:12px">—</span>';
+      const segs = [4,3,2,1].filter(n=>niv[n]>0).map(n=>{
+        const w=(niv[n]/tot*100).toFixed(1);
+        const fg = (n===2)?'#5a4a00':'#fff'; // el amarillo necesita texto oscuro
+        return `<span title="${NIV_LBL[n]}: ${niv[n]}" style="display:flex;align-items:center;justify-content:center;width:${w}%;background:${NIV_HEX[n]};color:${fg};font-size:10.5px;font-weight:700;min-width:16px">${niv[n]}</span>`;
+      }).join('');
+      const tip = [4,3,2,1].filter(n=>niv[n]>0).map(n=>`${NIV_LBL[n]}: ${niv[n]}`).join(' · ');
+      return `<div title="${tip}" style="display:flex;height:16px;border-radius:5px;overflow:hidden;min-width:90px">${segs}</div>`;
+    };
     const celN = (n,txt)=> n>0 ? `<span title="${txt}"><strong>${n}</strong></span>` : '<span style="color:var(--mist)">—</span>';
     filas.forEach(([ofi,g],i)=>{
       const tt=`${g.nR} riesgo${g.nR!==1?'s':''} · ${g.nO} oportunidad${g.nO!==1?'es':''}`;
@@ -2976,6 +2995,7 @@ async function renderEstadoPorOficina(recs){
       html+=`<tr class="epo-fila" data-oficina="${ofi.toLowerCase().replace(/"/g,'')}" style="border-top:1px solid var(--line)">
         <td style="padding:9px 10px;font-weight:600">${ofi.replace(/</g,'&lt;')}</td>
         <td style="padding:9px 10px;text-align:center" title="${tt}${sinTratar>0?' · '+sinTratar+' aún sin respuesta':''}"><span style="cursor:help;border-bottom:1px dotted var(--mist)">${g.total}</span></td>
+        <td style="padding:9px 10px">${barraNivel(g.niv)}</td>
         <td style="padding:9px 10px;text-align:center">${celN(g.conResp,'Ya definieron su estrategia de respuesta y sus medidas (incluye los que están en ejecución o controlados)')}</td>
         <td style="padding:9px 10px" title="${desg}">${g.nConTrat>0?barraPct(avance):'<span style=\"color:var(--mist)\">sin datos</span>'}</td>
         <td style="padding:9px 10px" title="${desgCtrl}">${ctrl!==null?barraPct(ctrl):'<span style=\"color:var(--mist);font-size:12px\">n/a</span>'}</td>
@@ -2989,9 +3009,11 @@ async function renderEstadoPorOficina(recs){
     const totNCtrl=filas.reduce((a,[,g])=>a+g.nCtrl,0);
     const totSumaCtrl=filas.reduce((a,[,g])=>a+g.sumaCtrl,0);
     const ctrlGlobal = totNCtrl>0 ? totSumaCtrl/totNCtrl : null;
+    const nivGlobal = filas.reduce((a,[,g])=>{a[1]+=g.niv[1];a[2]+=g.niv[2];a[3]+=g.niv[3];a[4]+=g.niv[4];return a;},{1:0,2:0,3:0,4:0});
     html+=`<tr style="border-top:2px solid var(--brand);font-weight:700;background:var(--paper)">
       <td style="padding:9px 10px">TOTAL</td>
       <td style="padding:9px 10px;text-align:center">${tot.total}</td>
+      <td style="padding:9px 10px">${barraNivel(nivGlobal)}</td>
       <td style="padding:9px 10px;text-align:center">${filas.reduce((a,[,g])=>a+g.conResp,0)||'—'}</td>
       <td style="padding:9px 10px">${totNConTrat>0?barraPct(avanceGlobal):'—'}</td>
       <td style="padding:9px 10px">${ctrlGlobal!==null?barraPct(ctrlGlobal):'<span style=\"color:var(--mist);font-size:12px\">n/a</span>'}</td>
@@ -3000,6 +3022,7 @@ async function renderEstadoPorOficina(recs){
     html+='</tbody></table></div>';
     html+=`<div style="margin-top:14px;padding:12px 14px;background:var(--paper);border-radius:9px;font-size:12.5px;line-height:1.7">
       <strong style="display:block;margin-bottom:6px">¿Qué significa cada etapa?</strong>
+      <div><span style="font-weight:600">Nivel de riesgo:</span> reparto de los riesgos por nivel inherente (gravedad original), con el número en cada segmento: <span style="color:#c0392b;font-weight:600">rojo intolerable (4)</span> · <span style="color:#e08e0b;font-weight:600">alto (3)</span> · <span style="color:#b8860b;font-weight:600">medio (2)</span> · <span style="color:#1f7a3d;font-weight:600">bajo (1)</span>.</div>
       <div><span style="color:#e08e0b">🟠 Con respuesta:</span> ya tiene definidas tanto la estrategia de respuesta (Mitigar, Explotar…) como las medidas concretas. Incluye también los que están en ejecución o ya controlados.</div>
       <div><span style="color:#c9a800">🟡 Nivel de ejecución:</span> el avance promedio de las medidas de la oficina (% completado). Los riesgos ya controlados cuentan como 100%. La barra y el porcentaje muestran qué tan avanzada está la oficina en ejecutar sus tratamientos.</div>
       <div><span style="color:#2b7fc9">🔵 Cumplim. de control:</span> % de cumplimiento del monitoreo del control en los riesgos de nivel intolerable (4). Si el riesgo aún no tiene reportes de monitoreo, cuenta como 0% (monitoreo pendiente). "n/a" aparece solo en oficinas sin riesgos de nivel 4.</div>
