@@ -2948,6 +2948,7 @@ async function renderEstadoPorOficina(recs){
 
     let html='<div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:13.5px">'
       +'<thead><tr style="text-align:left;color:var(--mist);font-size:11px;text-transform:uppercase;letter-spacing:.03em">'
+      +'<th style="padding:9px 10px;text-align:center;width:34px">#</th>'
       +'<th style="padding:9px 10px">Oficina</th>'
       +'<th style="padding:9px 10px;text-align:center">Total</th>'
       +'<th style="padding:9px 10px;text-align:center;min-width:130px" title="Reparto de los riesgos por nivel inherente (gravedad original): rojo intolerable (4) → verde bajo (1)">Nivel de riesgo</th>'
@@ -2993,6 +2994,7 @@ async function renderEstadoPorOficina(recs){
       const ctrl = g.nCtrl>0 ? g.sumaCtrl/g.nCtrl : null;
       const desgCtrl = g.nCtrl>0 ? `Promedio de ${g.nCtrl} riesgo${g.nCtrl!==1?'s':''} nivel 4 (un 0% puede indicar monitoreo aún sin reportar)` : 'No hay riesgos de nivel 4 en esta oficina';
       html+=`<tr class="epo-fila" data-oficina="${ofi.toLowerCase().replace(/"/g,'')}" style="border-top:1px solid var(--line)">
+        <td style="padding:9px 10px;text-align:center;font-weight:700;color:var(--mist)">${i+1}</td>
         <td style="padding:9px 10px;font-weight:600">${ofi.replace(/</g,'&lt;')}</td>
         <td style="padding:9px 10px;text-align:center" title="${tt}${sinTratar>0?' · '+sinTratar+' aún sin respuesta':''}"><span style="cursor:help;border-bottom:1px dotted var(--mist)">${g.total}</span></td>
         <td style="padding:9px 10px">${barraNivel(g.niv)}</td>
@@ -3011,6 +3013,7 @@ async function renderEstadoPorOficina(recs){
     const ctrlGlobal = totNCtrl>0 ? totSumaCtrl/totNCtrl : null;
     const nivGlobal = filas.reduce((a,[,g])=>{a[1]+=g.niv[1];a[2]+=g.niv[2];a[3]+=g.niv[3];a[4]+=g.niv[4];return a;},{1:0,2:0,3:0,4:0});
     html+=`<tr style="border-top:2px solid var(--brand);font-weight:700;background:var(--paper)">
+      <td style="padding:9px 10px"></td>
       <td style="padding:9px 10px">TOTAL</td>
       <td style="padding:9px 10px;text-align:center">${tot.total}</td>
       <td style="padding:9px 10px">${barraNivel(nivGlobal)}</td>
@@ -3031,10 +3034,83 @@ async function renderEstadoPorOficina(recs){
       <div style="margin-top:6px;color:var(--mist)">El <strong>Total</strong> incluye todos los registros de la oficina. La diferencia entre el total y "Con respuesta" son los que aún no tienen definido su tratamiento (respuesta y medidas).</div>
     </div>`;
     cont.innerHTML=html;
+    // Guardar los datos calculados para la descarga a Excel
+    _EPO_DATA = { filas, tot, nivGlobal, avanceGlobal, ctrlGlobal, totNConTrat,
+      conRespTot: filas.reduce((a,[,g])=>a+g.conResp,0) };
+    // Botón de descarga (se coloca arriba de la tabla, junto al buscador)
+    const barraBusq = document.getElementById('buscarOficinaEPO');
+    if(barraBusq && !document.getElementById('btnEPOExcel')){
+      const btn=document.createElement('button');
+      btn.id='btnEPOExcel'; btn.className='btn btn-ghost';
+      btn.style.cssText='margin-left:10px;padding:7px 14px;font-size:13px;white-space:nowrap';
+      btn.innerHTML='⬇️ Descargar Excel';
+      btn.onclick=descargarEstadoPorOficina;
+      barraBusq.parentElement.style.display='flex';
+      barraBusq.parentElement.style.gap='10px';
+      barraBusq.parentElement.style.alignItems='center';
+      barraBusq.parentElement.appendChild(btn);
+    }
   }catch(e){
     cont.innerHTML='<p class="hint" style="color:#c0392b">No se pudo calcular: '+(e.message||e)+'</p>';
   }
 }
+let _EPO_DATA=null;
+
+// Descarga la tabla "Estado por oficina" a un .xls (HTML que Excel abre con formato).
+function descargarEstadoPorOficina(){
+  if(!_EPO_DATA){ toast('Primero abre el Tablero para generar los datos.', true); return; }
+  const {filas, tot, nivGlobal, avanceGlobal, ctrlGlobal, totNConTrat, conRespTot} = _EPO_DATA;
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const pct = v => (v==null?'':Math.round(v)+'%');
+  let filasHtml='';
+  filas.forEach(([ofi,g],i)=>{
+    const avance = g.nConTrat>0 ? Math.round(g.sumaPct/g.nConTrat) : '';
+    const ctrl = g.nCtrl>0 ? Math.round(g.sumaCtrl/g.nCtrl) : 'n/a';
+    filasHtml += `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td>${esc(ofi)}</td>
+      <td style="text-align:center">${g.total}</td>
+      <td style="text-align:center">${g.niv[4]}</td>
+      <td style="text-align:center">${g.niv[3]}</td>
+      <td style="text-align:center">${g.niv[2]}</td>
+      <td style="text-align:center">${g.niv[1]}</td>
+      <td style="text-align:center">${g.conResp}</td>
+      <td style="text-align:center">${avance===''?'':avance+'%'}</td>
+      <td style="text-align:center">${ctrl==='n/a'?'n/a':ctrl+'%'}</td>
+      <td style="text-align:center">${g.e4}</td>
+    </tr>`;
+  });
+  const avG = totNConTrat>0 ? Math.round(avanceGlobal)+'%' : '';
+  const ctrlG = ctrlGlobal!=null ? Math.round(ctrlGlobal)+'%' : 'n/a';
+  const totalHtml = `<tr style="font-weight:bold;background:#e8f3ec">
+    <td></td><td>TOTAL</td><td style="text-align:center">${tot.total}</td>
+    <td style="text-align:center">${nivGlobal[4]}</td><td style="text-align:center">${nivGlobal[3]}</td>
+    <td style="text-align:center">${nivGlobal[2]}</td><td style="text-align:center">${nivGlobal[1]}</td>
+    <td style="text-align:center">${conRespTot}</td><td style="text-align:center">${avG}</td>
+    <td style="text-align:center">${ctrlG}</td><td style="text-align:center">${tot.e4}</td>
+  </tr>`;
+  const hoy = new Date().toLocaleDateString('es-PE');
+  const tabla = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body>
+    <table border="1" style="border-collapse:collapse;font-family:Cambria,serif;font-size:11pt">
+      <tr><td colspan="11" style="font-weight:bold;font-size:13pt;background:#1f7a3d;color:#fff;padding:6px">Estado de riesgos y oportunidades por oficina — ${hoy}</td></tr>
+      <tr style="font-weight:bold;background:#2b7fc9;color:#fff">
+        <td style="text-align:center">#</td><td>Oficina</td><td style="text-align:center">Total</td>
+        <td style="text-align:center">Nivel 4 (Intolerable)</td><td style="text-align:center">Nivel 3 (Alto)</td>
+        <td style="text-align:center">Nivel 2 (Medio)</td><td style="text-align:center">Nivel 1 (Bajo)</td>
+        <td style="text-align:center">Con respuesta</td><td style="text-align:center">Nivel de ejecución</td>
+        <td style="text-align:center">Cumplim. de control</td><td style="text-align:center">Controlado</td>
+      </tr>
+      ${filasHtml}${totalHtml}
+    </table></body></html>`;
+  const blob = new Blob(['\ufeff'+tabla], {type:'application/vnd.ms-excel;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`Estado_por_oficina_${new Date().toISOString().slice(0,10)}.xls`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  toast('Descargando la tabla en Excel…');
+}
+window.descargarEstadoPorOficina = descargarEstadoPorOficina;
 window.renderEstadoPorOficina=renderEstadoPorOficina;
 
 // Resalta la fila de la oficina buscada (sin ocultar las demás) y hace scroll hasta ella.
