@@ -882,7 +882,10 @@
           <h3 style="margin:0;font-size:16px;color:var(--slate)">Usuarios del sistema</h3>
           <p style="margin:4px 0 0;font-size:13px;color:var(--mist)">Crea, edita, activa/desactiva o elimina usuarios.</p>
         </div>
-        <button class="btn btn-primary" onclick="abrirFormUsuario()">+ Crear usuario</button>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button class="btn btn-ghost" onclick="descargarUsuariosExcel()" title="Descargar la lista de usuarios a Excel">⬇️ Descargar Excel</button>
+          <button class="btn btn-primary" onclick="abrirFormUsuario()">+ Crear usuario</button>
+        </div>
       </div>
       <div id="usuariosLista"><p class="hint">Cargando usuarios…</p></div>
     </div>
@@ -1253,6 +1256,48 @@ async function cargarUsuarios(){
   }catch(e){ cont.innerHTML = '<p class="hint">Error al cargar usuarios: '+e.message+'</p>'; }
 }
 window.cargarUsuarios = cargarUsuarios;
+
+// Descarga la lista de usuarios a un .xls (HTML que Excel abre con formato).
+function descargarUsuariosExcel(){
+  const recs = _usuariosCache || [];
+  if(!recs.length){ toast('No hay usuarios para descargar.', true); return; }
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let filasHtml='';
+  recs.forEach((r,i)=>{
+    const v=r.values||{};
+    const nombre=_leerNombreUsuario(v)||'—';
+    const usuario=_limpioU(v['Usuario'])||'—';
+    const rol=_limpioU(v['Rol'])||'Oficina';
+    const oficinas=(rol==='Oficina') ? (_parseOficinas(_limpioU(v['Oficina asignada'])).join('; ')||'—') : '(ve todo)';
+    const activo=_limpioU(v['Activo'])==='No'?'No':'Sí';
+    filasHtml += `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td>${esc(nombre)}</td>
+      <td>${esc(usuario)}</td>
+      <td>${esc(rol)}</td>
+      <td>${esc(oficinas)}</td>
+      <td style="text-align:center">${activo}</td>
+    </tr>`;
+  });
+  const hoy = new Date().toLocaleDateString('es-PE');
+  const tabla = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body>
+    <table border="1" style="border-collapse:collapse;font-family:Cambria,serif;font-size:11pt">
+      <tr><td colspan="6" style="font-weight:bold;font-size:13pt;background:#1f7a3d;color:#fff;padding:6px">Usuarios del sistema — Matriz de Riesgos y Oportunidades — ${hoy}</td></tr>
+      <tr style="font-weight:bold;background:#2b7fc9;color:#fff">
+        <td style="text-align:center">#</td><td>Nombre completo</td><td>Usuario</td>
+        <td>Rol</td><td>Oficina(s)</td><td style="text-align:center">Activo</td>
+      </tr>
+      ${filasHtml}
+    </table></body></html>`;
+  const blob = new Blob(['\ufeff'+tabla], {type:'application/vnd.ms-excel;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`Usuarios_${new Date().toISOString().slice(0,10)}.xls`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  toast('Descargando la lista de usuarios…');
+}
+window.descargarUsuariosExcel = descargarUsuariosExcel;
 
 // Pinta la tabla de usuarios aplicando el filtro del buscador (sobre la caché ya cargada).
 function renderUsuariosTabla(){
