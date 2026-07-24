@@ -578,7 +578,7 @@
 
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <div class="conn" style="margin-bottom:0;flex:1;min-width:220px">
-        <input id="segBuscar" placeholder="Buscar por descripción o proceso…" style="border:0;background:transparent;flex:1;padding:0" oninput="filtrarSeguimientoEnVivo()">
+        <input id="segBuscar" placeholder="Buscar por descripción, proceso u oficina…" style="border:0;background:transparent;flex:1;padding:0" oninput="filtrarSeguimientoEnVivo()">
       </div>
       <div style="display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px">
         <button class="seg-tab-btn active" data-segtipo="todos" onclick="setSegTipo('todos')" style="border:0;background:var(--brand);color:#fff;font-family:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer">Todos</button>
@@ -3860,12 +3860,15 @@ function filtrarSeguimientoEnVivo(){
   const q = norm(document.getElementById('segBuscar')?.value||'');
   const tb = document.getElementById('tablaSeguimiento');
   if(!tb) return;
-  tb.querySelectorAll('tr.grupo-row').forEach(gr=>{
+  const grupos = tb.querySelectorAll('tr.grupo-row');
+  console.log('[buscar] q=', JSON.stringify(q), '| grupos encontrados:', grupos.length);
+  grupos.forEach(gr=>{
     // Nombre de la oficina de este grupo (para que buscar por oficina también funcione)
     const ofiNombre = norm(gr.querySelector('.grupo-nombre')?.textContent||'');
-    let vis=0, n=gr.nextElementSibling;
+    let vis=0, n=gr.nextElementSibling, filasCont=0;
     while(n && !n.classList.contains('grupo-row')){
       if(n.classList.contains('seg-fila')){
+        filasCont++;
         const txt = norm(n.getAttribute('data-buscar')||'');
         // Coincide si el texto de la fila O el nombre de su oficina contienen la búsqueda
         const match = !q || txt.includes(q) || ofiNombre.includes(q);
@@ -3874,6 +3877,7 @@ function filtrarSeguimientoEnVivo(){
       }
       n=n.nextElementSibling;
     }
+    console.log('[buscar] oficina=', JSON.stringify(ofiNombre), '| filas seg-fila:', filasCont, '| visibles:', vis);
     gr.style.display = vis>0 ? '' : 'none';
   });
 }
