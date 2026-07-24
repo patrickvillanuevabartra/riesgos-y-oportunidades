@@ -3860,24 +3860,22 @@ function filtrarSeguimientoEnVivo(){
   const q = norm(document.getElementById('segBuscar')?.value||'');
   const tb = document.getElementById('tablaSeguimiento');
   if(!tb) return;
-  const grupos = tb.querySelectorAll('tr.grupo-row');
-  console.log('[buscar] q=', JSON.stringify(q), '| grupos encontrados:', grupos.length);
-  grupos.forEach(gr=>{
-    // Nombre de la oficina de este grupo (para que buscar por oficina también funcione)
+  tb.querySelectorAll('tr.grupo-row').forEach(gr=>{
     const ofiNombre = norm(gr.querySelector('.grupo-nombre')?.textContent||'');
-    let vis=0, n=gr.nextElementSibling, filasCont=0;
+    // Si el nombre de la oficina coincide, se muestra TODO el grupo. Además, en cualquier
+    // oficina, se muestran las filas cuyo texto (descripción/proceso) coincida. Así el usuario
+    // ve tanto la oficina buscada como los riesgos de otras áreas que mencionan la palabra.
+    const grupoCoincide = q && ofiNombre.includes(q);
+    let vis=0, n=gr.nextElementSibling;
     while(n && !n.classList.contains('grupo-row')){
       if(n.classList.contains('seg-fila')){
-        filasCont++;
         const txt = norm(n.getAttribute('data-buscar')||'');
-        // Coincide si el texto de la fila O el nombre de su oficina contienen la búsqueda
-        const match = !q || txt.includes(q) || ofiNombre.includes(q);
+        const match = !q || grupoCoincide || txt.includes(q);
         n.style.display = match ? '' : 'none';
         if(match) vis++;
       }
       n=n.nextElementSibling;
     }
-    console.log('[buscar] oficina=', JSON.stringify(ofiNombre), '| filas seg-fila:', filasCont, '| visibles:', vis);
     gr.style.display = vis>0 ? '' : 'none';
   });
 }
