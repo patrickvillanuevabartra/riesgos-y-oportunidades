@@ -3855,19 +3855,23 @@ window.descargarExcel = descargarExcel;
 // Filtra la tabla de Seguimiento SIN recargar datos: solo oculta/muestra las filas ya
 // renderizadas según el texto buscado, y esconde los grupos de oficina que queden vacíos.
 function filtrarSeguimientoEnVivo(){
-  const q = (document.getElementById('segBuscar')?.value||'').toLowerCase().trim();
+  // Normaliza: minúsculas y SIN acentos, para que "Planificación" y "planificacion" coincidan.
+  const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  const q = norm(document.getElementById('segBuscar')?.value||'');
   const tb = document.getElementById('tablaSeguimiento');
   if(!tb) return;
-  const filas = tb.querySelectorAll('tr.seg-fila');
-  filas.forEach(tr=>{
-    const txt = tr.getAttribute('data-buscar')||'';
-    tr.style.display = (!q || txt.includes(q)) ? '' : 'none';
-  });
-  // Ocultar encabezados de grupo (oficina) sin filas visibles debajo
   tb.querySelectorAll('tr.grupo-row').forEach(gr=>{
+    // Nombre de la oficina de este grupo (para que buscar por oficina también funcione)
+    const ofiNombre = norm(gr.querySelector('.grupo-nombre')?.textContent||'');
     let vis=0, n=gr.nextElementSibling;
     while(n && !n.classList.contains('grupo-row')){
-      if(n.classList.contains('seg-fila') && n.style.display!=='none') vis++;
+      if(n.classList.contains('seg-fila')){
+        const txt = norm(n.getAttribute('data-buscar')||'');
+        // Coincide si el texto de la fila O el nombre de su oficina contienen la búsqueda
+        const match = !q || txt.includes(q) || ofiNombre.includes(q);
+        n.style.display = match ? '' : 'none';
+        if(match) vis++;
+      }
       n=n.nextElementSibling;
     }
     gr.style.display = vis>0 ? '' : 'none';
