@@ -5550,9 +5550,26 @@ function editarReporte(repId){
 }
 window.editarReporte = editarReporte;
 
-function cancelarEdicionReporte(){
-  // Recarga el historial del riesgo actualmente abierto
-  if(SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id) toggleHistorial(SEG_RIESGO_ACTUAL.id);
+async function cancelarEdicionReporte(){
+  // Vuelve a la lista de reportes SIN cerrar el panel. Cubre los dos contextos
+  // (modal de acciones o historial inline) reutilizando la misma lógica que "Guardar".
+  const id = SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id;
+  if(!id) return;
+  const modalAcc = document.getElementById('modalAcciones');
+  if(modalAcc && !modalAcc.classList.contains('hidden')){
+    // Estamos en el modal: recargar su contenido de reportes.
+    abrirReporteAcciones(id);
+    return;
+  }
+  // Historial inline: re-render solo de la lista, sin togglear el panel.
+  const cont = document.getElementById('histlist-'+id);
+  const r = STATE.matriz.find(x=>x.id===id);
+  const subIds = subIdsDe(r, SUBFORM_FIELD_ID);
+  if(!cont) return;
+  if(!subIds.length){ cont.innerHTML='<p class="hint">Sin reportes aún.</p>'; return; }
+  cont.innerHTML = '<p class="hint">Cargando…</p>';
+  try { cont.innerHTML = await renderHistorialHTML(subIds); }
+  catch(e){ cont.innerHTML = '<p class="hint">Error: '+e.message+'</p>'; }
 }
 window.cancelarEdicionReporte = cancelarEdicionReporte;
 
