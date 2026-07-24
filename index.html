@@ -578,7 +578,7 @@
 
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <div class="conn" style="margin-bottom:0;flex:1;min-width:220px">
-        <input id="segBuscar" placeholder="Buscar por descripción o proceso…" style="border:0;background:transparent;flex:1;padding:0" oninput="renderSeguimiento()">
+        <input id="segBuscar" placeholder="Buscar por descripción o proceso…" style="border:0;background:transparent;flex:1;padding:0" oninput="filtrarSeguimientoEnVivo()">
       </div>
       <div style="display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px">
         <button class="seg-tab-btn active" data-segtipo="todos" onclick="setSegTipo('todos')" style="border:0;background:var(--brand);color:#fff;font-family:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer">Todos</button>
@@ -3852,6 +3852,29 @@ async function descargarExcel(){
 }
 window.descargarExcel = descargarExcel;
 
+// Filtra la tabla de Seguimiento SIN recargar datos: solo oculta/muestra las filas ya
+// renderizadas según el texto buscado, y esconde los grupos de oficina que queden vacíos.
+function filtrarSeguimientoEnVivo(){
+  const q = (document.getElementById('segBuscar')?.value||'').toLowerCase().trim();
+  const tb = document.getElementById('tablaSeguimiento');
+  if(!tb) return;
+  const filas = tb.querySelectorAll('tr.seg-fila');
+  filas.forEach(tr=>{
+    const txt = tr.getAttribute('data-buscar')||'';
+    tr.style.display = (!q || txt.includes(q)) ? '' : 'none';
+  });
+  // Ocultar encabezados de grupo (oficina) sin filas visibles debajo
+  tb.querySelectorAll('tr.grupo-row').forEach(gr=>{
+    let vis=0, n=gr.nextElementSibling;
+    while(n && !n.classList.contains('grupo-row')){
+      if(n.classList.contains('seg-fila') && n.style.display!=='none') vis++;
+      n=n.nextElementSibling;
+    }
+    gr.style.display = vis>0 ? '' : 'none';
+  });
+}
+window.filtrarSeguimientoEnVivo = filtrarSeguimientoEnVivo;
+
 async function renderSeguimiento() {
   const tb = document.getElementById('tablaSeguimiento');
   try {
@@ -3906,7 +3929,7 @@ async function renderSeguimiento() {
     })
     // Filtro por el selector Todos/Riesgos/Oportunidades
     .filter(f => SEG_TIPO==='todos' || (SEG_TIPO==='oportunidades'?f.op:!f.op))
-    .filter(f => !filtro || f.desc.toLowerCase().includes(filtro) || f.proc.toLowerCase().includes(filtro) || f.oficina.toLowerCase().includes(filtro));
+    .filter(f => true); // La búsqueda se aplica en vivo (filtrarSeguimientoEnVivo) sin reconstruir.
 
     // ── Etiqueta de totales (según la pestaña y el estado activo/archivado) ──
     const nR = filas.filter(f=>!f.op).length;
@@ -3946,7 +3969,7 @@ async function renderSeguimiento() {
       : '';
 
     const filaHTML = (f, num) => `
-      <tr>
+      <tr class="seg-fila" data-buscar="${((f.desc||'')+' '+(f.proc||'')).toLowerCase().replace(/"/g,'&quot;')}">
         <td data-label="#" style="text-align:center;color:var(--mist);font-variant-numeric:tabular-nums">${num}</td>
         <td class="cards-main" data-label="Descripción">
           ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>42?f.desc.slice(0,42)+'…':f.desc}</a>
@@ -3993,6 +4016,9 @@ async function renderSeguimiento() {
       </td></tr>
       ${grupos[of].map(f => filaHTML(f, ++_n)).join('')}
     `).join('') : '<tr><td colspan="11"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
+
+    // Si había texto en el buscador, reaplicar el filtro en vivo tras reconstruir.
+    if((document.getElementById('segBuscar')?.value||'').trim()) filtrarSeguimientoEnVivo();
 
     setConn(true);
 
@@ -4228,12 +4254,17 @@ function barraAvance(pct){
 // === Render del historial de reportes (HTML) para un riesgo ===
 async function renderHistorialHTML(subIds){
   if(!subIds.length) return '<p class="hint">Este riesgo aún no tiene reportes.</p>';
-  // Intentar usar el caché; si la precarga falla, seguimos con lectura individual.
-  try{ await precargarSubcache(); }catch(e){ console.warn('[renderHistorialHTML] precarga falló, se usará lectura individual:', e.message); }
-  const reps = await Promise.all(subIds.map(id =>
-    getSub('reportes', id)
-      .then(s=> s ? {values:s.values, created_at:s.created_at, id} : null).catch(()=>null)
-  ));
+  // Precargar una vez y leer TODO del caché (síncrono), sin una llamada por reporte.
+  let cache={};
+  try{ const sc=await precargarSubcache(); cache=(sc&&sc.reportes)||{}; }
+  catch(e){ console.warn('[renderHistorialHTML] precarga falló, se usará lectura individual:', e.message); }
+  // Si algún reporte no está en el caché, se lee individual solo para esos (respaldo).
+  const reps = await Promise.all(subIds.map(async id =>{
+    const c = cache[id];
+    if(c) return {values:c.values, created_at:c.created_at, id};
+    try{ const s=await getSub('reportes', id); return s?{values:s.values, created_at:s.created_at, id}:null; }
+    catch(_){ return null; }
+  }));
   const RF = CONFIG.REPORTE_FIELDS;
   const val=(rec,col)=> rec && rec.values ? (rec.values[col]||'') : '';
   return reps.filter(Boolean).map(rec=>{
