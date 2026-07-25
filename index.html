@@ -577,8 +577,11 @@
     </details>
 
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <div class="conn" style="margin-bottom:0;flex:1;min-width:220px">
-        <input id="segBuscar" placeholder="Buscar por descripción, proceso u oficina…" style="border:0;background:transparent;flex:1;padding:0" oninput="filtrarSeguimientoEnVivo()">
+      <select id="segOficinaSel" onchange="filtrarSeguimientoPorOficina()" style="flex:1;min-width:220px;padding:9px 11px;font-size:13px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--slate);font-family:inherit;cursor:pointer">
+        <option value="">📋 Todas las oficinas</option>
+      </select>
+      <div class="conn" style="margin-bottom:0;min-width:180px;flex:0 1 240px">
+        <input id="segBuscar" placeholder="🔍 Buscar texto…" style="border:0;background:transparent;flex:1;padding:0" oninput="filtrarSeguimientoPorOficina()">
       </div>
       <div style="display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:4px">
         <button class="seg-tab-btn active" data-segtipo="todos" onclick="setSegTipo('todos')" style="border:0;background:var(--brand);color:#fff;font-family:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer">Todos</button>
@@ -3854,23 +3857,24 @@ window.descargarExcel = descargarExcel;
 
 // Filtra la tabla de Seguimiento SIN recargar datos: solo oculta/muestra las filas ya
 // renderizadas según el texto buscado, y esconde los grupos de oficina que queden vacíos.
-function filtrarSeguimientoEnVivo(){
-  // Normaliza: minúsculas y SIN acentos, para que "Planificación" y "planificacion" coincidan.
+// Filtra Seguimiento combinando el DESPLEGABLE de oficina (coincidencia exacta de grupo)
+// con un texto libre opcional (descripción/proceso). Ambos se aplican sobre las filas ya
+// renderizadas, sin recargar datos.
+function filtrarSeguimientoPorOficina(){
   const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  const ofiSel = norm(document.getElementById('segOficinaSel')?.value||'');
   const q = norm(document.getElementById('segBuscar')?.value||'');
   const tb = document.getElementById('tablaSeguimiento');
   if(!tb) return;
   tb.querySelectorAll('tr.grupo-row').forEach(gr=>{
     const ofiNombre = norm(gr.querySelector('.grupo-nombre')?.textContent||'');
-    // Si el nombre de la oficina coincide, se muestra TODO el grupo. Además, en cualquier
-    // oficina, se muestran las filas cuyo texto (descripción/proceso) coincida. Así el usuario
-    // ve tanto la oficina buscada como los riesgos de otras áreas que mencionan la palabra.
-    const grupoCoincide = q && ofiNombre.includes(q);
+    // El desplegable filtra por oficina EXACTA; si hay una elegida y no es esta, se oculta todo el grupo.
+    const grupoPasa = !ofiSel || ofiNombre===ofiSel;
     let vis=0, n=gr.nextElementSibling;
     while(n && !n.classList.contains('grupo-row')){
       if(n.classList.contains('seg-fila')){
         const txt = norm(n.getAttribute('data-buscar')||'');
-        const match = !q || grupoCoincide || txt.includes(q);
+        const match = grupoPasa && (!q || txt.includes(q));
         n.style.display = match ? '' : 'none';
         if(match) vis++;
       }
@@ -3879,6 +3883,32 @@ function filtrarSeguimientoEnVivo(){
     gr.style.display = vis>0 ? '' : 'none';
   });
 }
+window.filtrarSeguimientoPorOficina = filtrarSeguimientoPorOficina;
+
+// Puebla el desplegable de oficinas con las que existen en la tabla + su conteo de registros.
+function poblarDesplegableOficinas(){
+  const sel = document.getElementById('segOficinaSel');
+  if(!sel) return;
+  const tb = document.getElementById('tablaSeguimiento');
+  if(!tb) return;
+  const valorPrevio = sel.value;
+  const oficinas = [];
+  tb.querySelectorAll('tr.grupo-row').forEach(gr=>{
+    const nombre = (gr.querySelector('.grupo-nombre')?.textContent||'').trim();
+    if(!nombre) return;
+    // Contar filas de detalle de este grupo
+    let cnt=0, n=gr.nextElementSibling;
+    while(n && !n.classList.contains('grupo-row')){ if(n.classList.contains('seg-fila')) cnt++; n=n.nextElementSibling; }
+    oficinas.push({nombre, cnt});
+  });
+  sel.innerHTML = '<option value="">📋 Todas las oficinas ('+oficinas.reduce((a,o)=>a+o.cnt,0)+')</option>'
+    + oficinas.map(o=>`<option value="${o.nombre.replace(/"/g,'&quot;')}">${o.nombre.replace(/</g,'&lt;')} (${o.cnt})</option>`).join('');
+  // Restaurar selección previa si sigue existiendo
+  if(valorPrevio && oficinas.some(o=>o.nombre===valorPrevio)) sel.value=valorPrevio;
+}
+window.poblarDesplegableOficinas = poblarDesplegableOficinas;
+
+function filtrarSeguimientoEnVivo(){ filtrarSeguimientoPorOficina(); } // compatibilidad
 window.filtrarSeguimientoEnVivo = filtrarSeguimientoEnVivo;
 
 async function renderSeguimiento() {
@@ -4023,8 +4053,11 @@ async function renderSeguimiento() {
       ${grupos[of].map(f => filaHTML(f, ++_n)).join('')}
     `).join('') : '<tr><td colspan="11"><div class="empty"><h3>Sin coincidencias</h3></div></td></tr>';
 
-    // Si había texto en el buscador, reaplicar el filtro en vivo tras reconstruir.
-    if((document.getElementById('segBuscar')?.value||'').trim()) filtrarSeguimientoEnVivo();
+    // Poblar el desplegable de oficinas y reaplicar filtros (oficina + texto) tras reconstruir.
+    poblarDesplegableOficinas();
+    if((document.getElementById('segOficinaSel')?.value||'') || (document.getElementById('segBuscar')?.value||'').trim()){
+      filtrarSeguimientoPorOficina();
+    }
 
     setConn(true);
 
