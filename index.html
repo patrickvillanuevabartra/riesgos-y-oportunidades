@@ -190,6 +190,18 @@
 
   .empty{text-align:center;padding:60px 20px;color:var(--mist)}
   .empty h3{color:var(--slate);margin-bottom:8px}
+  /* Editor de texto enriquecido (descripciones) */
+  .rte-wrap{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
+  .rte-bar{display:flex;flex-wrap:wrap;gap:2px;padding:5px 6px;background:var(--paper);border-bottom:1px solid var(--line)}
+  .rte-bar button{border:1px solid transparent;background:transparent;width:30px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;color:var(--slate);display:inline-flex;align-items:center;justify-content:center}
+  .rte-bar button:hover{background:#fff;border-color:var(--line)}
+  .rte-bar .rte-sep{width:1px;background:var(--line);margin:2px 3px}
+  .rte-area{min-height:80px;max-height:260px;overflow-y:auto;padding:9px 11px;font-size:15px;line-height:1.5;outline:none;color:var(--ink)}
+  .rte-area:empty::before{content:attr(data-ph);color:var(--mist)}
+  .rte-area a{color:var(--brand);text-decoration:underline}
+  .rte-area ul,.rte-area ol{margin:4px 0;padding-left:22px}
+  .det-v ul,.det-v ol{margin:4px 0;padding-left:20px}
+  .det-v a{color:var(--brand);text-decoration:underline}
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:#fff;padding:14px 22px;border-radius:11px;font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);transition:.3s;z-index:1000;opacity:0}
   .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
   .toast.err{background:var(--n4)}
@@ -2530,7 +2542,7 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   try {
     await API.saveForm(null, campos, CONFIG.ENTITIES.MATRIZ); // null = crear nuevo registro (POST)
     toast('Registro guardado correctamente.');
-    document.getElementById('formRiesgo').reset();
+    document.getElementById('formRiesgo').reset(); limpiarEditoresRTE('f_');
     limpiarMultiselects();
     limpiarInterruptorCtrl();
     limpiarPillsResponsable();
@@ -2572,7 +2584,7 @@ function limpiarInterruptorCtrl(){
 }
 window.limpiarInterruptorCtrl = limpiarInterruptorCtrl;
 document.getElementById('btnReset').onclick = () => {
-  document.getElementById('formRiesgo').reset(); limpiarMultiselects(); limpiarInterruptorCtrl(); limpiarPillsResponsable(); showOrigin(''); showEval(''); calcIndice(); toggleControles('f');
+  document.getElementById('formRiesgo').reset(); limpiarEditoresRTE('f_'); limpiarMultiselects(); limpiarInterruptorCtrl(); limpiarPillsResponsable(); showOrigin(''); showEval(''); calcIndice(); toggleControles('f');
 };
 
 /* ============================================================
@@ -3623,6 +3635,130 @@ function nivelOportInherenteDe(r){
 }
 
 // Descripción del registro, sea riesgo u oportunidad (con la columna correcta).
+/* ===== EDITOR DE TEXTO ENRIQUECIDO (descripciones) =====
+   Guarda HTML sencillo y seguro. Las descripciones se muestran CON formato solo en el
+   Detalle; en tablas, tooltips, títulos y Excel se usa texto plano (_txtPlano) porque el
+   HTML rompería el recorte de texto y las exportaciones. */
+const RTE_CAMPOS = ['f_riesgo_desc','f_oport_desc','ed_riesgo','ed_oport_desc'];
+
+function _rteSanitizar(html){
+  const tmp=document.createElement('div'); tmp.innerHTML=String(html||'');
+  const permitidas=new Set(['B','STRONG','I','EM','U','UL','OL','LI','BR','P','DIV','A','SPAN']);
+  (function limpiar(nodo){
+    [...nodo.childNodes].forEach(n=>{
+      if(n.nodeType===1){
+        if(!permitidas.has(n.tagName)){ // desenvolver etiqueta no permitida
+          while(n.firstChild) nodo.insertBefore(n.firstChild,n); nodo.removeChild(n); return;
+        }
+        [...n.attributes].forEach(a=>{
+          if(n.tagName==='A' && a.name==='href' && /^https?:\/\//i.test(a.value)) return;
+          n.removeAttribute(a.name);
+        });
+        if(n.tagName==='A'){ n.setAttribute('target','_blank'); n.setAttribute('rel','noopener'); }
+        limpiar(n);
+      } else if(n.nodeType!==3){ nodo.removeChild(n); }
+    });
+  })(tmp);
+  return tmp.innerHTML;
+}
+window._rteSanitizar=_rteSanitizar;
+
+// Convierte el HTML guardado a TEXTO PLANO (para tablas, tooltips, títulos y Excel).
+function _txtPlano(html){
+  const s=String(html||'');
+  if(!/[<&]/.test(s)) return s.trim();          // ya es texto plano
+  const t=document.createElement('div');
+  t.innerHTML=s.replace(/<\/(p|div|li)>/gi,' ').replace(/<br\s*\/?>/gi,' ');
+  return (t.textContent||'').replace(/\s+/g,' ').trim();
+}
+window._txtPlano=_txtPlano;
+
+function _rteVacio(html){ const t=document.createElement('div'); t.innerHTML=String(html||''); return !(t.textContent||'').trim(); }
+
+function _rteEditorHTML(id, valor, placeholder){
+  const cmd=(c)=>`document.execCommand('${c}');_rteSync('${id}');event.preventDefault()`;
+  return `<div class="rte-wrap">
+    <div class="rte-bar">
+      <button type="button" title="Negrita" onmousedown="${cmd('bold')}"><b>B</b></button>
+      <button type="button" title="Cursiva" onmousedown="${cmd('italic')}"><i>I</i></button>
+      <button type="button" title="Subrayado" onmousedown="${cmd('underline')}" style="text-decoration:underline">U</button>
+      <span class="rte-sep"></span>
+      <button type="button" title="Viñetas" onmousedown="${cmd('insertUnorderedList')}">•≡</button>
+      <button type="button" title="Numeración" onmousedown="${cmd('insertOrderedList')}">1.</button>
+      <span class="rte-sep"></span>
+      <button type="button" title="Insertar enlace" onmousedown="_rteEnlace('${id}');event.preventDefault()">🔗</button>
+      <button type="button" title="Quitar enlace" onmousedown="${cmd('unlink')}">⛓️</button>
+    </div>
+    <div class="rte-area" contenteditable="true" id="rte_${id}" data-ph="${(placeholder||'').replace(/"/g,'&quot;')}"
+         oninput="_rteSync('${id}')" onblur="_rteSync('${id}')">${_rteSanitizar(valor||'')}</div>
+    <input type="hidden" id="${id}"></div>`;
+}
+window._rteEditorHTML=_rteEditorHTML;
+
+// Sincroniza el editor con el input oculto (que es el que leen las funciones de guardado).
+function _rteSync(id){
+  const area=document.getElementById('rte_'+id), inp=document.getElementById(id);
+  if(area&&inp){ const html=_rteSanitizar(area.innerHTML); inp.value=_rteVacio(html)?'':html; }
+}
+window._rteSync=_rteSync;
+
+function _rteEnlace(id){
+  const area=document.getElementById('rte_'+id); if(area) area.focus();
+  const url=prompt('Pega la dirección del enlace (debe empezar con https://):','https://');
+  if(!url) return;
+  if(!/^https?:\/\//i.test(url)){ toast('El enlace debe empezar con http:// o https://', true); return; }
+  const sel=window.getSelection();
+  if(sel && sel.toString()){ document.execCommand('createLink',false,url); }
+  else { document.execCommand('insertHTML',false,'<a href="'+url.replace(/"/g,'%22')+'">'+url.replace(/</g,'&lt;')+'</a>'); }
+  _rteSync(id);
+}
+window._rteEnlace=_rteEnlace;
+
+// Reemplaza los <textarea> de RTE_CAMPOS por el editor, conservando su valor. Idempotente.
+function montarEditoresRTE(prefijo){
+  RTE_CAMPOS.forEach(id=>{
+    if(prefijo && !id.startsWith(prefijo)) return;
+    const ta=document.getElementById(id);
+    if(!ta || ta.tagName!=='TEXTAREA') return; // ya montado o no existe
+    const cont=document.createElement('div');
+    cont.innerHTML=_rteEditorHTML(id, ta.value||'', ta.getAttribute('placeholder')||'');
+    ta.replaceWith(cont.firstElementChild);
+    _rteSync(id);
+  });
+}
+window.montarEditoresRTE=montarEditoresRTE;
+
+// Vacía los editores enriquecidos (form.reset() no limpia un <div> contenteditable).
+function limpiarEditoresRTE(prefijo){
+  RTE_CAMPOS.forEach(id=>{
+    if(prefijo && !id.startsWith(prefijo)) return;
+    const area=document.getElementById('rte_'+id);
+    if(area){ area.innerHTML=''; _rteSync(id); }
+  });
+}
+window.limpiarEditoresRTE=limpiarEditoresRTE;
+
+// Asigna un valor tanto si el campo sigue siendo textarea como si ya es editor enriquecido.
+function setCampoDesc(id, valor){
+  const area=document.getElementById('rte_'+id);
+  if(area){ area.innerHTML=_rteSanitizar(valor||''); _rteSync(id); return true; }
+  const el=document.getElementById(id); if(el){ el.value=valor||''; return true; }
+  return false;
+}
+window.setCampoDesc=setCampoDesc;
+
+// Descripción CON formato (solo para el Detalle).
+function descripcionHTMLDe(r){
+  const v=r.values||{};
+  const F=CONFIG.MATRIZ_FIELDS;
+  const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
+  const dR = limpio(v['Riesgo']!=='Riesgo'?v['Riesgo']:'') || limpio(F.riesgo_desc && v[F.riesgo_desc.id]);
+  const dO = limpio(v['Oportunidad']!=='Oportunidad'?v['Oportunidad']:'') || limpio(F.oportunidad_desc && v[F.oportunidad_desc.id]);
+  const val = esOportunidad(r) ? (dO || dR) : (dR || dO);
+  return val ? _rteSanitizar(val) : '';
+}
+window.descripcionHTMLDe=descripcionHTMLDe;
+
 function descripcionDe(r){
   const v=r.values||{};
   const F=CONFIG.MATRIZ_FIELDS;
@@ -3630,8 +3766,10 @@ function descripcionDe(r){
   // Leer por NOMBRE de columna y también por ID (por si la columna se llama distinto).
   const dR = limpio(v['Riesgo']!=='Riesgo'?v['Riesgo']:'') || limpio(F.riesgo_desc && v[F.riesgo_desc.id]);
   const dO = limpio(v['Oportunidad']!=='Oportunidad'?v['Oportunidad']:'') || limpio(F.oportunidad_desc && v[F.oportunidad_desc.id]);
-  if(esOportunidad(r)) return dO || dR || '(sin descripción)';
-  return dR || dO || '(sin descripción)';
+  // Devuelve SIEMPRE texto plano: si el campo trae formato del editor enriquecido, se
+  // quitan las etiquetas para que tablas, tooltips, títulos y Excel se vean bien.
+  const val = esOportunidad(r) ? (dO || dR) : (dR || dO);
+  return _txtPlano(val) || '(sin descripción)';
 }
 
 /* ===== FILTROS AVANZADOS ===== */
@@ -5841,7 +5979,10 @@ function verDetalle(riesgoId){
   const html = filas.map(([etq,col])=>{
     const val = limpio(col);
     if(!val) return '';
-    return `<div class="det-row"><div class="det-k">${etq}</div><div class="det-v">${val}</div></div>`;
+    // Las descripciones pueden traer formato del editor enriquecido: se sanitizan y se
+    // muestran CON formato. El resto de campos se muestran tal cual.
+    const cuerpo = (col==='Riesgo'||col==='Oportunidad') ? _rteSanitizar(val) : val;
+    return `<div class="det-row"><div class="det-k">${etq}</div><div class="det-v">${cuerpo}</div></div>`;
   }).filter(Boolean).join('');
 
   // Pie con metadatos automáticos de QuintaDB (creación, actualización, autor).
@@ -5894,7 +6035,7 @@ function duplicarRiesgo(riesgoId){
 
   // 2) Precargar tras un instante (para que la vista esté visible)
   setTimeout(()=>{
-    const set = (id,val)=>{ const el=document.getElementById(id); if(el!=null && val!=null) el.value=val; };
+    const set = (id,val)=>{ if(val==null) return; if(RTE_CAMPOS.includes(id)){ setCampoDesc(id,val); return; } const el=document.getElementById(id); if(el!=null) el.value=val; };
     // Identificación
     set('f_fecha', fechaParaInput(cur('Fecha de evaluación')) || new Date().toISOString().slice(0,10));
     const fuente = cur('Fuente de identificación del riesgo u oportunidad');
@@ -5934,7 +6075,7 @@ async function eliminarRiesgo(riesgoId){
   const r = STATE.matriz.find(x=>x.id===riesgoId);
   const F=CONFIG.MATRIZ_FIELDS;
   const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
-  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'este riesgo';
+  const desc=_txtPlano(get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad'))||'este riesgo';
   const corto = desc.length>60?desc.slice(0,60)+'…':desc;
   if(!confirm('¿Eliminar permanentemente este registro?\n\n"'+corto+'"\n\nEsta acción NO se puede deshacer.')) return;
   try {
@@ -6135,6 +6276,7 @@ function _editarRiesgoInterno(riesgoId){
   // Se aplica al final de todo el render y con estilo inline, que vence a
   // cualquier regla .hidden{display:none!important} que se haya podido aplicar.
   setTimeout(()=>{
+    montarEditoresRTE('ed_'); // editor enriquecido en las descripciones del modal
     const w = document.getElementById('ed_wrap_existe');
     if(w){ w.classList.remove('hidden'); w.style.setProperty('display','flex','important'); }
     const sw = document.getElementById('ed_ctrl_switch');
@@ -6344,8 +6486,10 @@ async function guardarEdit(){
 
   // Naturaleza (texto)
   if(g('ed_tipo_ro')) set(F.riesgo_u_oportunidad, g('ed_tipo_ro'));
-  set(F.riesgo_desc, limpiar(g('ed_riesgo')));
-  set(F.oportunidad_desc, limpiar(g('ed_oport_desc')));
+  // Las descripciones se guardan TAL CUAL (HTML del editor enriquecido, ya sanitizado):
+  // no se les aplica limpiar(), que convertiría los <br> en saltos y rompería el formato.
+  set(F.riesgo_desc, g('ed_riesgo'));
+  set(F.oportunidad_desc, g('ed_oport_desc'));
   set(F.causas, limpiar(g('ed_causas')));
   set(F.consecuencias, limpiar(g('ed_consec')));
   // Evaluación inherente (texto)
@@ -6586,7 +6730,7 @@ function abrirReeval(riesgoId){
   REEVAL_ACTUAL = riesgoId;
   const F=CONFIG.MATRIZ_FIELDS;
   const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
-  const desc=get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad')||'(sin descripción)';
+  const desc=_txtPlano(get(r,F.riesgo_desc,'Riesgo')||get(r,F.oportunidad_desc,'Oportunidad'))||'(sin descripción)';
   const esRiesgo = (get(r,F.riesgo_u_oportunidad,'¿Riesgo u oportunidad?')||'Riesgo')!=='Oportunidad';
 
   document.getElementById('reevalTitulo').textContent = desc.length>70?desc.slice(0,70)+'…':desc;
@@ -6681,6 +6825,7 @@ function setConn(ok, msg) {
    ============================================================ */
 (async function init(){
   initStaticSelects();
+  montarEditoresRTE('f_'); // editor enriquecido en las descripciones del formulario
   try {
     // ensureRelOptions y precargarMaestrasProceso son independientes → en paralelo.
     // initCascada depende de las maestras (para traducir), así que va después.
