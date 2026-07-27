@@ -1996,8 +1996,8 @@ function _datosNotif(r){
     parte_interesada: gv('Parte interesada ',F.parte_txt),
     requisitos: gv('Requisitos - texto',F.requisitos_txt),
     expectativas: gv('Expectativas - texto',F.expectativas_txt),
-    causas: gv('Causas',F.causas),
-    consecuencias: gv('Consecuencias',F.consecuencias),
+    causas: _txtPlano(gv('Causas',F.causas)),
+    consecuencias: _txtPlano(gv('Consecuencias',F.consecuencias)),
     // — Proceso / responsables —
     proceso: rutaProcesoDe(r)||'—',
     oficina: (oficinaDe(r)==='Sin oficina asignada'?'':oficinaDe(r)),
@@ -3639,7 +3639,7 @@ function nivelOportInherenteDe(r){
    Guarda HTML sencillo y seguro. Las descripciones se muestran CON formato solo en el
    Detalle; en tablas, tooltips, títulos y Excel se usa texto plano (_txtPlano) porque el
    HTML rompería el recorte de texto y las exportaciones. */
-const RTE_CAMPOS = ['f_riesgo_desc','f_oport_desc','ed_riesgo','ed_oport_desc'];
+const RTE_CAMPOS = ['f_riesgo_desc','f_oport_desc','f_causas','f_consec','ed_riesgo','ed_oport_desc','ed_causas','ed_consec'];
 
 function _rteSanitizar(html){
   const tmp=document.createElement('div'); tmp.innerHTML=String(html||'');
@@ -3932,8 +3932,8 @@ async function descargarExcel(){
       ['Descripción', r=>descripcionDe(r)],
       ['Proceso', r=>rutaProcesoDe(r)||''],
       ['Actividad específica', r=>g(r,'Actividad específica',F.actividad.id)],
-      ['Causas', r=>g(r,'Causas',F.causas.id)],
-      ['Consecuencias', r=>g(r,'Consecuencias',F.consecuencias.id)],
+      ['Causas', r=>_txtPlano(g(r,'Causas',F.causas.id))],
+      ['Consecuencias', r=>_txtPlano(g(r,'Consecuencias',F.consecuencias.id))],
       ['Oficina responsable', r=>oficinaDe(r)],
       ['Responsable', r=>leerTexto(r,F.responsable_txt,true)],
       ['Prob. inherente', r=>g(r,'Probabilidad riesgo inherente',F.prob_riesgo_inh.id)],
@@ -5981,7 +5981,7 @@ function verDetalle(riesgoId){
     if(!val) return '';
     // Las descripciones pueden traer formato del editor enriquecido: se sanitizan y se
     // muestran CON formato. El resto de campos se muestran tal cual.
-    const cuerpo = (col==='Riesgo'||col==='Oportunidad') ? _rteSanitizar(val) : val;
+    const cuerpo = ['Riesgo','Oportunidad','Causas','Consecuencias'].includes(col) ? _rteSanitizar(val) : val;
     return `<div class="det-row"><div class="det-k">${etq}</div><div class="det-v">${cuerpo}</div></div>`;
   }).filter(Boolean).join('');
 
@@ -6490,8 +6490,9 @@ async function guardarEdit(){
   // no se les aplica limpiar(), que convertiría los <br> en saltos y rompería el formato.
   set(F.riesgo_desc, g('ed_riesgo'));
   set(F.oportunidad_desc, g('ed_oport_desc'));
-  set(F.causas, limpiar(g('ed_causas')));
-  set(F.consecuencias, limpiar(g('ed_consec')));
+  // Causas y consecuencias también usan el editor enriquecido: se guardan tal cual.
+  set(F.causas, g('ed_causas'));
+  set(F.consecuencias, g('ed_consec'));
   // Evaluación inherente (texto)
   if(g('ed_prob')) set(F.prob_riesgo_inh, g('ed_prob'));
   if(g('ed_imp'))  set(F.imp_riesgo_inh, g('ed_imp'));
