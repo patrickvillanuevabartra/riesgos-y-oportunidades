@@ -106,6 +106,7 @@ const CONFIG = {
     frecuencia_calculo:      { id: "cmWOT4WPPcQ68wWOelgSkj", type: "select", col: "Frecuencia de cálculo", options: ["Diaria","Semanal","Quincenal","Mensual","Trimestral","Semestral","Anual"] },
     plan_monitoreo:          { id: "cLibRcOSnfW4HEtSoCcZus", type: "text", col: "Plan de monitoreo" },
     prog_metas:              { id: "cuB8khWOPcVRFdHgxcMJDC", type: "subform", entity: "PROG_METAS" },
+    codigo:                  { id: "cqW73cQCncr53dSCknWQnG", type: "string", col: "Código" },
     reporte_monitoreo:       { id: "a8zLxdQqvdOA12W4FcN20X", type: "subform", entity: "MONITOREO" }
   },
 
