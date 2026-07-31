@@ -190,6 +190,8 @@
 
   .empty{text-align:center;padding:60px 20px;color:var(--mist)}
   .empty h3{color:var(--slate);margin-bottom:8px}
+  .cod-tag{display:block;font-family:'IBM Plex Mono',Consolas,monospace;font-size:10.5px;font-weight:700;
+    color:var(--brand);letter-spacing:.03em;margin-bottom:2px}
   /* Editor de texto enriquecido (descripciones) */
   .rte-wrap{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
   .rte-bar{display:flex;flex-wrap:wrap;gap:2px;padding:5px 6px;background:var(--paper);border-bottom:1px solid var(--line)}
@@ -3759,6 +3761,16 @@ function descripcionHTMLDe(r){
 }
 window.descripcionHTMLDe=descripcionHTMLDe;
 
+// Código del riesgo/oportunidad (R-M01-027-2025). Se lee por nombre o por ID de campo.
+function codigoDe(r){
+  const v = r.values||{};
+  const F = CONFIG.MATRIZ_FIELDS;
+  const id = F.codigo && F.codigo.id;
+  const x = [v['Código'], id?v[id]:''].find(t => t && t!=='Código' && String(t).trim().length>3);
+  return x ? String(x).trim() : '';
+}
+window.codigoDe = codigoDe;
+
 function descripcionDe(r){
   const v=r.values||{};
   const F=CONFIG.MATRIZ_FIELDS;
@@ -3929,6 +3941,7 @@ async function descargarExcel(){
       ['Estado', r=>esArchivado(r)?'Archivado':'Activo'],
       ['Fecha de evaluación', r=>fechaParaInput(g(r,'Fecha de evaluación',F.fecha_evaluacion.id))||''],
       ['Fuente', r=>g(r,'Fuente de identificación del riesgo u oportunidad',F.fuente.id)],
+      ['Código', r=>codigoDe(r)],
       ['Descripción', r=>descripcionDe(r)],
       ['Proceso', r=>rutaProcesoDe(r)||''],
       ['Actividad específica', r=>g(r,'Actividad específica',F.actividad.id)],
@@ -4099,7 +4112,7 @@ async function renderSeguimiento() {
       // Estado de certificación del control (para destacar cuando procede certificar)
       const _certRaw = vR['Certificación de Implementación del Control'] || vR[CONFIG.MATRIZ_FIELDS.certificacion_control.id] || '';
       const certificacion = (_certRaw && !String(_certRaw).includes('Certificación')) ? String(_certRaw).trim() : '';
-      return {id:r.id, op, desc, proc, procFuente, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch, tieneMonitoreo, monIds, nMon:monIds.length, ctrlTxt, certificacion};
+      return {id:r.id, op, desc, codigo:codigoDe(r), proc, procFuente, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch, tieneMonitoreo, monIds, nMon:monIds.length, ctrlTxt, certificacion};
     })
     // Filtro por el selector Todos/Riesgos/Oportunidades
     .filter(f => SEG_TIPO==='todos' || (SEG_TIPO==='oportunidades'?f.op:!f.op))
@@ -4146,6 +4159,7 @@ async function renderSeguimiento() {
       <tr class="seg-fila" data-buscar="${((f.desc||'')+' '+(f.proc||'')).toLowerCase().replace(/"/g,'&quot;')}">
         <td data-label="#" style="text-align:center;color:var(--mist);font-variant-numeric:tabular-nums">${num}</td>
         <td class="cards-main" data-label="Descripción">
+          ${f.codigo?`<span class="cod-tag" title="Código del registro">${f.codigo}</span>`:''}
           ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>42?f.desc.slice(0,42)+'…':f.desc}</a>
         </td>
         <td data-label="Origen" title="${((f.procFuente?f.procFuente+': ':'')+(f.proc||'')).replace(/"/g,'&quot;')}" style="font-size:11.5px">${f.procFuente?`<span style="display:block;font-size:9.5px;font-weight:600;color:var(--brand);text-transform:uppercase;letter-spacing:.02em;line-height:1.2">${f.procFuente==='Partes interesadas'?'Partes':f.procFuente}</span>`:''}<span>${f.proc.length>20?f.proc.slice(0,20)+'…':f.proc}</span>${(f.desact && f.procFuente==='Proceso')?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
@@ -5882,6 +5896,7 @@ function verDetalle(riesgoId){
   const v = r.values||{};
   // Campos a mostrar (nombre legible → valor), omitiendo vacíos y los que repiten el nombre del campo
   const filas = [
+    ['Código','Código'],
     ['Fecha de evaluación','Fecha de evaluación'],
     ['Fuente de identificación','Fuente de identificación del riesgo u oportunidad'],
     ['¿Riesgo u oportunidad?','¿Riesgo u oportunidad?'],
@@ -6589,7 +6604,7 @@ async function renderReeval() {
       }
       const tag = op ? '<span class="tag tag-proc" style="margin-right:6px">Oport.</span>' : '<span class="tag tag-noproc" style="margin-right:6px">Riesgo</span>';
       return `<tr id="reev-row-${r.id}">
-        <td style="max-width:280px" title="${(desc||'').replace(/"/g,'&quot;')}">${tag}${desc.length>80?desc.slice(0,80)+'…':desc}</td>
+        <td style="max-width:280px" title="${(desc||'').replace(/"/g,'&quot;')}">${codigoDe(r)?`<span class="cod-tag">${codigoDe(r)}</span>`:''}${tag}${desc.length>80?desc.slice(0,80)+'…':desc}</td>
         <td title="${(proc||'').replace(/"/g,'&quot;')}">${proc.length>34?proc.slice(0,34)+'…':proc}</td>
         <td>${badgeNivel(nInh, op)}</td>
         <td id="reev-proc-${r.id}"><span class="hint">evaluando…</span></td>
