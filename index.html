@@ -6007,8 +6007,11 @@ function verDetalle(riesgoId){
     return String(s).replace(/(\d{2})-(\d{2})-(\d{4})\s*(.*)/, '$1/$2/$3 $4').trim();
   };
   const metaItems = [];
-  if(r.created_at) metaItems.push(`<span><strong>Creado:</strong> ${fmtFecha(r.created_at)}</span>`);
-  if(r.updated_at) metaItems.push(`<span><strong>Última actualización:</strong> ${fmtFecha(r.updated_at)}</span>`);
+  // Se ocultan "Creado" y "Última actualización": son fechas técnicas del registro en la
+  // base de datos, no información de gestión, y confunden con la Fecha de evaluación.
+  // (Para volver a mostrarlas, descomentar las dos líneas siguientes.)
+  // if(r.created_at) metaItems.push(`<span><strong>Creado:</strong> ${fmtFecha(r.created_at)}</span>`);
+  // if(r.updated_at) metaItems.push(`<span><strong>Última actualización:</strong> ${fmtFecha(r.updated_at)}</span>`);
   // El "Autor" se omite por ahora: como el aplicativo usa una sola cuenta (API key),
   // todos los registros mostrarían el mismo autor, lo que sería engañoso.
   // Se reactivará cuando exista login/trazabilidad real por usuario.
