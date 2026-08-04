@@ -568,7 +568,7 @@
     <div class="page-head">
       <div class="eyebrow">Acciones de respuesta</div>
       <h1>Seguimiento</h1>
-      <p>Registra el avance de las medidas de respuesta. Cada riesgo muestra cuántos reportes tiene; abre uno para ver su historial y añadir nuevos reportes.</p>
+      <p>Registra el avance de las medidas de respuesta y el cumplimiento del monitoreo del control, cuando corresponda. Cada registro muestra cuántos reportes tiene; ábrelo para ver su historial y añadir nuevos.</p>
     </div>
 
     <details class="ayuda">
@@ -4186,8 +4186,8 @@ async function renderSeguimiento() {
           ${f.tieneMonitoreo?`<button class="icon-btn" id="btnmon-${f.id}" title="Control y Seguimiento (se habilita cuando las medidas estén al 100%)" onclick="abrirMetasMonitoreo('${f.id}')" style="border-color:var(--brand-2);display:none">🎯</button>`:''}
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
           <button class="icon-btn" title="Editar" onclick="editarRiesgo('${f.id}')">✏️</button>
-          <button class="icon-btn" title="Notificar por WhatsApp" onclick="notificarWhatsApp('${f.id}')">📱</button>
-          <button class="icon-btn" title="Notificar por correo" onclick="notificarCorreo('${f.id}')">✉️</button>
+          ${puedeVerTodo()?`<button class="icon-btn" title="Notificar por WhatsApp" onclick="notificarWhatsApp('${f.id}')">📱</button>
+          <button class="icon-btn" title="Notificar por correo" onclick="notificarCorreo('${f.id}')">✉️</button>`:''}
           ${puedeEliminar()?`<button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
           <button class="icon-btn" title="Eliminar" onclick="eliminarRiesgo('${f.id}')">🗑️</button>`:''}
           </div>
@@ -6024,8 +6024,10 @@ function verDetalle(riesgoId){
   // Botones de notificación (solo si hay celular o correo del responsable de proceso)
   const dN=_datosNotif(r);
   const btns=[];
-  if(dN.celular) btns.push(`<button class="btn btn-primary" style="padding:8px 14px;font-size:13px" onclick="notificarWhatsApp('${r.id}')">📱 Notificar por WhatsApp</button>`);
-  if(dN.correo) btns.push(`<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="notificarCorreo('${r.id}')">✉️ Notificar por correo</button>`);
+  // Las notificaciones son una función de coordinación: solo Administrador y Gestor.
+  // Un usuario de oficina no debe notificarse a sí mismo.
+  if(puedeVerTodo() && dN.celular) btns.push(`<button class="btn btn-primary" style="padding:8px 14px;font-size:13px" onclick="notificarWhatsApp('${r.id}')">📱 Notificar por WhatsApp</button>`);
+  if(puedeVerTodo() && dN.correo) btns.push(`<button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="notificarCorreo('${r.id}')">✉️ Notificar por correo</button>`);
   const notifHTML = btns.length
     ? `<div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);display:flex;gap:8px;flex-wrap:wrap">${btns.join('')}</div>`
     : '';
