@@ -192,6 +192,11 @@
   .empty h3{color:var(--slate);margin-bottom:8px}
   .cod-tag{display:block;font-family:'IBM Plex Mono',Consolas,monospace;font-size:10.5px;font-weight:700;
     color:var(--brand);letter-spacing:.03em;margin-bottom:2px}
+  /* Evidencias: varios enlaces con etiqueta */
+  .ev-wrap{margin-top:2px}
+  .ev-wrap input{padding:7px 9px;font-size:13px}
+  .btn-sm{padding:6px 12px;font-size:12.5px;white-space:nowrap}
+  .rep-evid a{margin-right:12px}
   /* Editor de texto enriquecido (descripciones) */
   .rte-wrap{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
   .rte-bar{display:flex;flex-wrap:wrap;gap:2px;padding:5px 6px;background:var(--paper);border-bottom:1px solid var(--line)}
@@ -3761,6 +3766,111 @@ function descripcionHTMLDe(r){
 }
 window.descripcionHTMLDe=descripcionHTMLDe;
 
+
+/* ===== Evidencias: varios enlaces con su etiqueta =====
+   Se guardan en el MISMO campo de texto, una por línea:  Etiqueta | https://…
+   Un input oculto conserva ese texto, así el guardado y la carga siguen igual que antes.
+   Compatible con lo ya registrado: una línea que sea solo una URL se lee sin etiqueta. */
+function _evParse(txt){
+  return String(txt||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(linea=>{
+    const i = linea.search(/https?:\/\//i);
+    if(i<0) return { etq: linea.replace(/\s*\|\s*$/,'').trim(), url: '' };
+    const etq = linea.slice(0,i).replace(/\s*\|\s*$/,'').trim();
+    return { etq, url: linea.slice(i).trim() };
+  });
+}
+window._evParse=_evParse;
+function _evEsUrl(u){ return /^https?:\/\/\S+$/i.test(String(u||'').trim()); }
+function _evSync(el){
+  const wrap = el && el.closest ? el.closest('.ev-wrap') : null;
+  if(!wrap) return;
+  const hid = document.getElementById(wrap.getAttribute('data-target'));
+  if(!hid) return;
+  const lineas=[];
+  wrap.querySelectorAll('.ev-fila').forEach(f=>{
+    const etq=((f.querySelector('.ev-etq')||{}).value||'').trim();
+    const url=((f.querySelector('.ev-url')||{}).value||'').trim();
+    if(!etq && !url) return;
+    lineas.push(etq ? etq+' | '+url : url);
+    const inpU=f.querySelector('.ev-url'), av=f.querySelector('.ev-aviso');
+    const malo = url && !_evEsUrl(url);
+    if(inpU) inpU.style.borderColor = malo ? '#e0a800' : '';
+    if(av) av.style.display = malo ? '' : 'none';
+  });
+  hid.value = lineas.join('\n');
+}
+window._evSync=_evSync;
+function _evAbrir(btn){
+  const f=btn.closest('.ev-fila'); if(!f) return;
+  const url=((f.querySelector('.ev-url')||{}).value||'').trim();
+  if(!_evEsUrl(url)){ toast('Escribe primero una dirección válida que empiece con https://', true); return; }
+  window.open(url,'_blank','noopener');
+}
+window._evAbrir=_evAbrir;
+function _evQuitar(btn){
+  const wrap=btn.closest('.ev-wrap'); const f=btn.closest('.ev-fila');
+  if(f) f.remove();
+  if(wrap && !wrap.querySelector('.ev-fila')) _evAgregarEn(wrap);
+  if(wrap) _evSync(wrap.querySelector('.ev-fila') || wrap);
+}
+window._evQuitar=_evQuitar;
+function _evFilaHTML(etq, url){
+  const e=String(etq||'').replace(/"/g,'&quot;'), u=String(url||'').replace(/"/g,'&quot;');
+  return `<div class="ev-fila" style="display:flex;gap:6px;align-items:flex-start;margin-bottom:6px;flex-wrap:wrap">
+    <input class="ev-etq" value="${e}" placeholder="Etiqueta (ej. Acta de reunión)" oninput="_evSync(this)" style="flex:0 1 210px;min-width:150px">
+    <div style="flex:1 1 260px;min-width:200px">
+      <input class="ev-url" value="${u}" placeholder="https://…" oninput="_evSync(this)" style="width:100%">
+      <div class="ev-aviso" style="display:none;font-size:11px;color:#b06a00;margin-top:3px">Debe ser una dirección completa que empiece con https://</div>
+    </div>
+    <button type="button" class="btn btn-ghost btn-sm" title="Abrir el enlace en una pestaña nueva" onclick="_evAbrir(this)">Abrir</button>
+    <button type="button" class="icon-btn" title="Quitar este enlace" onclick="_evQuitar(this)">✕</button>
+  </div>`;
+}
+function _evAgregarEn(wrap){
+  if(!wrap) return;
+  const btn = wrap.querySelector('.ev-add');
+  if(btn) btn.insertAdjacentHTML('beforebegin', _evFilaHTML('',''));
+  else wrap.insertAdjacentHTML('beforeend', _evFilaHTML('',''));
+}
+function _evAgregar(btn){ _evAgregarEn(btn && btn.closest ? btn.closest('.ev-wrap') : null); }
+window._evAgregar=_evAgregar;
+function _evSyncDesdeInput(target){
+  const wraps = target
+    ? [document.querySelector('.ev-wrap[data-target="'+target+'"]')]
+    : [...document.querySelectorAll('.ev-wrap')];
+  wraps.forEach(wrap=>{
+    if(!wrap) return;
+    const hid=document.getElementById(wrap.getAttribute('data-target'));
+    if(!hid) return;
+    const lista=_evParse(hid.value);
+    wrap.innerHTML = (lista.length?lista:[{etq:'',url:''}]).map(x=>_evFilaHTML(x.etq,x.url)).join('')
+      + `<button type="button" class="btn btn-ghost btn-sm ev-add" style="margin-top:2px" onclick="_evAgregar(this)">+ Añadir enlace</button>`;
+  });
+}
+window._evSyncDesdeInput=_evSyncDesdeInput;
+// Pinta los enlaces de un valor de evidencias para los listados (solo lectura).
+function _evLinksHTML(valor, icono){
+  return _evParse(valor).filter(x=>x.url).map(x=>
+    `<a href="${String(x.url).replace(/"/g,'&quot;')}" target="_blank" rel="noopener">${icono||'📎'} ${(x.etq||'evidencia').replace(/</g,'&lt;')} ↗</a>`
+  ).join('');
+}
+window._evLinksHTML=_evLinksHTML;
+// Pinta automáticamente cualquier bloque de evidencias que aparezca vacío en el DOM.
+// Así funciona en los cinco paneles (reporte de acciones y monitoreo) sin tocar cada uno.
+(function(){
+  const pintarPendientes = () => {
+    document.querySelectorAll('.ev-wrap').forEach(w=>{
+      if(!w.querySelector('.ev-fila')) _evSyncDesdeInput(w.getAttribute('data-target'));
+    });
+  };
+  const arrancar = () => {
+    new MutationObserver(pintarPendientes).observe(document.body,{childList:true,subtree:true});
+    pintarPendientes();
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',arrancar);
+  else arrancar();
+})();
+
 // Código del riesgo/oportunidad (R-M01-027-2025). Se lee por nombre o por ID de campo.
 function codigoDe(r){
   const v = r.values||{};
@@ -4463,9 +4573,10 @@ async function renderHistorialHTML(subIds){
     const ev1=val(rec,'Evidencia 1');
     const ev2=val(rec,RF.evidencia2.col);
     const pct=val(rec,RF.pct_completado.col);
+    // Evidencia 1 sigue siendo un enlace suelto; Evidencia 2 admite varios con etiqueta.
     const evHtml = (ev1||ev2) ? `<div class="rep-evid">${
       ev1 ? `<a href="${ev1}" target="_blank" rel="noopener">📎 Evidencia 1</a>` : ''
-    }${ev2 ? `<a href="${ev2}" target="_blank" rel="noopener">🔗 Evidencia 2</a>` : ''}</div>` : '';
+    }${ev2 ? _evLinksHTML(ev2,'🔗') : ''}</div>` : '';
     // Guardamos los valores actuales para precargar el formulario de edición
     REPORTE_CACHE[rec.id] = {
       fecha: val(rec,RF.fecha_reporte.col),
@@ -4519,7 +4630,7 @@ async function toggleHistorial(riesgoId){
         <div class="field"><label>% completado</label><div class="pct-input"><input type="number" min="0" max="100" step="1" id="add_pct_${riesgoId}" placeholder="0"><span>%</span></div></div>
         <div class="field full"><label>Acción desarrollada</label><textarea id="add_accion_${riesgoId}"></textarea></div>
         <div class="field full"><label>Observación</label><textarea id="add_obs_${riesgoId}"></textarea></div>
-        <div class="field full"><label>Evidencia (enlace)</label><input id="add_evid_${riesgoId}" placeholder="https://…"></div>
+        <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label><div class="ev-wrap" data-target="add_evid_${riesgoId}"></div><input type="hidden" id="add_evid_${riesgoId}"></div>
       </div>
       <div style="text-align:right;margin-top:12px">
         <button class="btn btn-primary" onclick="guardarReporte('${riesgoId}')" id="addbtn-${riesgoId}">Guardar reporte</button>
@@ -4606,7 +4717,7 @@ async function renderPanelMonitoreoEdit(riesgoId, r){
           <div class="field"><label>Valor meta</label><input type="number" step="any" id="mon_meta_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
           <div class="field"><label>Valor real obtenido</label><input type="number" step="any" id="mon_real_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
           <div class="field"><label>% avance obtenido</label><div class="readonly-pill" id="mon_pct_${riesgoId}">—</div></div>
-          <div class="field full"><label>Evidencia (link)</label><input id="mon_evid_${riesgoId}" placeholder="https://…"></div>
+          <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label><div class="ev-wrap" data-target="mon_evid_${riesgoId}"></div><input type="hidden" id="mon_evid_${riesgoId}"></div>
           <div class="field full hidden" id="mon_wrap_plan_${riesgoId}"><label>Plan de remediación (link)</label><input id="mon_plan_${riesgoId}" placeholder="https://…"></div>
         </div>
         <p class="hint" style="margin-top:6px">El % avance = (valor real / valor meta) × 100. El plan de remediación aparece si el avance es menor a 100%.</p>
@@ -4703,7 +4814,7 @@ async function abrirReporteAcciones(riesgoId){
         <div class="field"><label>% completado</label><div class="pct-input"><input type="number" min="0" max="100" step="1" id="add_pct_${riesgoId}" placeholder="0"><span>%</span></div></div>
         <div class="field full"><label>Acción desarrollada</label><textarea id="add_accion_${riesgoId}"></textarea></div>
         <div class="field full"><label>Observación</label><textarea id="add_obs_${riesgoId}"></textarea></div>
-        <div class="field full"><label>Evidencia (enlace)</label><input id="add_evid_${riesgoId}" placeholder="https://…"></div>
+        <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label><div class="ev-wrap" data-target="add_evid_${riesgoId}"></div><input type="hidden" id="add_evid_${riesgoId}"></div>
       </div>
       <p class="hint" style="margin-top:6px">El <strong>% completado</strong> alimenta la columna «% Avance medidas» de la tabla de seguimiento.</p>
       <div style="text-align:right;margin-top:12px">
@@ -4877,7 +4988,7 @@ async function renderMonPaneRep(riesgoId, r){
         ${esRazonMon?`<div class="field"><label>Denominador real</label><input type="number" step="any" id="mon_den_${riesgoId}" oninput="calcValorReal('${riesgoId}')"></div>`:'<div class="field"></div>'}
         <div class="field"><label>Valor real obtenido ${esRazonMon?'(%)':''}</label><div class="readonly-pill" id="mon_real_val_${riesgoId}">—</div><input type="hidden" id="mon_real_${riesgoId}"></div>
         <div class="field"><label>% cumplimiento (calculado)</label><div class="readonly-pill" id="mon_pct_${riesgoId}">—</div></div>
-        <div class="field full"><label>Evidencia (link)</label><input id="mon_evid_${riesgoId}" placeholder="https://…"></div>
+        <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label><div class="ev-wrap" data-target="mon_evid_${riesgoId}"></div><input type="hidden" id="mon_evid_${riesgoId}"></div>
       </div>
       <p class="hint" style="margin-top:6px">Indicador <strong>${tipoMon}</strong>. ${esRazonMon?'El valor real = numerador ÷ denominador × 100.':'El valor real es el número que ingreses.'} El % cumplimiento = valor real ÷ valor meta × 100. Puedes registrar mediciones parciales hasta alcanzar el 100%.</p>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button type="button" class="btn btn-ghost" id="moncancel-${riesgoId}" onclick="cancelarEdicionMon('${riesgoId}')" style="display:none">Cancelar</button><button type="button" class="btn btn-primary" onclick="guardarMonitoreo('${riesgoId}')" id="monbtn-${riesgoId}">+ Guardar reporte de monitoreo</button></div>
@@ -5115,7 +5226,7 @@ async function renderPanelMonitoreo(riesgoId, r){
           <div class="field"><label>Valor meta</label><input type="number" step="any" id="mon_meta_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
           <div class="field"><label>Valor real obtenido</label><input type="number" step="any" id="mon_real_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
           <div class="field"><label>% avance obtenido</label><div class="readonly-pill" id="mon_pct_${riesgoId}">—</div></div>
-          <div class="field full"><label>Evidencia (link)</label><input id="mon_evid_${riesgoId}" placeholder="https://…"></div>
+          <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label><div class="ev-wrap" data-target="mon_evid_${riesgoId}"></div><input type="hidden" id="mon_evid_${riesgoId}"></div>
           <div class="field full"><label>Plan de remediación (link, de ser el caso)</label><input id="mon_plan_${riesgoId}" placeholder="https://…"></div>
         </div>
         <p class="hint" style="margin-top:6px">El indicador y la fórmula se copian automáticamente del riesgo. El % avance = (valor real / valor meta) × 100.</p>
@@ -5358,7 +5469,7 @@ async function renderMonitoreoHTML(ids, riesgoId){
         <div><strong>${fmtFecha(g('Fecha de monitoreo'))||'(sin fecha)'}</strong> · Meta monitoreada: ${meta||'—'}</div>
         <div>Real obtenido: <strong>${real||'—'}</strong>${compReal} · Avance: <strong style="color:var(--brand)">${pct!==''&&pct!=null?pct+'%':'—'}</strong></div>
         <div style="display:flex;gap:12px;margin-top:3px;align-items:center">
-          ${evid?`<a href="${evid}" target="_blank" class="riesgo-link">📎 Evidencia</a>`:''}
+          ${evid?_evLinksHTML(evid,'📎'):''}
           <a class="riesgo-link" style="margin-left:auto;cursor:pointer" onclick="verDetalleMon('${riesgoId}','${id}')">👁 Detalle</a>
           ${riesgoId?`<a class="riesgo-link" style="cursor:pointer" onclick="editarMonitoreo('${riesgoId}','${id}')">✏️ Editar</a>
           <a class="riesgo-link" style="color:#c0392b;cursor:pointer" onclick="eliminarSubregistro('${riesgoId}','${id}','monitoreo')">🗑️ Eliminar</a>`:''}
@@ -5557,6 +5668,7 @@ async function editarMonitoreo(riesgoId, monId){
     set('mon_num', g('Numerador real'));
     set('mon_den', g('Denominador real'));
     set('mon_evid', g('Evidencia (link)'));
+    if(typeof _evSyncDesdeInput==='function') _evSyncDesdeInput('mon_evid_'+riesgoId);
     set('mon_periodo', g('Periodo'));
     calcValorReal(riesgoId); // refresca el valor real y el % cumplimiento
     const btn=document.getElementById('monbtn-'+riesgoId);
@@ -5633,7 +5745,7 @@ async function verDetalleMon(riesgoId, monId){
       _filaDet('Denominador real', g('Denominador real')) +
       _filaDet('Valor real obtenido', g('Valor real obtenido')) +
       _filaDet('% cumplimiento', pct) +
-      _filaDet('Evidencia', g('Evidencia (link)')) ||
+      _filaDet('Evidencias', (typeof _evLinksHTML==='function' && g('Evidencia (link)')) ? _evLinksHTML(g('Evidencia (link)'),'📎') : g('Evidencia (link)')) ||
       '<p class="hint">Sin datos.</p>';
   }catch(e){ cont.innerHTML='<p class="hint">Error al cargar: '+e.message+'</p>'; }
 }
