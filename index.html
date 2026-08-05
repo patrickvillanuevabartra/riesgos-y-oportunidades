@@ -338,7 +338,7 @@
     <div style="text-align:center;margin-bottom:22px">
       <div style="width:54px;height:54px;border-radius:12px;background:#0f8f5e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;margin:0 auto 14px">R</div>
       <h2 style="margin:0;font-size:19px;color:#1a2b22">Matriz de Riesgos y Oportunidades</h2>
-      <p style="margin:6px 0 0;font-size:13px;color:#6b7d74">Facultad de Ingeniería · URP</p>
+      <p style="margin:6px 0 0;font-size:13px;color:#6b7d74;line-height:1.5">Facultad de Ingeniería · URP<br>Sistema de Gestión para Organizaciones Educativas (SGOE)<br>ISO 21001</p>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">
       <div>
@@ -363,7 +363,7 @@
   <div class="bar">
     <div class="logo">
       <div class="logo-mark">R</div>
-      <div><b>Matriz de Riesgos y Oportunidades</b><span>Facultad de Ingeniería · URP — Sistema de Gestión ISO 21001</span></div>
+      <div><b>Matriz de Riesgos y Oportunidades</b><span>Facultad de Ingeniería · URP — Sistema de Gestión para Organizaciones Educativas (SGOE)<br>ISO 21001</span></div>
     </div>
     <nav>
       <button data-view="dashboard" class="active">Tablero</button>
@@ -2102,9 +2102,9 @@ function aplicarPlantilla(txt, datos){
 }
 
 // Plantillas por defecto (si no hay nada configurado en QuintaDB)
-const PLANTILLA_WA_DEFECTO = 'Estimado/a {responsable},\n\nLe notificamos sobre el siguiente {tipo} bajo su responsabilidad:\n\n• Descripción: {descripcion}\n• Nivel: {nivel}\n• Proceso: {proceso}\n\nPor favor revisar y dar seguimiento.\n\n— Sistema de Gestión ISO 21001, Facultad de Ingeniería URP';
-const PLANTILLA_ASUNTO_DEFECTO = 'Notificación de {tipo} — Sistema de Gestión ISO 21001 URP';
-const PLANTILLA_CORREO_DEFECTO = 'Estimado/a {responsable},\n\nLe notificamos sobre el siguiente {tipo} bajo su responsabilidad:\n\n• Descripción: {descripcion}\n• Nivel: {nivel}\n• Proceso: {proceso}\n• Respuesta planificada: {respuesta}\n\nPor favor revisar y dar seguimiento.\n\nSaludos cordiales,\nSistema de Gestión ISO 21001 — Facultad de Ingeniería URP';
+const PLANTILLA_WA_DEFECTO = 'Estimado/a {responsable},\n\nLe notificamos sobre el siguiente {tipo} bajo su responsabilidad:\n\n• Descripción: {descripcion}\n• Nivel: {nivel}\n• Proceso: {proceso}\n\nPor favor revisar y dar seguimiento.\n\n— Sistema de Gestión para Organizaciones Educativas (SGOE)\nISO 21001 · Facultad de Ingeniería URP';
+const PLANTILLA_ASUNTO_DEFECTO = 'Notificación de {tipo} — SGOE ISO 21001 · Facultad de Ingeniería URP';
+const PLANTILLA_CORREO_DEFECTO = 'Estimado/a {responsable},\n\nLe notificamos sobre el siguiente {tipo} bajo su responsabilidad:\n\n• Descripción: {descripcion}\n• Nivel: {nivel}\n• Proceso: {proceso}\n• Respuesta planificada: {respuesta}\n\nPor favor revisar y dar seguimiento.\n\nSaludos cordiales,\nSistema de Gestión para Organizaciones Educativas (SGOE)\nISO 21001 — Facultad de Ingeniería URP';
 
 // Cache de plantillas cargadas desde QuintaDB
 let PLANTILLAS = null;       // {wa, asunto, correo}
