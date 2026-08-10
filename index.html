@@ -192,6 +192,11 @@
   .empty h3{color:var(--slate);margin-bottom:8px}
   .cod-tag{display:block;font-family:'IBM Plex Mono',Consolas,monospace;font-size:10.5px;font-weight:700;
     color:var(--brand);letter-spacing:.03em;margin-bottom:2px}
+  .oblig{color:#c0392b;font-weight:700}
+  .aviso-ambar{background:#fff8e6;border:1px solid #e0a800;border-radius:8px;padding:9px 12px;
+    font-size:12.5px;color:#7a5b00;line-height:1.5}
+  .aviso-ambar div+div{margin-top:5px}
+  .nota-oblig{font-size:11.5px;color:var(--mist);margin-top:6px}
   /* Evidencias: varios enlaces con etiqueta */
   .ev-wrap{margin-top:2px}
   .ev-wrap input{padding:7px 9px;font-size:13px}
@@ -3647,6 +3652,18 @@ function nivelOportInherenteDe(r){
    Detalle; en tablas, tooltips, títulos y Excel se usa texto plano (_txtPlano) porque el
    HTML rompería el recorte de texto y las exportaciones. */
 const RTE_CAMPOS = ['f_riesgo_desc','f_oport_desc','f_causas','f_consec','ed_riesgo','ed_oport_desc','ed_causas','ed_consec'];
+// Los campos de los reportes tienen id dinámico (add_accion_<riesgoId>), así que se montan
+// por patrón: cualquier textarea con la clase .rte-auto recibe el editor enriquecido.
+function montarRTEAuto(){
+  document.querySelectorAll('textarea.rte-auto').forEach(ta=>{
+    if(!ta.id) return;
+    const cont=document.createElement('div');
+    cont.innerHTML=_rteEditorHTML(ta.id, ta.value||'', ta.getAttribute('placeholder')||'');
+    ta.replaceWith(cont.firstElementChild);
+    _rteSync(ta.id);
+  });
+}
+window.montarRTEAuto = montarRTEAuto;
 
 function _rteSanitizar(html){
   const tmp=document.createElement('div'); tmp.innerHTML=String(html||'');
@@ -3695,6 +3712,8 @@ function _rteEditorHTML(id, valor, placeholder){
       <span class="rte-sep"></span>
       <button type="button" title="Insertar enlace" onmousedown="_rteEnlace('${id}');event.preventDefault()">🔗</button>
       <button type="button" title="Quitar enlace" onmousedown="${cmd('unlink')}">⛓️</button>
+      <span class="rte-sep"></span>
+      <button type="button" title="Limpiar formato" onmousedown="${cmd('removeFormat')}">🧹</button>
     </div>
     <div class="rte-area" contenteditable="true" id="rte_${id}" data-ph="${(placeholder||'').replace(/"/g,'&quot;')}"
          oninput="_rteSync('${id}')" onblur="_rteSync('${id}')">${_rteSanitizar(valor||'')}</div>
@@ -3766,6 +3785,95 @@ function descripcionHTMLDe(r){
 }
 window.descripcionHTMLDe=descripcionHTMLDe;
 
+
+
+/* ===== Tipo de medición del reporte de avance =====
+   Parcial = corte en curso  → la medida queda En Proceso
+   Cierre  = fin del plazo   → la medida queda Culminado/Ejecutado
+   El % se declara SIEMPRE como ACUMULADO: dónde está la medida hoy, no cuánto sumó
+   este reporte. El avance de la medida es el del último reporte por fecha. */
+const TIPOS_MEDICION = [
+  { v:'Parcial', txt:'Parcial (corte / avance en curso)',  estado:'En Proceso' },
+  { v:'Cierre',  txt:'De cierre (fin del plazo de la medida)', estado:'Culminado/Ejecutado' }
+];
+
+// Devuelve el mayor % ya reportado para un riesgo (para detectar retrocesos).
+function _pctPrevioDe(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId);
+  if(!r) return null;
+  const RF = CONFIG.REPORTE_FIELDS;
+  const cache = (STATE.subCache && STATE.subCache.reportes) || {};
+  const ts = st => { const m=String(st||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/);
+    return m ? new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+m[6]).getTime() : 0; };
+  let mejor=null, mejorT=-1;
+  (subIdsDe(r, SUBFORM_FIELD_ID)||[]).forEach(id=>{
+    const x = cache[id]; if(!x) return;
+    if(_REP_EDIT_ID && id===_REP_EDIT_ID) return;   // ignorar el que se está editando
+    const t = ts(x.created_at);
+    if(t>=mejorT){ mejorT=t; mejor=x; }
+  });
+  if(!mejor) return null;
+  const v = parseInt((mejor.values||{})[RF.pct_completado.col]);
+  return isNaN(v) ? null : v;
+}
+let _REP_EDIT_ID = null;   // id del reporte que se está editando (para no compararse consigo mismo)
+window._pctPrevioDe = _pctPrevioDe;
+
+// El tipo de medición manda sobre el estado: se fija y se bloquea el selector.
+function aplicarTipoMedicion(riesgoId, pref){
+  pref = pref || 'add';
+  const sel  = document.getElementById(pref+'_tipo_'+riesgoId);
+  const est  = document.getElementById(pref+'_estado_'+riesgoId);
+  const pct  = document.getElementById(pref+'_pct_'+riesgoId);
+  const nota = document.getElementById(pref+'_nota_tipo_'+riesgoId);
+  if(!sel || !est) return;
+  const def = TIPOS_MEDICION.find(t=>t.v===sel.value);
+  if(def){
+    est.value = def.estado;
+    est.disabled = true;
+    est.title = 'El estado lo determina el tipo de medición';
+    est.style.background = 'var(--paper)';
+    // Al cerrar se propone 100 %, pero el usuario puede bajarlo si la medida venció incompleta.
+    if(def.v==='Cierre' && pct && (pct.value===''||parseInt(pct.value)===0)) pct.value = 100;
+    if(nota) nota.textContent = def.v==='Cierre'
+      ? 'La medida quedará como Culminado/Ejecutado. Se propone 100 %, pero puedes bajarlo si venció sin completarse.'
+      : 'La medida quedará En Proceso. Indica el avance ACUMULADO a la fecha, no lo que sumó este reporte.';
+  } else {
+    est.disabled = false; est.style.background=''; est.title='';
+    if(nota) nota.textContent = 'Elige primero el tipo de medición.';
+  }
+  validarAvanceReporte(riesgoId, pref);
+}
+window.aplicarTipoMedicion = aplicarTipoMedicion;
+
+// Avisos ámbar: cierre por debajo del 100 % y retroceso respecto del reporte anterior.
+function validarAvanceReporte(riesgoId, pref){
+  pref = pref || 'add';
+  const sel = document.getElementById(pref+'_tipo_'+riesgoId);
+  const pct = document.getElementById(pref+'_pct_'+riesgoId);
+  const av  = document.getElementById(pref+'_aviso_'+riesgoId);
+  if(!av || !pct) return;
+  const n = parseInt(pct.value);
+  const msgs = [];
+  if(sel && sel.value==='Cierre' && !isNaN(n) && n<100)
+    msgs.push('Cierre con '+n+' %: la medida quedará cerrada sin llegar al 100 %. Si aún falta trabajo, márcalo como Parcial.');
+  const previo = _pctPrevioDe(pref==='er' ? (window._REP_EDIT_RIESGO||'') : riesgoId);
+  if(previo!=null && !isNaN(n) && n<previo)
+    msgs.push('Retroceso: el reporte anterior declaraba '+previo+' % y este declara '+n+' %. Es válido si estás corrigiendo una sobrestimación; si no, revisa el dato.');
+  av.innerHTML = msgs.map(m=>'<div>⚠ '+m+'</div>').join('');
+  av.style.display = msgs.length ? '' : 'none';
+  pct.style.borderColor = msgs.length ? '#e0a800' : '';
+}
+window.validarAvanceReporte = validarAvanceReporte;
+
+// Deduce el tipo de medición de un reporte ya guardado (para editarlo).
+function tipoMedicionDe(valores){
+  const RF = CONFIG.REPORTE_FIELDS;
+  const t = String(valores[RF.tipo_medicion.col]||'').trim();
+  if(t==='Parcial'||t==='Cierre') return t;
+  return /culmin|ejecut/i.test(String(valores[RF.estado.col]||'')) ? 'Cierre' : 'Parcial';
+}
+window.tipoMedicionDe = tipoMedicionDe;
 
 /* ===== Evidencias: varios enlaces con su etiqueta =====
    Se guardan en el MISMO campo de texto, una por línea:  Etiqueta | https://…
@@ -3862,6 +3970,7 @@ window._evLinksHTML=_evLinksHTML;
     document.querySelectorAll('.ev-wrap').forEach(w=>{
       if(!w.querySelector('.ev-fila')) _evSyncDesdeInput(w.getAttribute('data-target'));
     });
+    if(typeof montarRTEAuto==='function') montarRTEAuto();
   };
   const arrancar = () => {
     new MutationObserver(pintarPendientes).observe(document.body,{childList:true,subtree:true});
@@ -4584,7 +4693,8 @@ async function renderHistorialHTML(subIds){
       pct: pct,
       accion: val(rec,RF.accion.col),
       obs: val(rec,RF.observacion.col),
-      evid: ev2
+      evid: ev2,
+      tipo: val(rec,RF.tipo_medicion.col)
     };
     return `<div class="rep-item" id="repitem-${rec.id}">
       <div class="top">
@@ -4625,11 +4735,20 @@ async function toggleHistorial(riesgoId){
     <div id="histlist-${riesgoId}">${subIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes aún.</p>'}</div>
     <details class="add-rep"><summary>+ Añadir reporte</summary>
       <div class="grid" style="margin-top:14px">
-        <div class="field"><label>Fecha de reporte</label><input type="date" id="add_fecha_${riesgoId}"></div>
-        <div class="field"><label>Estado</label><select id="add_estado_${riesgoId}"><option value="">Seleccione…</option><option>Pendiente</option><option>En Proceso</option><option>Observado</option><option>Culminado/Ejecutado</option></select></div>
-        <div class="field"><label>% completado</label><div class="pct-input"><input type="number" min="0" max="100" step="1" id="add_pct_${riesgoId}" placeholder="0"><span>%</span></div></div>
-        <div class="field full"><label>Acción desarrollada</label><textarea id="add_accion_${riesgoId}"></textarea></div>
-        <div class="field full"><label>Observación</label><textarea id="add_obs_${riesgoId}"></textarea></div>
+        <div class="field"><label>Fecha de reporte <span class="oblig">*</span></label><input type="date" id="add_fecha_${riesgoId}"></div>
+        <div class="field"><label>Tipo de medición <span class="oblig">*</span></label>
+          <select id="add_tipo_${riesgoId}" onchange="aplicarTipoMedicion('${riesgoId}')">
+            <option value="">Seleccione…</option>
+            <option value="Parcial">Parcial (corte / avance en curso)</option>
+            <option value="Cierre">De cierre (fin del plazo de la medida)</option>
+          </select></div>
+        <div class="field"><label>Estado de la medida</label><select id="add_estado_${riesgoId}" disabled style="background:var(--paper)" title="El estado lo determina el tipo de medición"><option value="">Seleccione…</option><option>Pendiente</option><option>En Proceso</option><option>Observado</option><option>Culminado/Ejecutado</option></select></div>
+        <div class="field"><label>% completado (acumulado) <span class="oblig">*</span></label><div class="pct-input"><input type="number" min="0" max="100" step="1" id="add_pct_${riesgoId}" placeholder="0" oninput="validarAvanceReporte('${riesgoId}')"><span>%</span></div></div>
+        <div class="field full"><p class="hint" id="add_nota_tipo_${riesgoId}" style="margin:0">Elige primero el tipo de medición.</p></div>
+        <div class="field full"><div id="add_aviso_${riesgoId}" class="aviso-ambar" style="display:none"></div></div>
+        <div class="field full"><label>Acción desarrollada <span class="oblig">*</span></label><textarea class="rte-auto" id="add_accion_${riesgoId}"></textarea></div>
+        <div class="field full"><label>Observación</label><textarea class="rte-auto" id="add_obs_${riesgoId}"></textarea></div>
+        <div class="field full"><p class="nota-oblig"><span class="oblig">*</span> campos obligatorios</p></div>
         <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label><div class="ev-wrap" data-target="add_evid_${riesgoId}"></div><input type="hidden" id="add_evid_${riesgoId}"></div>
       </div>
       <div style="text-align:right;margin-top:12px">
@@ -4809,11 +4928,20 @@ async function abrirReporteAcciones(riesgoId){
     <div id="histlist-${riesgoId}">${subIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes aún.</p>'}</div>
     <details class="add-rep" open><summary>+ Añadir reporte de acciones</summary>
       <div class="grid" style="margin-top:14px">
-        <div class="field"><label>Fecha de reporte</label><input type="date" id="add_fecha_${riesgoId}"></div>
-        <div class="field"><label>Estado</label><select id="add_estado_${riesgoId}"><option value="">Seleccione…</option><option>Pendiente</option><option>En Proceso</option><option>Observado</option><option>Culminado/Ejecutado</option></select></div>
-        <div class="field"><label>% completado</label><div class="pct-input"><input type="number" min="0" max="100" step="1" id="add_pct_${riesgoId}" placeholder="0"><span>%</span></div></div>
-        <div class="field full"><label>Acción desarrollada</label><textarea id="add_accion_${riesgoId}"></textarea></div>
-        <div class="field full"><label>Observación</label><textarea id="add_obs_${riesgoId}"></textarea></div>
+        <div class="field"><label>Fecha de reporte <span class="oblig">*</span></label><input type="date" id="add_fecha_${riesgoId}"></div>
+        <div class="field"><label>Tipo de medición <span class="oblig">*</span></label>
+          <select id="add_tipo_${riesgoId}" onchange="aplicarTipoMedicion('${riesgoId}')">
+            <option value="">Seleccione…</option>
+            <option value="Parcial">Parcial (corte / avance en curso)</option>
+            <option value="Cierre">De cierre (fin del plazo de la medida)</option>
+          </select></div>
+        <div class="field"><label>Estado de la medida</label><select id="add_estado_${riesgoId}" disabled style="background:var(--paper)" title="El estado lo determina el tipo de medición"><option value="">Seleccione…</option><option>Pendiente</option><option>En Proceso</option><option>Observado</option><option>Culminado/Ejecutado</option></select></div>
+        <div class="field"><label>% completado (acumulado) <span class="oblig">*</span></label><div class="pct-input"><input type="number" min="0" max="100" step="1" id="add_pct_${riesgoId}" placeholder="0" oninput="validarAvanceReporte('${riesgoId}')"><span>%</span></div></div>
+        <div class="field full"><p class="hint" id="add_nota_tipo_${riesgoId}" style="margin:0">Elige primero el tipo de medición.</p></div>
+        <div class="field full"><div id="add_aviso_${riesgoId}" class="aviso-ambar" style="display:none"></div></div>
+        <div class="field full"><label>Acción desarrollada <span class="oblig">*</span></label><textarea class="rte-auto" id="add_accion_${riesgoId}"></textarea></div>
+        <div class="field full"><label>Observación</label><textarea class="rte-auto" id="add_obs_${riesgoId}"></textarea></div>
+        <div class="field full"><p class="nota-oblig"><span class="oblig">*</span> campos obligatorios</p></div>
         <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label><div class="ev-wrap" data-target="add_evid_${riesgoId}"></div><input type="hidden" id="add_evid_${riesgoId}"></div>
       </div>
       <p class="hint" style="margin-top:6px">El <strong>% completado</strong> alimenta la columna «% Avance medidas» de la tabla de seguimiento.</p>
@@ -5799,7 +5927,14 @@ async function guardarReporte(riesgoId){
     }
     return el ? el.value : '';
   };
-  if(!g('add_estado') && !g('add_accion')){ toast('Indica al menos la acción o el estado.',true); return; }
+  // Obligatorios: fecha, tipo de medición, % completado y acción desarrollada.
+  const _falta = [];
+  if(!g('add_fecha'))  _falta.push('Fecha de reporte');
+  if(!g('add_tipo'))   _falta.push('Tipo de medición');
+  const _pctIn = g('add_pct');
+  if(_pctIn==='' || _pctIn==null) _falta.push('% completado');
+  if(!String(g('add_accion')||'').replace(/<[^>]*>/g,'').trim()) _falta.push('Acción desarrollada');
+  if(_falta.length){ toast('Faltan campos obligatorios: '+_falta.join(', ')+'.', true); return; }
   const btn=document.getElementById('addbtn-'+riesgoId);
 
   const repVals={};
@@ -5811,7 +5946,13 @@ async function guardarReporte(riesgoId){
   if(_accion) repVals[RF.accion.id] = _accion;
   if(g('add_obs')) repVals[RF.observacion.id]=g('add_obs');
   if(g('add_evid'))   repVals[RF.evidencia2.id]=g('add_evid');
-  if(g('add_estado')) repVals[RF.estado.id]=g('add_estado');
+  // El tipo de medición manda: fija el estado de la medida.
+  const _tipo = g('add_tipo');
+  if(_tipo){
+    repVals[RF.tipo_medicion.id] = _tipo;
+    const _def = TIPOS_MEDICION.find(t=>t.v===_tipo);
+    if(_def) repVals[RF.estado.id] = _def.estado;
+  } else if(g('add_estado')) repVals[RF.estado.id]=g('add_estado');
   const pctVal=g('add_pct');
   if(pctVal!=='' && pctVal!=null){
     const pn=Math.max(0,Math.min(100,parseInt(pctVal)||0));
@@ -5863,24 +6004,41 @@ function editarReporte(repId){
   // Convertir fecha mostrada a formato yyyy-mm-dd para el input date
   const fechaISO = fechaParaInput(d.fecha);
   const esc=s=>(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  // Tipo de medición: el guardado o, si es un reporte antiguo, deducido del estado.
+  const _tipoAct = (d.tipo==='Parcial'||d.tipo==='Cierre') ? d.tipo
+                 : (/culmin|ejecut/i.test(String(d.estado||'')) ? 'Cierre' : 'Parcial');
+  _REP_EDIT_ID = repId;                                   // no compararse consigo mismo
+  window._REP_EDIT_RIESGO = (SEG_RIESGO_ACTUAL && SEG_RIESGO_ACTUAL.id) || '';
   item.innerHTML = `<div class="rep-edit-form">
     <div class="hist-head" style="margin-bottom:10px">✏️ Editando reporte</div>
     <div class="grid">
-      <div class="field"><label>Fecha de reporte</label><input type="date" id="er_fecha_${repId}" value="${fechaISO}"></div>
-      <div class="field"><label>Estado</label><select id="er_estado_${repId}">
+      <div class="field"><label>Fecha de reporte <span class="oblig">*</span></label><input type="date" id="er_fecha_${repId}" value="${fechaISO}"></div>
+      <div class="field"><label>Tipo de medición <span class="oblig">*</span></label>
+        <select id="er_tipo_${repId}" onchange="aplicarTipoMedicion('${repId}','er')">
+          <option value="">Seleccione…</option>
+          <option value="Parcial" ${_tipoAct==='Parcial'?'selected':''}>Parcial (corte / avance en curso)</option>
+          <option value="Cierre" ${_tipoAct==='Cierre'?'selected':''}>De cierre (fin del plazo de la medida)</option>
+        </select></div>
+      <div class="field"><label>Estado de la medida</label><select id="er_estado_${repId}" disabled style="background:var(--paper)" title="El estado lo determina el tipo de medición">
         <option value="">Seleccione…</option>
         ${['Pendiente','En Proceso','Observado','Culminado/Ejecutado'].map(o=>`<option ${d.estado===o?'selected':''}>${o}</option>`).join('')}
       </select></div>
-      <div class="field"><label>% completado</label><div class="pct-input"><input type="number" min="0" max="100" step="1" id="er_pct_${repId}" value="${d.pct!==''&&d.pct!=null?d.pct:''}" placeholder="0"><span>%</span></div></div>
-      <div class="field full"><label>Acción desarrollada</label><textarea id="er_accion_${repId}">${esc(d.accion)}</textarea></div>
-      <div class="field full"><label>Observación</label><textarea id="er_obs_${repId}">${esc(d.obs)}</textarea></div>
-      <div class="field full"><label>Evidencia (enlace)</label><input id="er_evid_${repId}" value="${esc(d.evid)}" placeholder="https://…"></div>
+      <div class="field"><label>% completado (acumulado) <span class="oblig">*</span></label><div class="pct-input"><input type="number" min="0" max="100" step="1" id="er_pct_${repId}" value="${d.pct!==''&&d.pct!=null?d.pct:''}" placeholder="0" oninput="validarAvanceReporte('${repId}','er')"><span>%</span></div></div>
+      <div class="field full"><p class="hint" id="er_nota_tipo_${repId}" style="margin:0"></p></div>
+      <div class="field full"><div id="er_aviso_${repId}" class="aviso-ambar" style="display:none"></div></div>
+      <div class="field full"><label>Acción desarrollada <span class="oblig">*</span></label><textarea class="rte-auto" id="er_accion_${repId}">${esc(d.accion)}</textarea></div>
+      <div class="field full"><label>Observación</label><textarea class="rte-auto" id="er_obs_${repId}">${esc(d.obs)}</textarea></div>
+      <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label>
+        <div class="ev-wrap" data-target="er_evid_${repId}"></div>
+        <input type="hidden" id="er_evid_${repId}" value="${esc(d.evid)}"></div>
     </div>
+    <p class="nota-oblig"><span class="oblig">*</span> campos obligatorios</p>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
       <button class="btn" onclick="cancelarEdicionReporte()">Cancelar</button>
       <button class="btn btn-primary" id="erbtn-${repId}" onclick="guardarEdicionReporte('${repId}')">Guardar cambios</button>
     </div>
   </div>`;
+  setTimeout(()=>aplicarTipoMedicion(repId,'er'),0);
 }
 window.editarReporte = editarReporte;
 
@@ -5909,12 +6067,25 @@ window.cancelarEdicionReporte = cancelarEdicionReporte;
 
 async function guardarEdicionReporte(repId){
   const RF=CONFIG.REPORTE_FIELDS;
+  _REP_EDIT_ID = null;
   const g=id=>{ const el=document.getElementById(id+'_'+repId); return el?el.value:''; };
   const btn=document.getElementById('erbtn-'+repId);
   const values={};
   // Enviamos todos los campos (vacío permite borrar)
+  // Obligatorios
+  const _falta=[];
+  if(!g('er_fecha')) _falta.push('Fecha de reporte');
+  if(!g('er_tipo'))  _falta.push('Tipo de medición');
+  if(g('er_pct')==='' || g('er_pct')==null) _falta.push('% completado');
+  if(!String(g('er_accion')||'').replace(/<[^>]*>/g,'').trim()) _falta.push('Acción desarrollada');
+  if(_falta.length){ toast('Faltan campos obligatorios: '+_falta.join(', ')+'.', true); return; }
+
   values[RF.fecha_reporte.id] = g('er_fecha');
-  values[RF.estado.id]        = g('er_estado');
+  // El tipo de medición fija el estado de la medida.
+  const _tipoEd = g('er_tipo');
+  values[RF.tipo_medicion.id] = _tipoEd;
+  const _defEd = TIPOS_MEDICION.find(t=>t.v===_tipoEd);
+  values[RF.estado.id] = _defEd ? _defEd.estado : g('er_estado');
   values[RF.accion.id]        = g('er_accion');
   values[RF.observacion.id]   = g('er_obs');
   values[RF.evidencia2.id]    = g('er_evid');
