@@ -4488,14 +4488,10 @@ async function cargarUltimosEstados(filasConReportes) {
       } else if (pctRaw !== '' && pctRaw != null) {
         pctMedidas = Math.max(0, Math.min(100, parseInt(pctRaw)||0));
       }
-      // AUTO: cualquier riesgo con medidas 100% + Culminado pero control aún "No"/vacío
-      // → marcar "Sí" automáticamente (las medidas cumplidas implican control implementado).
-      // Aplica a TODOS los niveles (1-4). En nivel 4 esto además revela el botón 🎯.
-      const _culmAuto = /culmin|ejecut/i.test(String(est));
-      if (pctMedidas===100 && _culmAuto && f.ctrlTxt!=='Sí') {
-        autoMarcarControlSi(f.id);
-        continue; // renderSeguimiento se reejecutará tras el guardado
-      }
+      // NOTA: al llegar a 100 % + Culminado NO se marca el control automáticamente.
+      // Solo se DESBLOQUEA el botón «Sí, ya existe un control» en el modal de edición
+      // (ver bloquearSiSegunAvance). La declaración la hace la persona, y al hacerla debe
+      // describir el control: así ningún registro queda con «Sí» sin evidencia documentada.
       // Habilitación del MONITOREO: medidas al 100% Y último estado Culminado/Ejecutado.
       if (f.tieneMonitoreo) {
         const culminado = /culmin|ejecut/i.test(String(est));
@@ -4595,6 +4591,9 @@ window.cargarProcedeReeval = cargarProcedeReeval;
 // guarda en QuintaDB: las medidas cumplidas implican que el control quedó implementado.
 // Esto revela el botón 🎯 sin intervención manual.
 const _autoCtrlEnCurso = new Set();
+// SIN USO desde que se quitó el marcado automático: el control lo declara la persona
+// en el modal de edición, donde además debe describirlo. Se conserva por si se quisiera
+// reactivar, pero reactivarla permitiría registros con «Sí» sin control documentado.
 async function autoMarcarControlSi(riesgoId){
   if(_autoCtrlEnCurso.has(riesgoId)) return; // evitar llamadas duplicadas
   _autoCtrlEnCurso.add(riesgoId);
@@ -6521,7 +6520,7 @@ function _editarRiesgoInterno(riesgoId){
       <div class="field oculta-si-control"></div>
       <div class="field full oculta-si-control" id="ed_wrap_medida"><label>Medida(s) de respuesta</label><textarea id="ed_medida">${cur('Medida(s) de respuesta')}</textarea></div>
       <!-- Control e indicadores: SOLO nivel 4 con "Sí" -->
-      <div class="field full ctrl-si hidden" id="ed_wrap_control"><label>Control establecido</label><textarea id="ed_control" placeholder="Describe el control que ya está implementado para este riesgo">${cur('Control establecido')}</textarea></div>
+      <div class="field full ctrl-si hidden" id="ed_wrap_control"><label>Control establecido <span class="oblig">*</span></label><textarea id="ed_control" placeholder="Describe el control que ya está implementado para este riesgo" oninput="this.style.borderColor=''">${cur('Control establecido')}</textarea><p class="nota-oblig">Obligatorio si marcaste «Sí, ya existe un control». Sin esta descripción el riesgo no podrá reevaluarse.</p></div>
       <div class="field full ctrl-si ctrl-n4 hidden" id="ed_wrap_monit_aviso"><div class="hint" style="background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px">Riesgo de nivel intolerable (4): defina el sistema de monitoreo del control (indicador, fórmula y frecuencias).</div></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_indicador"><label>Indicador</label><input id="ed_indicador" value="${(cur('Indicador')||'').replace(/"/g,'&quot;')}" oninput="actualizarRefIndicador()"></div>
       <div class="field ctrl-si ctrl-n4 hidden" id="ed_wrap_tipo_ind"><label>Tipo de indicador</label><select id="ed_tipo_ind">${opt(['Absoluto','Razón'],cur('Tipo de indicador'))}</select><div class="hint" style="margin-top:4px;font-size:11.5px"><strong>Absoluto:</strong> un solo número. <strong>Razón:</strong> numerador ÷ denominador × 100.</div></div>
@@ -6807,6 +6806,16 @@ async function guardarEdit(){
   if(_edNorm) set(F.existen_controles, _edNorm);
   const _edMonFormal = (window._edNivelInherente||0)>=3;
   if(_edConControl){
+    // Si se declara que YA existe un control, hay que describirlo: es la evidencia
+    // de qué se está haciendo. Sin descripción, «Sí» no significa nada auditable.
+    const _txtCtrl = String(g('ed_control')||'').replace(/<[^>]*>/g,'').trim();
+    if(!_txtCtrl){
+      toast('Describe el control establecido: si marcas «Sí, ya existe un control», ese campo es obligatorio.', true);
+      const _c = document.getElementById('ed_control');
+      if(_c){ _c.style.borderColor = '#c0392b'; _c.focus(); _c.scrollIntoView({behavior:'smooth',block:'center'}); }
+      if(btn){ btn.disabled=false; btn.textContent='Guardar cambios'; }
+      return;
+    }
     set(F.control_establecido, limpiar(g('ed_control')));
     if(_edMonFormal){
       set(F.indicador, limpiar(g('ed_indicador')));
@@ -6973,6 +6982,7 @@ async function puedeReevaluar(r){
     const certRaw = String((r.values||{})['Certificación de Implementación del Control']||'');
     const certificado = /certificad|operativ/i.test(certRaw);
     if(!certificado) return {procede:false, motivo:'Nivel '+nivel+' con control: falta certificar el control (marca «Certificado/Operativo» en la pestaña Certificación).'};
+    if(!_controlDescrito(r)) return {procede:false, motivo:'Falta describir el control establecido. Entra a Editar y completa «Control establecido».'};
     return {procede:true};
   } else {
     // NIVEL 1-2 (o cualquiera sin monitoreo formal): medidas 100% + Culminado.
@@ -6988,10 +6998,25 @@ async function puedeReevaluar(r){
     if(nivel<=3 && !_conControl){
       return {procede:false, motivo:'Medidas completas. Marca «Sí, ya existe un control» en el interruptor para confirmar que el control quedó implementado y habilitar la reevaluación.'};
     }
+    // Con el control confirmado, hay que tenerlo DESCRITO: no se puede medir el riesgo
+    // residual apoyándose en un control que no está documentado.
+    if(!_controlDescrito(r)){
+      return {procede:false, motivo:'Falta describir el control establecido. Entra a Editar y completa «Control establecido» con el control que quedó implementado.'};
+    }
     return {procede:true};
   }
 }
 window.puedeReevaluar = puedeReevaluar;
+
+// ¿El control establecido está descrito? (texto real, no el nombre de la columna ni vacío)
+function _controlDescrito(r){
+  const v = r.values||{};
+  const F = CONFIG.MATRIZ_FIELDS;
+  const bruto = [v['Control establecido'], v[F.control_establecido.id]]
+    .find(x => x && x!=='Control establecido');
+  return String(bruto||'').replace(/<[^>]*>/g,'').trim().length > 2;
+}
+window._controlDescrito = _controlDescrito;
 
 // En el modal de EDICIÓN: el botón «Sí, ya existe un control» permanece visible pero
 // INACTIVO hasta que las medidas estén al 100% y el último estado sea Culminado/Ejecutado.
