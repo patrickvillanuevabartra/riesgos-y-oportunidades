@@ -117,6 +117,7 @@ const CONFIG = {
     pct_completado: { id: "cQW4tdRKLdVioZWOJdQCoW", type: "integer", col: "% completado" },
     evidencia2:     { id: "aIWRX9W7TmW5TbwmoXcszL", type: "url",  col: "Evidencia 2" },
     observacion:    { id: "aQWOHyWRvcSiotbeSqWOen", type: "text", col: "Observación" },
+    tipo_medicion:  { id: "cvx8kZFYvcO5NdKItcHvrP", type: "select", col: "Tipo de medición", options: ["Parcial","Cierre"] },
     estado:         { id: "ddGIWLW6PcGikeWO88W6mU", type: "select", col: "Estado medida(s) de respuesta", options: ["Pendiente","En Proceso","Culminado/Ejecutado"] }
   },
 
