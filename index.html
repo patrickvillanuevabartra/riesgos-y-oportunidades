@@ -586,17 +586,21 @@
       <div class="ayuda-body">
         <p>El tratamiento de un riesgo sigue un orden lógico. Cada etapa habilita la siguiente:</p>
         <div class="flujo">
-          <span class="paso">1. Medidas de respuesta 📋</span><span class="arr">→</span>
+          <span class="paso">1. Reportar avances 📋</span><span class="arr">→</span>
           <span class="paso">2. Medidas al 100%</span><span class="arr">→</span>
-          <span class="paso">3. Monitoreo del control 🎯</span><span class="arr">→</span>
-          <span class="paso">4. Reevaluación (residual)</span>
+          <span class="paso">3. Confirmar el control 🛡️</span><span class="arr">→</span>
+          <span class="paso">4. Monitoreo 🎯 <em>(solo nivel 4)</em></span><span class="arr">→</span>
+          <span class="paso">5. Reevaluación</span>
         </div>
         <ol>
-          <li><strong>📋 Reporte de acciones a las medidas de respuesta.</strong> Registra cómo avanza lo que se comprometió a hacer para tratar el riesgo. El <strong>% completado</strong> de cada reporte alimenta la columna <strong>«% Avance medidas»</strong>.</li>
-          <li><strong>🎯 Metas, control y plan de monitoreo.</strong> Es la etapa <em>posterior</em>: solo se habilita cuando las medidas llegan al <strong>100%</strong>. Recién ahí tiene sentido medir el control con indicadores. Mientras tanto verás un candado 🔒 en la columna «% Cumpl. monitoreo». Aplica a riesgos de <strong>nivel alto o intolerable (3-4) con control «Sí»</strong>.</li>
-          <li><strong>Reevaluación (riesgo residual).</strong> Procede cuando el control está <strong>Certificado/Operativo</strong> y al menos una acción está <strong>Culminada/Ejecutada</strong>. Se gestiona en la pestaña «Reevaluación».</li>
+          <li><strong>📋 Reporte de avance de las medidas.</strong> Cada reporte declara <strong>dónde está la medida hoy</strong>, no cuánto sumó ese reporte: el porcentaje es <strong>acumulado</strong>. El sistema toma el <strong>último reporte por fecha</strong> para la columna «% Avance de medidas».</li>
+          <li><strong>Tipo de medición.</strong> <em>Parcial</em> para un corte en curso (la medida queda En Proceso) y <em>De cierre</em> cuando vence el plazo (queda Culminado/Ejecutado). El tipo fija el estado, por eso el selector de estado está bloqueado. Al cerrar se propone 100 %, pero puedes bajarlo si la medida venció sin completarse.</li>
+          <li><strong>🛡️ Confirmar el control.</strong> Cuando las medidas llegan al <strong>100 % con estado Culminado/Ejecutado</strong>, se desbloquea el interruptor «Sí, ya existe un control» en el modal de edición. Al marcarlo es <strong>obligatorio describir el control</strong>: sin esa descripción el riesgo no podrá reevaluarse.</li>
+          <li><strong>🎯 Monitoreo del control.</strong> Solo para riesgos de <strong>nivel intolerable (4)</strong>. Se habilita después del 100 % de las medidas; antes verás un candado 🔒 en «% Cumplim. de monitoreo». Incluye indicador, metas por periodo y la certificación del control.</li>
+          <li><strong>Reevaluación (riesgo residual).</strong> Se gestiona en su propia pestaña. La columna «¿Procede reevaluación?» te dice si ya puedes; si dice «No procede», pasa el mouse encima y verás qué falta.</li>
         </ol>
-        <div class="tip">📌 Recordatorio: «% Avance medidas» mide cuánto se han ejecutado las acciones; «% Cumpl. monitoreo» mide qué tan bien funciona el control ya implementado. No son lo mismo y no conviven hasta completar las medidas.</div>
+        <div class="tip">📌 Cada registro tiene su <strong>código</strong> (por ejemplo <code>R-M01-027-2025</code>) sobre la descripción: úsalo para referirte a él en correos, actas e informes. El número de la izquierda es solo el orden en pantalla y cambia con los filtros.</div>
+        <div class="tip">📌 «% Avance de medidas» mide cuánto se ha ejecutado; «% Cumplim. de monitoreo» mide qué tan bien funciona el control ya implementado. No son lo mismo y el segundo no se habilita hasta completar las medidas.</div>
       </div>
     </details>
 
@@ -614,7 +618,7 @@
       </div>
       <button id="btnVerArchivados" onclick="toggleArchivados()" style="border:1px solid var(--line);background:var(--card);color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer" title="Mostrar u ocultar los registros archivados">🗄️ Ver archivados</button>
       <button onclick="descargarExcel()" style="border:1px solid var(--line);background:var(--card);color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer" title="Descargar la tabla actual a Excel">⬇️ Descargar a Excel</button>
-      <button onclick="abrirEditorPlantillas()" style="border:1px solid var(--line);background:var(--card);color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer" title="Configurar las plantillas de notificación">⚙️ Plantillas</button>
+      <button id="btnPlantillas" onclick="abrirEditorPlantillas()" style="display:none;border:1px solid var(--line);background:var(--card);color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer" title="Configurar las plantillas de notificación">⚙️ Plantillas</button>
     </div>
 
     <!-- Filtros avanzados -->
@@ -827,7 +831,7 @@
       <div class="ayuda-body">
         <p>La reevaluación mide el <strong>riesgo residual</strong>: cuánto riesgo queda <em>después</em> de aplicar el tratamiento. Es la última etapa del ciclo.</p>
         <ol>
-          <li><strong>Se desbloquea</strong> según el nivel del riesgo. <strong>Nivel 4 (intolerable):</strong> monitoreo del control al <strong>100%</strong> + control <strong>Certificado/Operativo</strong>. <strong>Niveles 1-3:</strong> medidas al <strong>100%</strong> con estado <strong>Culminado/Ejecutado</strong> + control confirmado como implementado («Sí»).</li>
+          <li><strong>Se desbloquea</strong> según el nivel del riesgo. <strong>Niveles 1 a 3:</strong> medidas al <strong>100 %</strong> con estado <strong>Culminado/Ejecutado</strong> + control confirmado como implementado («Sí»). <strong>Nivel 4 (intolerable):</strong> además, monitoreo del control al <strong>100 %</strong> y control <strong>Certificado/Operativo</strong>. Los niveles 1 a 3 <em>no</em> requieren indicadores ni certificación.</li><li><strong>En todos los niveles</strong> es indispensable tener <strong>descrito el control establecido</strong>. No se puede medir el riesgo residual apoyándose en un control que no está documentado.</li>
           <li>Vuelves a calificar <strong>probabilidad × impacto</strong>, ahora considerando que el control ya opera. El sistema calcula el <strong>nivel residual</strong>.</li>
           <li>Comparando <strong>nivel inherente vs. residual</strong> demuestras la eficacia del tratamiento: lo esperado es que el riesgo haya bajado de nivel.</li>
         </ol>
@@ -1069,6 +1073,12 @@ document.querySelectorAll('nav button').forEach(b => {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     b.classList.add('active');
     document.getElementById('view-' + b.dataset.view).classList.add('active');
+    // Al cambiar de pestaña se invalida la caché para releer de QuintaDB. Así se reflejan
+    // los cambios hechos fuera del aplicativo (por ejemplo, editando directo en la base).
+    if (['dashboard','seguimiento','reevaluar'].includes(b.dataset.view)){
+      STATE.matriz = [];
+      if(typeof invalidarSubcache==='function') invalidarSubcache();
+    }
     if (b.dataset.view === 'dashboard') renderDashboard();
     if (b.dataset.view === 'seguimiento') { renderFiltros(); renderSeguimiento(); }
     if (b.dataset.view === 'reevaluar') renderReeval();
@@ -1219,6 +1229,9 @@ function aplicarPermisos(){
   // Pestaña Administración: solo para el Administrador
   const navAdmin = document.getElementById('navAdmin');
   if(navAdmin) navAdmin.style.display = esAdmin() ? '' : 'none';
+  // Las plantillas de notificación son de coordinación: no las gestiona una oficina.
+  const btnPl = document.getElementById('btnPlantillas');
+  if(btnPl) btnPl.style.display = puedeVerTodo() ? '' : 'none';
 }
 
 function mostrarBarraSesion(){
@@ -2025,7 +2038,7 @@ function _datosNotif(r){
     existen_controles: limpiarSel(gv('¿Existen controles?',F.existen_controles)),
     control: gv('Control establecido',F.control_establecido),
     respuesta: limpiarSel(gv('Respuesta al riesgo u oportunidad',F.respuesta)),
-    medida: gv('Medida(s) de respuesta',F.medida_respuesta),
+    medida: _txtPlano(gv('Medida(s) de respuesta',F.medida_respuesta)),
     indicador: gv('Indicador',F.indicador),
     formula: gv('Fórmula del indicador',F.formula_indicador),
     frecuencia_medicion: limpiarSel(gv('Frecuencia de medición',F.frecuencia_medicion)),
@@ -2744,7 +2757,7 @@ window.limpiarFiltrosDash = limpiarFiltrosDash;
 
 async function renderDashboard() {
   try {
-    const recsAll = await loadMatriz();
+    const recsAll = await loadMatriz(!STATE.matriz.length);
     await precargarMaestrasProceso(); // garantizar diccionario id→nombre
     const F = CONFIG.MATRIZ_FIELDS;
     // helper: lee por nombre de columna (name_value=1) o por id
@@ -2930,7 +2943,7 @@ async function renderEstadoPorOficina(recs){
       const v=r.values||{};
       const op=esOportunidad(r);
       const respuesta = lee(r,'Respuesta al riesgo u oportunidad', F.respuesta&&F.respuesta.id);
-      const medidas   = lee(r,'Medida(s) de respuesta', F.medida_respuesta&&F.medida_respuesta.id);
+      const medidas   = _txtPlano(lee(r,'Medida(s) de respuesta', F.medida_respuesta&&F.medida_respuesta.id));
       // "Seleccione" (valor inicial del desplegable) NO cuenta como respuesta real.
       const tieneRespuesta = respuesta && !/^seleccione/i.test(respuesta);
       const tieneMedidas   = medidas && medidas.length>1;
@@ -3651,7 +3664,7 @@ function nivelOportInherenteDe(r){
    Guarda HTML sencillo y seguro. Las descripciones se muestran CON formato solo en el
    Detalle; en tablas, tooltips, títulos y Excel se usa texto plano (_txtPlano) porque el
    HTML rompería el recorte de texto y las exportaciones. */
-const RTE_CAMPOS = ['f_riesgo_desc','f_oport_desc','f_causas','f_consec','ed_riesgo','ed_oport_desc','ed_causas','ed_consec'];
+const RTE_CAMPOS = ['f_riesgo_desc','f_oport_desc','f_causas','f_consec','f_medida','ed_riesgo','ed_oport_desc','ed_causas','ed_consec','ed_medida'];
 // Los campos de los reportes tienen id dinámico (add_accion_<riesgoId>), así que se montan
 // por patrón: cualquier textarea con la clase .rte-auto recibe el editor enriquecido.
 function montarRTEAuto(){
@@ -3963,6 +3976,11 @@ function _evLinksHTML(valor, icono){
   ).join('');
 }
 window._evLinksHTML=_evLinksHTML;
+// ¿El campo de evidencias tiene al menos un enlace válido?
+function _evTieneEnlace(valor){
+  return _evParse(valor).some(x=>_evEsUrl(x.url));
+}
+window._evTieneEnlace=_evTieneEnlace;
 // Pinta automáticamente cualquier bloque de evidencias que aparezca vacío en el DOM.
 // Así funciona en los cinco paneles (reporte de acciones y monitoreo) sin tocar cada uno.
 (function(){
@@ -4177,7 +4195,7 @@ async function descargarExcel(){
       // --- Tratamiento ---
       ['¿Tiene control?', r=>{ const v=r.values||{}; const raw=v['¿Existen controles?']||v[F.existen_controles.id]||''; return (raw && raw!=='¿Existen controles?') ? String(raw).trim() : ''; }],
       ['Respuesta', r=>g(r,'Respuesta al riesgo u oportunidad',F.respuesta.id)],
-      ['Medida(s) de respuesta', r=>g(r,'Medida(s) de respuesta',F.medida_respuesta.id)],
+      ['Medida(s) de respuesta', r=>_txtPlano(g(r,'Medida(s) de respuesta',F.medida_respuesta.id))],
       ['Control establecido', r=>g(r,'Control establecido',F.control_establecido.id)],
       ['Indicador', r=>g(r,'Indicador',F.indicador.id)],
       ['Fórmula del indicador', r=>g(r,'Fórmula del indicador',F.formula_indicador.id)],
@@ -4748,7 +4766,7 @@ async function toggleHistorial(riesgoId){
         <div class="field full"><label>Acción desarrollada <span class="oblig">*</span></label><textarea class="rte-auto" id="add_accion_${riesgoId}"></textarea></div>
         <div class="field full"><label>Observación</label><textarea class="rte-auto" id="add_obs_${riesgoId}"></textarea></div>
         <div class="field full"><p class="nota-oblig"><span class="oblig">*</span> campos obligatorios</p></div>
-        <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label><div class="ev-wrap" data-target="add_evid_${riesgoId}"></div><input type="hidden" id="add_evid_${riesgoId}"></div>
+        <div class="field full"><label>Evidencias (enlaces) <span class="oblig">*</span> <span class="hint" style="font-weight:400">— al menos una; puedes agregar varias, cada una con su etiqueta</span></label><div class="ev-wrap" data-target="add_evid_${riesgoId}"></div><input type="hidden" id="add_evid_${riesgoId}"></div>
       </div>
       <div style="text-align:right;margin-top:12px">
         <button class="btn btn-primary" onclick="guardarReporte('${riesgoId}')" id="addbtn-${riesgoId}">Guardar reporte</button>
@@ -4835,7 +4853,7 @@ async function renderPanelMonitoreoEdit(riesgoId, r){
           <div class="field"><label>Valor meta</label><input type="number" step="any" id="mon_meta_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
           <div class="field"><label>Valor real obtenido</label><input type="number" step="any" id="mon_real_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
           <div class="field"><label>% avance obtenido</label><div class="readonly-pill" id="mon_pct_${riesgoId}">—</div></div>
-          <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label><div class="ev-wrap" data-target="mon_evid_${riesgoId}"></div><input type="hidden" id="mon_evid_${riesgoId}"></div>
+          <div class="field full"><label>Evidencias (enlaces) <span class="oblig">*</span> <span class="hint" style="font-weight:400">— al menos una; puedes agregar varias, cada una con su etiqueta</span></label><div class="ev-wrap" data-target="mon_evid_${riesgoId}"></div><input type="hidden" id="mon_evid_${riesgoId}"></div>
           <div class="field full hidden" id="mon_wrap_plan_${riesgoId}"><label>Plan de remediación (link)</label><input id="mon_plan_${riesgoId}" placeholder="https://…"></div>
         </div>
         <p class="hint" style="margin-top:6px">El % avance = (valor real / valor meta) × 100. El plan de remediación aparece si el avance es menor a 100%.</p>
@@ -4941,7 +4959,7 @@ async function abrirReporteAcciones(riesgoId){
         <div class="field full"><label>Acción desarrollada <span class="oblig">*</span></label><textarea class="rte-auto" id="add_accion_${riesgoId}"></textarea></div>
         <div class="field full"><label>Observación</label><textarea class="rte-auto" id="add_obs_${riesgoId}"></textarea></div>
         <div class="field full"><p class="nota-oblig"><span class="oblig">*</span> campos obligatorios</p></div>
-        <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label><div class="ev-wrap" data-target="add_evid_${riesgoId}"></div><input type="hidden" id="add_evid_${riesgoId}"></div>
+        <div class="field full"><label>Evidencias (enlaces) <span class="oblig">*</span> <span class="hint" style="font-weight:400">— al menos una; puedes agregar varias, cada una con su etiqueta</span></label><div class="ev-wrap" data-target="add_evid_${riesgoId}"></div><input type="hidden" id="add_evid_${riesgoId}"></div>
       </div>
       <p class="hint" style="margin-top:6px">El <strong>% completado</strong> alimenta la columna «% Avance medidas» de la tabla de seguimiento.</p>
       <div style="text-align:right;margin-top:12px">
@@ -5115,7 +5133,7 @@ async function renderMonPaneRep(riesgoId, r){
         ${esRazonMon?`<div class="field"><label>Denominador real</label><input type="number" step="any" id="mon_den_${riesgoId}" oninput="calcValorReal('${riesgoId}')"></div>`:'<div class="field"></div>'}
         <div class="field"><label>Valor real obtenido ${esRazonMon?'(%)':''}</label><div class="readonly-pill" id="mon_real_val_${riesgoId}">—</div><input type="hidden" id="mon_real_${riesgoId}"></div>
         <div class="field"><label>% cumplimiento (calculado)</label><div class="readonly-pill" id="mon_pct_${riesgoId}">—</div></div>
-        <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label><div class="ev-wrap" data-target="mon_evid_${riesgoId}"></div><input type="hidden" id="mon_evid_${riesgoId}"></div>
+        <div class="field full"><label>Evidencias (enlaces) <span class="oblig">*</span> <span class="hint" style="font-weight:400">— al menos una; puedes agregar varias, cada una con su etiqueta</span></label><div class="ev-wrap" data-target="mon_evid_${riesgoId}"></div><input type="hidden" id="mon_evid_${riesgoId}"></div>
       </div>
       <p class="hint" style="margin-top:6px">Indicador <strong>${tipoMon}</strong>. ${esRazonMon?'El valor real = numerador ÷ denominador × 100.':'El valor real es el número que ingreses.'} El % cumplimiento = valor real ÷ valor meta × 100. Puedes registrar mediciones parciales hasta alcanzar el 100%.</p>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button type="button" class="btn btn-ghost" id="moncancel-${riesgoId}" onclick="cancelarEdicionMon('${riesgoId}')" style="display:none">Cancelar</button><button type="button" class="btn btn-primary" onclick="guardarMonitoreo('${riesgoId}')" id="monbtn-${riesgoId}">+ Guardar reporte de monitoreo</button></div>
@@ -5353,7 +5371,7 @@ async function renderPanelMonitoreo(riesgoId, r){
           <div class="field"><label>Valor meta</label><input type="number" step="any" id="mon_meta_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
           <div class="field"><label>Valor real obtenido</label><input type="number" step="any" id="mon_real_${riesgoId}" oninput="calcAvanceMon('${riesgoId}')"></div>
           <div class="field"><label>% avance obtenido</label><div class="readonly-pill" id="mon_pct_${riesgoId}">—</div></div>
-          <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label><div class="ev-wrap" data-target="mon_evid_${riesgoId}"></div><input type="hidden" id="mon_evid_${riesgoId}"></div>
+          <div class="field full"><label>Evidencias (enlaces) <span class="oblig">*</span> <span class="hint" style="font-weight:400">— al menos una; puedes agregar varias, cada una con su etiqueta</span></label><div class="ev-wrap" data-target="mon_evid_${riesgoId}"></div><input type="hidden" id="mon_evid_${riesgoId}"></div>
           <div class="field full"><label>Plan de remediación (link, de ser el caso)</label><input id="mon_plan_${riesgoId}" placeholder="https://…"></div>
         </div>
         <p class="hint" style="margin-top:6px">El indicador y la fórmula se copian automáticamente del riesgo. El % avance = (valor real / valor meta) × 100.</p>
@@ -5933,6 +5951,7 @@ async function guardarReporte(riesgoId){
   const _pctIn = g('add_pct');
   if(_pctIn==='' || _pctIn==null) _falta.push('% completado');
   if(!String(g('add_accion')||'').replace(/<[^>]*>/g,'').trim()) _falta.push('Acción desarrollada');
+  if(!_evTieneEnlace(g('add_evid'))) _falta.push('Evidencias (al menos un enlace que empiece con https://)');
   if(_falta.length){ toast('Faltan campos obligatorios: '+_falta.join(', ')+'.', true); return; }
   const btn=document.getElementById('addbtn-'+riesgoId);
 
@@ -6027,7 +6046,7 @@ function editarReporte(repId){
       <div class="field full"><div id="er_aviso_${repId}" class="aviso-ambar" style="display:none"></div></div>
       <div class="field full"><label>Acción desarrollada <span class="oblig">*</span></label><textarea class="rte-auto" id="er_accion_${repId}">${esc(d.accion)}</textarea></div>
       <div class="field full"><label>Observación</label><textarea class="rte-auto" id="er_obs_${repId}">${esc(d.obs)}</textarea></div>
-      <div class="field full"><label>Evidencias (enlaces) <span class="hint" style="font-weight:400">— puedes agregar varias; cada una con su etiqueta</span></label>
+      <div class="field full"><label>Evidencias (enlaces) <span class="oblig">*</span> <span class="hint" style="font-weight:400">— al menos una; puedes agregar varias, cada una con su etiqueta</span></label>
         <div class="ev-wrap" data-target="er_evid_${repId}"></div>
         <input type="hidden" id="er_evid_${repId}" value="${esc(d.evid)}"></div>
     </div>
@@ -6077,6 +6096,7 @@ async function guardarEdicionReporte(repId){
   if(!g('er_tipo'))  _falta.push('Tipo de medición');
   if(g('er_pct')==='' || g('er_pct')==null) _falta.push('% completado');
   if(!String(g('er_accion')||'').replace(/<[^>]*>/g,'').trim()) _falta.push('Acción desarrollada');
+  if(!_evTieneEnlace(g('er_evid'))) _falta.push('Evidencias (al menos un enlace que empiece con https://)');
   if(_falta.length){ toast('Faltan campos obligatorios: '+_falta.join(', ')+'.', true); return; }
 
   values[RF.fecha_reporte.id] = g('er_fecha');
@@ -6278,7 +6298,7 @@ function verDetalle(riesgoId){
     if(!val) return '';
     // Las descripciones pueden traer formato del editor enriquecido: se sanitizan y se
     // muestran CON formato. El resto de campos se muestran tal cual.
-    const cuerpo = ['Riesgo','Oportunidad','Causas','Consecuencias'].includes(col) ? _rteSanitizar(val) : val;
+    const cuerpo = ['Riesgo','Oportunidad','Causas','Consecuencias','Medida(s) de respuesta','Control establecido'].includes(col) ? _rteSanitizar(val) : val;
     return `<div class="det-row"><div class="det-k">${etq}</div><div class="det-v">${cuerpo}</div></div>`;
   }).filter(Boolean).join('');
 
@@ -6826,7 +6846,7 @@ async function guardarEdit(){
     }
   } else {
     if(g('ed_resp')) set(F.respuesta, g('ed_resp'));
-    set(F.medida_respuesta, limpiar(g('ed_medida')));
+    set(F.medida_respuesta, g('ed_medida'));   // conserva el formato del editor
   }
   // La certificación ya NO se edita aquí: se gestiona en el modal "Control y Seguimiento" (🎯).
   // Solo se escribe si por alguna razón el campo existiera en este formulario.
