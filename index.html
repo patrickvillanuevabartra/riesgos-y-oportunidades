@@ -2958,9 +2958,18 @@ async function renderEstadoPorOficina(recs){
       });
       const nivel=(op?nivelOportInherenteDe(r):nivelInherenteDe(r)).nivel;
       let etapa;
-      // 4 Controlado: medidas 100% culminadas; en nivel 4 además exige certificación.
+      // 4 Controlado: mismas condiciones que exige la reevaluación, para que el tablero
+      // y la columna «¿Procede reevaluación?» nunca se contradigan.
+      //   Todos los niveles: medidas 100% + Culminado + control «Sí» + control DESCRITO.
+      //   Nivel 4: además, control Certificado/Operativo.
+      // Llegar al 100% por sí solo NO controla el riesgo: la persona debe confirmar y
+      // describir el control (el sistema ya no lo marca automáticamente).
+      const _ctrlSi = /^s[ií]$/i.test(lee(r,'¿Existen controles?', F.existen_controles&&F.existen_controles.id));
+      const _ctrlDesc = (typeof _controlDescrito==='function') ? _controlDescrito(r) : true;
       if(pct>=100 && culminado){
-        if(nivel===4){
+        if(!_ctrlSi || !_ctrlDesc){
+          etapa = 3;                       // ejecutó las medidas, pero el control no está confirmado/descrito
+        } else if(nivel===4){
           const cert=lee(r,'Certificación de Implementación del Control', F.certificacion_control&&F.certificacion_control.id);
           etapa = /certificad|operativ/i.test(cert) ? 4 : 3; // 100% pero falta certificar
         } else etapa = 4;
