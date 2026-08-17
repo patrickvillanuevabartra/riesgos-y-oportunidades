@@ -7197,5 +7197,207 @@ function setConn(ok, msg) {
   }
 })();
 </script>
+
+<!-- ===================== ASISTENTE DE AYUDA (chat con Gemini) · Riesgos y Oportunidades ===================== -->
+<style>
+  #asis-btn{position:fixed;right:20px;bottom:20px;z-index:900;height:56px;border-radius:28px;
+    background:var(--brand);color:#fff;border:0;cursor:pointer;display:flex;align-items:center;
+    justify-content:center;gap:9px;padding:0 20px 0 16px;box-shadow:0 6px 22px rgba(0,0,0,.22);
+    font:inherit;font-size:15px;font-weight:600;white-space:nowrap;
+    transition:padding .25s ease,width .25s ease,transform .15s}
+  #asis-btn .asis-ico{font-size:24px;line-height:1}
+  #asis-btn .asis-txt{max-width:120px;overflow:hidden;transition:max-width .25s ease,opacity .2s ease}
+  #asis-btn.mini{padding:0;width:56px}
+  #asis-btn.mini .asis-txt{max-width:0;opacity:0}
+  #asis-btn:hover{transform:scale(1.06)}
+  #asis-btn.mini:hover{padding:0 20px 0 16px;width:auto}
+  #asis-btn.mini:hover .asis-txt{max-width:120px;opacity:1}
+  .asis-msg.err button{margin-top:8px;display:block;background:#c0392b;color:#fff;border:0;border-radius:8px;
+    padding:6px 12px;cursor:pointer;font:inherit;font-size:12px;font-weight:600}
+  .asis-msg a{color:inherit;text-decoration:underline}
+  #asis-panel{position:fixed;right:20px;bottom:88px;z-index:900;width:min(390px,calc(100vw - 32px));
+    max-height:min(500px,calc(100vh - 230px));display:none;flex-direction:column;background:var(--card);
+    border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 44px rgba(0,0,0,.20);overflow:hidden}
+  #asis-panel.abierto{display:flex}
+  .asis-cab{background:var(--brand);color:#fff;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .asis-cab b{font-size:14px}
+  .asis-cab small{display:block;font-size:11px;opacity:.85;font-weight:400}
+  .asis-cab button{background:transparent;border:0;color:#fff;font-size:20px;cursor:pointer;line-height:1;padding:0 4px}
+  .asis-msgs{flex:1 1 auto;min-height:90px;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--paper)}
+  .asis-msg{max-width:88%;padding:9px 12px;border-radius:12px;font-size:13.5px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word}
+  .asis-msg.yo{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:4px}
+  .asis-msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--line);color:var(--ink);border-bottom-left-radius:4px}
+  .asis-msg.err{align-self:flex-start;background:#fdeceb;border:1px solid #f0b3ac;color:#c0392b}
+  .asis-msg b{font-weight:700}
+  .asis-msg ul,.asis-msg ol{margin:5px 0;padding-left:20px}
+  .asis-suge{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 10px;background:var(--paper)}
+  .asis-suge button{font:inherit;font-size:12px;padding:5px 10px;border:1px solid var(--brand-2);background:var(--card);
+    color:var(--brand);border-radius:14px;cursor:pointer}
+  .asis-suge button:hover{background:var(--paper)}
+  .asis-pie{border-top:1px solid var(--line);padding:10px;display:flex;gap:8px;align-items:flex-end;background:var(--card)}
+  .asis-pie textarea{flex:1;resize:none;font:inherit;font-size:13.5px;padding:8px 10px;border:1px solid var(--line);
+    border-radius:9px;max-height:90px;min-height:38px}
+  .asis-pie button{background:var(--brand);color:#fff;border:0;border-radius:9px;padding:9px 14px;cursor:pointer;font:inherit;font-size:13px;font-weight:600}
+  .asis-pie button:disabled{opacity:.5;cursor:not-allowed}
+  .asis-nota{font-size:10.5px;color:var(--mist);padding:0 14px 8px;background:var(--card);line-height:1.4}
+  .asis-esc{display:flex;gap:4px;align-items:center;padding:4px 0}
+  .asis-esc span{width:6px;height:6px;border-radius:50%;background:var(--mist);animation:asisP 1.2s infinite}
+  .asis-esc span:nth-child(2){animation-delay:.2s}
+  .asis-esc span:nth-child(3){animation-delay:.4s}
+  @keyframes asisP{0%,60%,100%{opacity:.3}30%{opacity:1}}
+  @media(max-width:520px){ #asis-panel{right:10px;left:10px;width:auto;bottom:80px;max-height:calc(100vh - 150px)} #asis-btn{right:14px;bottom:14px} }
+</style>
+
+<button id="asis-btn" title="Asistente de ayuda" aria-label="Abrir el asistente de ayuda" onclick="asisAbrir()"><span class="asis-ico" aria-hidden="true">💬</span><span class="asis-txt">Ayuda</span></button>
+
+<div id="asis-panel" role="dialog" aria-label="Asistente de ayuda">
+  <div class="asis-cab">
+    <div><b>Asistente de ayuda</b><small>Dudas sobre el aplicativo</small></div>
+    <button onclick="asisCerrar()" title="Cerrar">×</button>
+  </div>
+  <div class="asis-msgs" id="asis-msgs"></div>
+  <div class="asis-suge" id="asis-suge"></div>
+  <div class="asis-pie">
+    <textarea id="asis-input" rows="1" placeholder="Escribe tu pregunta…"
+      oninput="asisAutoAlto(this)" onkeydown="asisTecla(event)"></textarea>
+    <button id="asis-enviar" onclick="asisEnviar()">Enviar</button>
+  </div>
+  <div class="asis-nota">Asistente con IA. Explica cómo usar el aplicativo; no ve tus riesgos ni tus reportes. No escribas información confidencial.</div>
+</div>
+
+<script>
+/* ---- Asistente de ayuda: chat conectado al Worker que consulta a Gemini ----
+   La clave de la API NO está aquí: vive como secreto en el Worker. */
+const ASISTENTE_URL = 'https://asistente-riesgos.patrick-villanueva.workers.dev';
+
+let ASIS_HIST = [];        // historial de la conversación (se pierde al recargar)
+let ASIS_OCUPADO = false;
+
+const ASIS_SUGERENCIAS = [
+  '¿Cómo registro un avance?',
+  'No veo mis riesgos, me desaparecieron',
+  'No puedo marcar que ya existe un control',
+  '¿Cuándo tengo que reevaluar?'
+];
+
+function asisAbrir(){
+  const p=document.getElementById('asis-panel');
+  p.classList.add('abierto');
+  document.getElementById('asis-btn').style.display='none';
+  if(!ASIS_HIST.length){
+    asisPintar('bot','¡Hola! Soy el asistente del aplicativo. Puedo explicarte cómo registrar un avance, cerrar medidas, confirmar controles, reevaluar o resolver dudas frecuentes.\n\nSi necesitas apoyo de una persona, escribe a la Subcomisión de Sistematización (patrick.villanueva@urp.edu.pe).\n\n¿En qué te ayudo?');
+    asisSugerencias();
+  }
+  setTimeout(()=>document.getElementById('asis-input').focus(),80);
+}
+function asisCerrar(){
+  document.getElementById('asis-panel').classList.remove('abierto');
+  document.getElementById('asis-btn').style.display='flex';
+}
+window.asisAbrir=asisAbrir; window.asisCerrar=asisCerrar;
+
+function asisSugerencias(){
+  const c=document.getElementById('asis-suge');
+  c.innerHTML = ASIS_SUGERENCIAS.map(t=>`<button onclick="asisPreguntar('${t.replace(/'/g,"\\'")}')">${t}</button>`).join('');
+}
+function asisPreguntar(t){
+  document.getElementById('asis-input').value=t;
+  asisEnviar();
+}
+window.asisPreguntar=asisPreguntar;
+
+function asisAutoAlto(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,90)+'px'; }
+window.asisAutoAlto=asisAutoAlto;
+function asisTecla(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); asisEnviar(); } }
+window.asisTecla=asisTecla;
+
+// Convierte el formato sencillo de la respuesta (negritas, listas) a HTML seguro
+function asisFormato(txt){
+  const esc = String(txt||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return esc
+    .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+    .replace(/«(.+?)»/g,'«<b>$1</b>»')
+    .replace(/([\w.+-]+@[\w-]+\.[\w.-]+)/g,'<a href="mailto:$1">$1</a>');
+}
+
+function asisPintar(quien, texto){
+  const cont=document.getElementById('asis-msgs');
+  const d=document.createElement('div');
+  d.className='asis-msg '+quien;
+  d.innerHTML = (quien==='yo') ? String(texto).replace(/</g,'&lt;') : asisFormato(texto);
+  cont.appendChild(d);
+  cont.scrollTop=cont.scrollHeight;
+  return d;
+}
+
+// ¿En qué pantalla está el usuario? Ayuda al asistente a responder mejor
+function asisPantalla(){
+  const b=document.querySelector('nav button.active');
+  return b ? (b.textContent||'').replace(/\s+/g,' ').trim() : '';
+}
+
+// Muestra el error, devuelve la pregunta a la caja y ofrece reintentar
+function asisFallo(nodo, mensaje, pregunta){
+  if(ASIS_HIST.length && ASIS_HIST[ASIS_HIST.length-1].rol==='user'){ ASIS_HIST.pop(); }
+  nodo.className='asis-msg err';
+  nodo.innerHTML='';
+  const t=document.createElement('div'); t.textContent=mensaje; nodo.appendChild(t);
+  const b=document.createElement('button'); b.type='button'; b.textContent='Reintentar';
+  b.onclick=function(){ nodo.remove(); asisPreguntar(pregunta); };
+  nodo.appendChild(b);
+  const inp=document.getElementById('asis-input');
+  if(!(inp.value||'').trim()){ inp.value=pregunta; asisAutoAlto(inp); }
+}
+
+async function asisEnviar(){
+  if(ASIS_OCUPADO) return;
+  const inp=document.getElementById('asis-input');
+  const pregunta=(inp.value||'').trim();
+  if(!pregunta) return;
+
+  inp.value=''; asisAutoAlto(inp);
+  document.getElementById('asis-suge').innerHTML='';
+  asisPintar('yo', pregunta);
+  ASIS_HIST.push({rol:'user', texto:pregunta});
+
+  ASIS_OCUPADO=true;
+  document.getElementById('asis-enviar').disabled=true;
+  const esperando=asisPintar('bot','');
+  esperando.innerHTML='<div class="asis-esc"><span></span><span></span><span></span></div>';
+
+  try{
+    const r=await fetch(ASISTENTE_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mensaje:pregunta, historial:ASIS_HIST.slice(0,-1), pantalla:asisPantalla() })
+    });
+    const data=await r.json().catch(()=>({}));
+    if(r.ok && data.ok!==false && data.respuesta){
+      esperando.innerHTML=asisFormato(data.respuesta);
+      ASIS_HIST.push({rol:'modelo', texto:data.respuesta});
+    } else {
+      asisFallo(esperando, data.error || data.respuesta || 'No pude responder. Inténtalo de nuevo.', pregunta);
+    }
+  }catch(e){
+    asisFallo(esperando,'No pude conectarme con el asistente. Revisa tu conexión e inténtalo de nuevo.', pregunta);
+  }finally{
+    ASIS_OCUPADO=false;
+    document.getElementById('asis-enviar').disabled=false;
+    document.getElementById('asis-msgs').scrollTop=document.getElementById('asis-msgs').scrollHeight;
+    inp.focus();
+  }
+}
+window.asisEnviar=asisEnviar;
+
+// El asistente solo se muestra con la sesión iniciada
+document.addEventListener('DOMContentLoaded',()=>{
+  const btn=document.getElementById('asis-btn');
+  const ver=()=>{ btn.style.display = (typeof SESION!=='undefined' && SESION) ? 'flex' : 'none'; };
+  ver(); setInterval(ver, 1500);
+  // La píldora muestra la palabra «Ayuda» unos segundos y luego se contrae al
+  // círculo, para no tapar contenido. Vuelve a abrirse al pasar el cursor.
+  setTimeout(()=>btn.classList.add('mini'), 6000);
+});
+</script>
 </body>
 </html>
