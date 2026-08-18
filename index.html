@@ -7248,7 +7248,7 @@ function setConn(ok, msg) {
   @media(max-width:520px){ #asis-panel{right:10px;left:10px;width:auto;bottom:80px;max-height:calc(100vh - 150px)} #asis-btn{right:14px;bottom:14px} }
 </style>
 
-<button id="asis-btn" title="Asistente de ayuda" aria-label="Abrir el asistente de ayuda" onclick="asisAbrir()"><span class="asis-ico" aria-hidden="true">💬</span><span class="asis-txt">Ayuda</span></button>
+<button id="asis-btn" title="Asistente de ayuda" aria-label="Abrir el asistente de ayuda" aria-expanded="false" onclick="asisAlternar()"><span class="asis-ico" aria-hidden="true">💬</span><span class="asis-txt">Ayuda</span></button>
 
 <div id="asis-panel" role="dialog" aria-label="Asistente de ayuda">
   <div class="asis-cab">
@@ -7283,8 +7283,14 @@ const ASIS_SUGERENCIAS = [
 function asisAbrir(){
   const p=document.getElementById('asis-panel');
   p.classList.add('abierto');
-  document.getElementById('asis-btn').style.display='none';
-  if(!ASIS_HIST.length){
+  const b=document.getElementById('asis-btn');
+  b.classList.remove('mini');
+  b.setAttribute('aria-expanded','true');
+  b.setAttribute('aria-label','Cerrar el asistente de ayuda');
+  b.querySelector('.asis-ico').textContent='✕';
+  b.querySelector('.asis-txt').textContent='Cerrar';
+  const yaSaludado = document.getElementById('asis-msgs').children.length > 0;
+  if(!yaSaludado){
     asisPintar('bot','¡Hola! Soy el asistente del aplicativo. Puedo explicarte cómo registrar un avance, cerrar medidas, confirmar controles, reevaluar o resolver dudas frecuentes.\n\nSi necesitas apoyo de una persona, escribe a la Subcomisión de Sistematización (patrick.villanueva@urp.edu.pe).\n\n¿En qué te ayudo?');
     asisSugerencias();
   }
@@ -7292,9 +7298,19 @@ function asisAbrir(){
 }
 function asisCerrar(){
   document.getElementById('asis-panel').classList.remove('abierto');
-  document.getElementById('asis-btn').style.display='flex';
+  const b=document.getElementById('asis-btn');
+  b.classList.add('mini');
+  b.setAttribute('aria-expanded','false');
+  b.setAttribute('aria-label','Abrir el asistente de ayuda');
+  b.querySelector('.asis-ico').textContent='💬';
+  b.querySelector('.asis-txt').textContent='Ayuda';
 }
-window.asisAbrir=asisAbrir; window.asisCerrar=asisCerrar;
+// Un clic en el botón abre si está cerrado y cierra si está abierto.
+function asisAlternar(){
+  const p=document.getElementById('asis-panel');
+  if(p.classList.contains('abierto')) asisCerrar(); else asisAbrir();
+}
+window.asisAbrir=asisAbrir; window.asisCerrar=asisCerrar; window.asisAlternar=asisAlternar;
 
 function asisSugerencias(){
   const c=document.getElementById('asis-suge');
