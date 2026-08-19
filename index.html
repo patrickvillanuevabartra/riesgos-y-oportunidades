@@ -188,6 +188,15 @@
   .grupo-nombre{font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:14px;color:#fff}
   .grupo-count{font-size:12px;color:rgba(255,255,255,.7);margin-left:10px}
 
+  /* ===== Cabeceras de tabla fijas al desplazar =====
+     El <header> verde es sticky, así que las cabeceras deben quedar justo debajo:
+     la variable --alto-header la calcula el script del final (cambia entre
+     escritorio y móvil). Los contenedores con overflow-x crean su propio marco de
+     desplazamiento y anularían el sticky, por eso en escritorio se liberan. */
+  thead th{position:sticky;top:var(--alto-header,0px);z-index:6;background:var(--card);
+    box-shadow:inset 0 -2px 0 var(--line)}
+  .modal thead th, .modal-body thead th{top:0}
+  @media(min-width:821px){ .tabla-wrap{overflow-x:visible} }
   /* Tooltip propio: el nativo del navegador no se puede agrandar por CSS.
      Para cambiar de estilo, sustituye background, color y border por una de estas variantes:
        · Gris pizarra suave: background:#37474f; color:rgba(255,255,255,.95); border:0;
@@ -3358,7 +3367,7 @@ async function renderAvancePorRangos(recs){
       h+=`<div id="${anc}" style="scroll-margin-top:90px;margin-bottom:10px">`;
       if(items.length){
         h+=`<div style="font-weight:600;font-size:12.5px;color:${b.color};margin-bottom:4px">${b.t} (${items.length})</div>`;
-        h+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>';
+        h+='<div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tbody>';
         items.sort((a,c)=>c.pct-a.pct).forEach(it=>{
           h+=`<tr style="border-top:1px solid var(--line)">
             <td style="padding:6px 8px;color:var(--slate)">${String(it.desc).replace(/</g,'&lt;').slice(0,90)}</td>
@@ -7479,6 +7488,29 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
   document.addEventListener('mouseout', function(){ if(caja) caja.classList.remove('visible'); });
   window.addEventListener('scroll', function(){ if(caja) caja.classList.remove('visible'); }, true);
+})();
+</script>
+<script>
+(function cabecerasFijas(){
+  // Mide en vivo la altura del header y la publica como variable CSS.
+  // Se divide entre el zoom del body porque getBoundingClientRect ya viene escalado
+  // y la propiedad top del sticky se resuelve en el sistema de coordenadas del body.
+  function ajustar(){
+    const h=document.querySelector('header');
+    if(!h) return;
+    const fijo = getComputedStyle(h).position==='sticky';
+    const alto = fijo ? h.getBoundingClientRect().height : 0;
+    const zoom = parseFloat(getComputedStyle(document.body).zoom) || 1;
+    document.documentElement.style.setProperty('--alto-header', (alto/zoom)+'px');
+  }
+  ajustar();
+  window.addEventListener('resize', ajustar);
+  window.addEventListener('orientationchange', ajustar);
+  // El header cambia de alto al iniciar sesión (aparece el nombre del usuario).
+  if(window.ResizeObserver){
+    const h=document.querySelector('header');
+    if(h) new ResizeObserver(ajustar).observe(h);
+  }
 })();
 </script>
 </body>
