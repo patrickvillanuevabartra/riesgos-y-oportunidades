@@ -196,7 +196,6 @@
   thead th{position:sticky;top:var(--alto-header,0px);z-index:6;background:var(--card);
     box-shadow:inset 0 -2px 0 var(--line)}
   .modal thead th, .modal-body thead th{top:0}
-  @media(min-width:821px){ .tabla-wrap{overflow-x:visible} }
   /* Tooltip propio: el nativo del navegador no se puede agrandar por CSS.
      Para cambiar de estilo, sustituye background, color y border por una de estas variantes:
        · Gris pizarra suave: background:#37474f; color:rgba(255,255,255,.95); border:0;
@@ -252,6 +251,9 @@
   /* ===== RESPONSIVE MÓVIL ===== */
   /* Las tablas pueden desplazarse horizontalmente en pantallas medianas */
   .tabla-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* Va DESPUÉS de la regla de arriba a propósito: si se declara antes, el
+     overflow-x:auto la pisa por orden de aparición y el sticky deja de funcionar. */
+  @media(min-width:821px){ .tabla-wrap{overflow-x:visible} }
   @media(max-width:760px){
     body{zoom:1.06}                           /* el zoom de escritorio estorba en móvil: solo un poco */
     .wrap,main{padding-left:10px;padding-right:10px}
