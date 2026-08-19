@@ -168,12 +168,12 @@
   .heat-leyenda i{width:13px;height:13px;border-radius:3px;display:inline-block;flex:none}
 
   /* Tabla reevaluación */
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mist);font-weight:600;padding:10px 12px;border-bottom:2px solid var(--line)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--mist);font-weight:600;padding:10px 12px;border-bottom:2px solid var(--line)}
   td{padding:11px 12px;border-bottom:1px solid var(--line);color:var(--slate)}
   /* Tabla de seguimiento: filas compactas y celdas centradas verticalmente */
-  table.tabla-cards{font-size:12px}
-  table.tabla-cards > thead > tr > th{padding:7px 4px;font-size:11px;vertical-align:bottom;line-height:1.22}
+  table.tabla-cards{font-size:13.5px}
+  table.tabla-cards > thead > tr > th{padding:7px 4px;font-size:12px;vertical-align:bottom;line-height:1.22}
   table.tabla-cards > tbody > tr:not(.grupo-row):not(.hist-row) > td{padding:6px 4px;vertical-align:middle}
   table.tabla-cards td.cards-main{width:210px;max-width:210px;line-height:1.28}
   /* Anchos ajustados para evitar el scroll horizontal */
@@ -188,6 +188,16 @@
   .grupo-nombre{font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:14px;color:#fff}
   .grupo-count{font-size:12px;color:rgba(255,255,255,.7);margin-left:10px}
 
+  /* Tooltip propio: el nativo del navegador no se puede agrandar por CSS.
+     Para cambiar de estilo, sustituye background, color y border por una de estas variantes:
+       · Gris pizarra suave: background:#37474f; color:rgba(255,255,255,.95); border:0;
+       · Tarjeta clara:      background:#fbfdfc; color:#33413b; border:1px solid #d7e2dc; */
+  #tip-grande{position:fixed;z-index:3000;max-width:520px;
+    background:#eef6f1;color:#1f3b2e;border:1px solid #bcd9c8;
+    font:500 14.5px/1.6 'IBM Plex Sans',system-ui,sans-serif;padding:11px 14px;border-radius:9px;
+    box-shadow:0 6px 22px rgba(20,60,40,.16);pointer-events:none;opacity:0;transition:opacity .12s;
+    white-space:pre-wrap;word-break:break-word}
+  #tip-grande.visible{opacity:1}
   .empty{text-align:center;padding:60px 20px;color:var(--mist)}
   .empty h3{color:var(--slate);margin-bottom:8px}
   .cod-tag{display:block;font-family:'IBM Plex Mono',Consolas,monospace;font-size:10.5px;font-weight:700;
@@ -200,7 +210,7 @@
   /* Evidencias: varios enlaces con etiqueta */
   .ev-wrap{margin-top:2px}
   .ev-wrap input{padding:7px 9px;font-size:13px}
-  .btn-sm{padding:6px 12px;font-size:12.5px;white-space:nowrap}
+  .btn-sm{padding:6px 12px;font-size:13.5px;white-space:nowrap}
   .rep-evid a{margin-right:12px}
   /* Editor de texto enriquecido (descripciones) */
   .rte-wrap{border:1px solid var(--line);border-radius:9px;overflow:hidden;background:#fff}
@@ -345,21 +355,21 @@
       <h2 style="margin:0;font-size:19px;color:#1a2b22">Matriz de Riesgos y Oportunidades</h2>
       <p style="margin:6px 0 0;font-size:13px;color:#6b7d74;line-height:1.5">Facultad de Ingeniería · URP<br>Sistema de Gestión para Organizaciones Educativas (SGOE)<br>ISO 21001</p>
     </div>
-    <div style="display:flex;flex-direction:column;gap:14px">
+    <form id="login_form" onsubmit="event.preventDefault();hacerLogin();return false;" style="display:flex;flex-direction:column;gap:14px">
       <div>
         <label style="display:block;font-size:13px;font-weight:600;color:#1a2b22;margin-bottom:5px">Usuario</label>
-        <input id="login_user" type="text" autocomplete="username" style="width:100%;padding:11px 13px;border:1px solid #d4ddd7;border-radius:9px;font-size:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter')document.getElementById('login_pass').focus()">
+        <input id="login_user" name="username" type="text" autocomplete="username" style="width:100%;padding:11px 13px;border:1px solid #d4ddd7;border-radius:9px;font-size:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('login_pass').focus();}">
       </div>
       <div>
         <label style="display:block;font-size:13px;font-weight:600;color:#1a2b22;margin-bottom:5px">Contraseña</label>
         <div style="position:relative">
-          <input id="login_pass" type="password" autocomplete="current-password" style="width:100%;padding:11px 42px 11px 13px;border:1px solid #d4ddd7;border-radius:9px;font-size:14px;box-sizing:border-box" onkeydown="if(event.key==='Enter')hacerLogin()">
+          <input id="login_pass" name="password" type="password" autocomplete="current-password" style="width:100%;padding:11px 42px 11px 13px;border:1px solid #d4ddd7;border-radius:9px;font-size:14px;box-sizing:border-box" >
           <button type="button" id="login_pass_toggle" onclick="toggleLoginPass()" title="Mostrar u ocultar la contraseña" aria-label="Mostrar u ocultar la contraseña" style="position:absolute;top:50%;right:8px;transform:translateY(-50%);background:none;border:0;cursor:pointer;font-size:17px;line-height:1;padding:4px;color:#6b7d74">👁️</button>
         </div>
       </div>
       <div id="login_error" style="display:none;font-size:13px;color:#c0392b;background:#fdecea;border-radius:8px;padding:9px 11px"></div>
-      <button onclick="hacerLogin()" id="login_btn" style="margin-top:6px;padding:12px;background:#0f8f5e;color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:600;cursor:pointer">Iniciar sesión</button>
-    </div>
+      <button type="submit" id="login_btn" style="margin-top:6px;padding:12px;background:#0f8f5e;color:#fff;border:none;border-radius:9px;font-size:15px;font-weight:600;cursor:pointer">Iniciar sesión</button>
+    </form>
     <p style="margin:18px 0 0;font-size:11px;color:#9aa8a0;text-align:center">Acceso restringido. Cada usuario solo puede ver los registros de su unidad.</p>
   </div>
 </div>
@@ -1195,6 +1205,8 @@ async function hacerLogin(){
     const oficinas = [...setOfi.values()];
     const nombre = _leerNombreUsuario(v);
     SESION = { rol, usuario:limpio(v['Usuario']), nombre, oficina:oficinas[0]||'', oficinas, recordId: encontrado.id };
+    // Se recuerda solo el nombre de usuario. La contraseña NO: de eso se encarga el navegador.
+    try{ localStorage.setItem('mi_ultimo_usuario_riesgos', u); }catch(_){}
     // Aviso SOLO para administradores cuando detecta registros duplicados que conviene unificar.
     if(rol==='Administrador' && coincidencias.length>1){
       setTimeout(()=>toast('Nota: el usuario "'+u+'" tiene '+coincidencias.length+' registros. Conviene unificarlo en uno solo con varias oficinas.', true), 1200);
@@ -4003,6 +4015,16 @@ window._evTieneEnlace=_evTieneEnlace;
     new MutationObserver(pintarPendientes).observe(document.body,{childList:true,subtree:true});
     pintarPendientes();
   };
+  // Precarga el último usuario para no reescribirlo en cada visita.
+  try{
+    const guardado = localStorage.getItem('mi_ultimo_usuario_riesgos');
+    const campoU = document.getElementById('login_user');
+    const campoP = document.getElementById('login_pass');
+    if(guardado && campoU && !campoU.value){
+      campoU.value = guardado;
+      if(campoP) setTimeout(()=>campoP.focus(), 120);
+    }
+  }catch(_){}
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',arrancar);
   else arrancar();
 })();
@@ -7414,6 +7436,50 @@ document.addEventListener('DOMContentLoaded',()=>{
   // círculo, para no tapar contenido. Vuelve a abrirse al pasar el cursor.
   setTimeout(()=>btn.classList.add('mini'), 6000);
 });
+</script>
+<script>
+/* ===== Tooltip propio para las celdas de las tablas =====
+   El aviso nativo del navegador usa la letra del sistema y no se puede agrandar.
+   Se cuelga de <html> y no de <body> porque el body tiene zoom, que
+   descuadraría las coordenadas de un elemento con position:fixed. */
+(function tooltipGrande(){
+  let caja=null;
+  function crear(){
+    if(caja) return caja;
+    caja=document.createElement('div');
+    caja.id='tip-grande';
+    document.documentElement.appendChild(caja);
+    return caja;
+  }
+  function colocar(c, el){
+    const r=el.getBoundingClientRect();
+    c.style.left='-9999px'; c.style.top='0px';
+    const w=c.offsetWidth, h=c.offsetHeight;
+    let x=r.left, y=r.bottom+8;
+    if(x+w > window.innerWidth-12) x = window.innerWidth-w-12;
+    if(x<12) x=12;
+    if(y+h > window.innerHeight-12) y = r.top-h-8;
+    if(y<12) y=12;
+    c.style.left=x+'px'; c.style.top=y+'px';
+  }
+  document.addEventListener('mouseover', function(e){
+    const el = e.target.closest && e.target.closest('[title],[data-tip]');
+    if(!el || !el.closest('table')) return;
+    if(el.hasAttribute('title')){
+      const t = el.getAttribute('title');
+      if(t){ el.setAttribute('data-tip', t); }
+      el.removeAttribute('title');
+    }
+    const txt = el.getAttribute('data-tip');
+    if(!txt) return;
+    const c = crear();
+    c.textContent = txt;
+    c.classList.add('visible');
+    colocar(c, el);
+  });
+  document.addEventListener('mouseout', function(){ if(caja) caja.classList.remove('visible'); });
+  window.addEventListener('scroll', function(){ if(caja) caja.classList.remove('visible'); }, true);
+})();
 </script>
 </body>
 </html>
