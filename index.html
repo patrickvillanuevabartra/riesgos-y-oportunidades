@@ -6033,6 +6033,17 @@ async function guardarReporte(riesgoId){
   if(!g('add_tipo'))   _falta.push('Tipo de medición');
   const _pctIn = g('add_pct');
   if(_pctIn==='' || _pctIn==null) _falta.push('% completado');
+  // Coherencia: un 100% significa que la medida terminó, así que no puede
+  // reportarse como medición parcial. Se exige el reporte de cierre.
+  const _tipoIn = String(g('add_tipo')||'');
+  if(parseInt(_pctIn)>=100 && /parcial/i.test(_tipoIn)){
+    toast('Con 100% de avance el tipo de medición debe ser «De cierre», no «Parcial». Cambia el tipo o baja el porcentaje.', true);
+    return;
+  }
+  // Y al revés: un reporte de cierre por debajo del 100% deja la medida a medias.
+  if(parseInt(_pctIn)<100 && /cierre/i.test(_tipoIn)){
+    if(!confirm('Estás cerrando la medida con '+parseInt(_pctIn)+'% de avance.\n\n¿Confirmas que la medida queda cerrada sin llegar al 100%?')) return;
+  }
   if(!String(g('add_accion')||'').replace(/<[^>]*>/g,'').trim()) _falta.push('Acción desarrollada');
   if(!_evTieneEnlace(g('add_evid'))) _falta.push('Evidencias (al menos un enlace que empiece con https://)');
   if(_falta.length){ toast('Faltan campos obligatorios: '+_falta.join(', ')+'.', true); return; }
