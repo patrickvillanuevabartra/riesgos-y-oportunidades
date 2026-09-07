@@ -4408,7 +4408,8 @@ async function renderSeguimiento() {
       // Estado de certificación del control (para destacar cuando procede certificar)
       const _certRaw = vR['Certificación de Implementación del Control'] || vR[CONFIG.MATRIZ_FIELDS.certificacion_control.id] || '';
       const certificacion = (_certRaw && !String(_certRaw).includes('Certificación')) ? String(_certRaw).trim() : '';
-      return {id:r.id, op, desc, codigo:codigoDe(r), proc, procFuente, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch, tieneMonitoreo, monIds, nMon:monIds.length, ctrlTxt, certificacion};
+      return {id:r.id, op, desc, codigo:codigoDe(r), proc, procFuente, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch, tieneMonitoreo, monIds, nMon:monIds.length, ctrlTxt, certificacion,
+        tecCorreo:(_rtDelRiesgo(r)[0]||''), tecNombre:(leerTexto(r,RT_NOMBRE,true)||''), tecMio:_rtEsMio(r), puedeTrab:rtPuedeTrabajar(r)};
     })
     // Filtro por el selector Todos/Riesgos/Oportunidades
     .filter(f => SEG_TIPO==='todos' || (SEG_TIPO==='oportunidades'?f.op:!f.op))
@@ -4479,10 +4480,10 @@ async function renderSeguimiento() {
         <td data-label="¿Procede reevaluación?" id="procede-${f.id}" title="Evaluando condiciones…"><span class="hint" style="font-size:11.5px">…</span></td>
         <td class="cards-acciones" style="text-align:right;vertical-align:middle;padding:5px 4px">
           <div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;width:116px;margin-left:auto">
-          <button class="icon-btn" title="${f.puedeTrab?'Reporte de acciones a la(s) medida(s) de respuesta':'Este riesgo tiene otro responsable técnico'}" onclick="abrirReporteAcciones('${f.id}')" ${f.puedeTrab?'':'disabled style="opacity:.35;cursor:not-allowed"'}>📋</button>
+          <button class="icon-btn" title="${f.puedeTrab===false?'Este riesgo tiene otro responsable técnico':'Reporte de acciones a la(s) medida(s) de respuesta'}" onclick="abrirReporteAcciones('${f.id}')" ${f.puedeTrab===false?'disabled style="opacity:.35;cursor:not-allowed"':''}>📋</button>
           ${f.tieneMonitoreo?`<button class="icon-btn" id="btnmon-${f.id}" title="Control y Seguimiento (se habilita cuando las medidas estén al 100%)" onclick="abrirMetasMonitoreo('${f.id}')" style="border-color:var(--brand-2);display:none">🎯</button>`:''}
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
-          <button class="icon-btn" title="${f.puedeTrab?'Editar':'Este riesgo tiene otro responsable técnico'}" onclick="editarRiesgo('${f.id}')" ${f.puedeTrab?'':'disabled style="opacity:.35;cursor:not-allowed"'}>✏️</button>
+          <button class="icon-btn" title="${f.puedeTrab===false?'Este riesgo tiene otro responsable técnico':'Editar'}" onclick="editarRiesgo('${f.id}')" ${f.puedeTrab===false?'disabled style="opacity:.35;cursor:not-allowed"':''}>✏️</button>
           ${puedeVerTodo()?`<button class="icon-btn" title="Notificar por WhatsApp" onclick="notificarWhatsApp('${f.id}')">📱</button>
           <button class="icon-btn" title="Notificar por correo" onclick="notificarCorreo('${f.id}')">✉️</button>`:''}
           ${puedeEliminar()?`<button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
