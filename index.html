@@ -584,6 +584,7 @@
           <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="f_resp_proc">—</div></div>
           <div class="field"><label>Celular responsable</label><div class="readonly-pill" id="f_resp_cel">—</div></div>
           <div class="field"><label>Correo responsable</label><div class="readonly-pill" id="f_resp_cor">—</div></div>
+          <div class="field"><label>Responsable técnico</label><select id="f_resp_tec"></select></div>
         </div>
       </div>
 
@@ -2005,6 +2006,12 @@ window.cargarMapaRespProceso = cargarMapaRespProceso;
 
 // Autocompleta responsable de proceso / celular / correo según la oficina elegida.
 async function autocompletarRespProceso(selOficinaId, repId, celId, correoId){
+  // El desplegable de responsables técnicos depende de la oficina y del
+  // responsable de proceso, así que se repinta cada vez que cambian.
+  setTimeout(function(){
+    const idSel = selOficinaId.indexOf('ed_')===0 ? 'ed_resp_tec' : 'f_resp_tec';
+    if(document.getElementById(idSel)) rtPintarSelect(idSel, selOficinaId, repId, '');
+  }, 0);
   const sel = document.getElementById(selOficinaId);
   const oficina = sel && sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].text.trim() : '';
   const elRep = document.getElementById(repId);
@@ -2050,6 +2057,10 @@ function _datosNotif(r){
     proceso: rutaProcesoDe(r)||'—',
     oficina: (oficinaDe(r)==='Sin oficina asignada'?'':oficinaDe(r)),
     responsable: leerTexto(r,F.resp_proceso_txt,true)||'',
+    tecCorreo: (_rtDelRiesgo(r)[0]||''),
+    tecNombre: leerTexto(r,RT_NOMBRE,true)||'',
+    tecMio: _rtEsMio(r),
+    puedeTrab: rtPuedeTrabajar(r),
     celular: leerTexto(r,F.resp_celular,true)||'',
     correo: leerTexto(r,F.resp_correo,true)||'',
     // — Evaluación inherente —
@@ -2583,6 +2594,10 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   // Responsable de proceso, celular y correo (autocompletados desde la oficina)
   const txtRP = (id)=>{ const el=document.getElementById(id); const t=el?el.textContent.trim():''; return (t && t!=='—' && !t.startsWith('(sin '))?t:''; };
   if(txtRP('f_resp_proc')) put(F.resp_proceso_txt, txtRP('f_resp_proc'));
+  const _rt = rtValores('f_resp_tec');
+  if(_rt.correo)  put(RT_CORREO,  _rt.correo);
+  if(_rt.nombre)  put(RT_NOMBRE,  _rt.nombre);
+  if(_rt.celular) put(RT_CELULAR, _rt.celular);
   if(txtRP('f_resp_cel'))  put(F.resp_celular, txtRP('f_resp_cel'));
   if(txtRP('f_resp_cor'))  put(F.resp_correo, txtRP('f_resp_cor'));
 
@@ -4036,6 +4051,8 @@ window._evTieneEnlace=_evTieneEnlace;
       if(campoP) setTimeout(()=>campoP.focus(), 120);
     }
   }catch(_){}
+  // Catálogo de responsables técnicos: se carga una vez y queda en memoria.
+  setTimeout(function(){ if(typeof cargarRespTecnicos==='function') cargarRespTecnicos(); }, 1500);
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',arrancar);
   else arrancar();
 })();
@@ -4440,6 +4457,7 @@ async function renderSeguimiento() {
         <td class="cards-main" data-label="Descripción">
           ${f.codigo?`<span class="cod-tag" title="Código del registro">${f.codigo}</span>`:''}
           ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>42?f.desc.slice(0,42)+'…':f.desc}</a>
+          ${f.tecMio?`<span class="tag tag-proc" title="Estás registrado como responsable técnico de este riesgo" style="margin-top:3px">★ A tu cargo</span>`:(f.tecCorreo?`<span class="hint" style="display:block;font-size:10.5px" title="${(f.tecNombre||f.tecCorreo).replace(/"/g,'&quot;')}">Técnico: ${(f.tecNombre||f.tecCorreo).slice(0,26)}</span>`:'')}
         </td>
         <td data-label="Origen" title="${((f.procFuente?f.procFuente+': ':'')+(f.proc||'')).replace(/"/g,'&quot;')}" style="font-size:11.5px">${f.procFuente?`<span style="display:block;font-size:9.5px;font-weight:600;color:var(--brand);text-transform:uppercase;letter-spacing:.02em;line-height:1.2">${f.procFuente==='Partes interesadas'?'Partes':f.procFuente}</span>`:''}<span>${f.proc.length>20?f.proc.slice(0,20)+'…':f.proc}</span>${(f.desact && f.procFuente==='Proceso')?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
         <td data-label="Nivel inherente" style="white-space:nowrap">${nivelBadge(f.nivel, f.op)}</td>
@@ -4461,10 +4479,10 @@ async function renderSeguimiento() {
         <td data-label="¿Procede reevaluación?" id="procede-${f.id}" title="Evaluando condiciones…"><span class="hint" style="font-size:11.5px">…</span></td>
         <td class="cards-acciones" style="text-align:right;vertical-align:middle;padding:5px 4px">
           <div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;width:116px;margin-left:auto">
-          <button class="icon-btn" title="Reporte de acciones a la(s) medida(s) de respuesta" onclick="abrirReporteAcciones('${f.id}')">📋</button>
+          <button class="icon-btn" title="${f.puedeTrab?'Reporte de acciones a la(s) medida(s) de respuesta':'Este riesgo tiene otro responsable técnico'}" onclick="abrirReporteAcciones('${f.id}')" ${f.puedeTrab?'':'disabled style="opacity:.35;cursor:not-allowed"'}>📋</button>
           ${f.tieneMonitoreo?`<button class="icon-btn" id="btnmon-${f.id}" title="Control y Seguimiento (se habilita cuando las medidas estén al 100%)" onclick="abrirMetasMonitoreo('${f.id}')" style="border-color:var(--brand-2);display:none">🎯</button>`:''}
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
-          <button class="icon-btn" title="Editar" onclick="editarRiesgo('${f.id}')">✏️</button>
+          <button class="icon-btn" title="${f.puedeTrab?'Editar':'Este riesgo tiene otro responsable técnico'}" onclick="editarRiesgo('${f.id}')" ${f.puedeTrab?'':'disabled style="opacity:.35;cursor:not-allowed"'}>✏️</button>
           ${puedeVerTodo()?`<button class="icon-btn" title="Notificar por WhatsApp" onclick="notificarWhatsApp('${f.id}')">📱</button>
           <button class="icon-btn" title="Notificar por correo" onclick="notificarCorreo('${f.id}')">✉️</button>`:''}
           ${puedeEliminar()?`<button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
@@ -6594,6 +6612,7 @@ function _editarRiesgoInterno(riesgoId){
       <!-- Responsable: siempre -->
       <div class="field full"><label>Responsable (oficina)</label><select id="ed_responsable" onchange="autocompletarRespProceso('ed_responsable','ed_resp_proc','ed_resp_cel','ed_resp_cor')"></select></div>
       <div class="field"><label>Responsable de proceso</label><div class="readonly-pill" id="ed_resp_proc">—</div></div>
+      <div class="field"><label>Responsable técnico</label><select id="ed_resp_tec"></select></div>
       <div class="field"><label>Celular responsable</label><div class="readonly-pill" id="ed_resp_cel">—</div></div>
       <div class="field full"><label>Correo responsable</label><div class="readonly-pill" id="ed_resp_cor">—</div></div>
     </div></div>`;
@@ -6899,6 +6918,10 @@ async function guardarEdit(){
   // Si no se eligió oficina, estos quedan vacíos también.
   const txtRPe = (id)=>{ const el=document.getElementById(id); const t=el?el.textContent.trim():''; return (t && t!=='—' && !t.startsWith('(sin '))?t:''; };
   set(F.resp_proceso_txt, txtRPe('ed_resp_proc'));
+  const _rte = rtValores('ed_resp_tec');
+  set(RT_CORREO,  _rte.correo);
+  set(RT_NOMBRE,  _rte.nombre);
+  set(RT_CELULAR, _rte.celular);
   set(F.resp_celular, txtRPe('ed_resp_cel'));
   set(F.resp_correo, txtRPe('ed_resp_cor'));
 
@@ -7599,5 +7622,116 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 })();
 </script>
+<script>
+/* ===================== RESPONSABLE TÉCNICO =====================
+   Réplica de lo implementado en la Matriz de Indicadores.
+   · El catálogo de personas vive en la tabla «Responsable técnico» de la MISMA
+     aplicación de QuintaDB, así que se consulta con el APP_ID actual.
+   · En cada riesgo se guardan tres columnas: el correo (que es el que manda para
+     los permisos), el nombre y el celular (solo para lectura en QuintaDB).
+   · El desplegable se filtra por el Responsable de proceso (Líder) y por la
+     oficina (Unidad responsable), igual que en indicadores.
+================================================================= */
+const RT_ENTITY = 'ddOCoDW51dSikTWP3dVSoL';
+const RT_CORREO  = { id:'dcTLxcId5gW74qW5FcLSkK', col:'Responsables técnicos' };
+const RT_NOMBRE  = { id:'ddN8oFv8jhDik-WRZdGCky', col:'Nombre responsable técnico' };
+const RT_CELULAR = { id:'ddL8kkESjotkb4W4pdNfmP', col:'Celular responsable técnico' };
+
+let _RT_LISTA = null;
+async function cargarRespTecnicos(forzar){
+  if(_RT_LISTA && !forzar) return _RT_LISTA;
+  const limpio = v => { const t=String(v==null?'':v).replace(/\s+/g,' ').trim();
+    return (!t || /^(Field_|Seleccione$)/.test(t)) ? '' : t; };
+  const out=[];
+  try{
+    const data = await API.records(RT_ENTITY);
+    (data.records||[]).forEach(r=>{
+      const v=r.values||{};
+      const nombre = limpio(v['Responsable técnico']);
+      const correo = limpio(v['Correo electrónico responsable técnico']);
+      if(!nombre && !correo) return;
+      out.push({ id:r.id, nombre, correo,
+        celular: limpio(v['Celular responsable técnico']),
+        lider:   limpio(v['Líder']),
+        unidad:  limpio(v['Unidad responsable']) });
+    });
+  }catch(e){ /* si falla, el desplegable queda vacío y todo sigue funcionando */ }
+  _RT_LISTA = out;
+  return out;
+}
+window.cargarRespTecnicos = cargarRespTecnicos;
+
+function _rtNorm(x){ return String(x||'').replace(/\s+/g,' ').trim().toLowerCase(); }
+function _rtPorCorreo(c){ const k=_rtNorm(c); return (!k||!_RT_LISTA)?null:(_RT_LISTA.find(x=>_rtNorm(x.correo)===k)||null); }
+
+// Correos asignados a un riesgo (pueden ser varios, separados por coma o salto)
+function _rtDelRiesgo(r){
+  const txt = (typeof leerTexto==='function') ? (leerTexto(r, RT_CORREO, true)||'') : '';
+  return String(txt).split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
+}
+// ¿El usuario en sesión es el técnico de ESTE riesgo?
+function _rtEsMio(r){
+  const yo=_rtNorm(SESION&&SESION.usuario);
+  if(!yo) return false;
+  return _rtDelRiesgo(r).some(c=>_rtNorm(c)===yo);
+}
+// Permiso final sobre un riesgo
+function rtPuedeTrabajar(r){
+  if(typeof puedeVerTodo==='function' && puedeVerTodo()) return true;  // admin y gestor
+  // El responsable de proceso conserva acceso a TODOS los riesgos de su oficina:
+  // es quien los reparte entre sus técnicos y debe poder reasignarlos después.
+  if(_rtEsResponsableProceso(r)) return true;
+  const asignados=_rtDelRiesgo(r);
+  if(!asignados.length) return true;   // sin asignar: lo trabaja la oficina, como hasta ahora
+  return _rtEsMio(r);                  // asignado: solo su responsable técnico
+}
+// ¿El usuario en sesión es el responsable de proceso de este riesgo?
+// Se compara con el correo que el aplicativo autocompleta al elegir la oficina.
+function _rtEsResponsableProceso(r){
+  const yo=_rtNorm(SESION&&SESION.usuario);
+  if(!yo || typeof F==='undefined' || !F.resp_correo) return false;
+  return _rtNorm(leerTexto(r, F.resp_correo, true)) === yo;
+}
+window.rtPuedeTrabajar = rtPuedeTrabajar;
+
+/* ===== Desplegable del formulario ===== */
+function rtOpciones(idOficina, idLider){
+  const oficina=_rtNorm((document.getElementById(idOficina)||{}).value||'');
+  const el=document.getElementById(idLider);
+  const lider=_rtNorm(el ? (el.value!==undefined?el.value:el.textContent) : '');
+  const todos=_RT_LISTA||[];
+  let lista=todos.filter(x => (lider && _rtNorm(x.lider)===lider) || (oficina && _rtNorm(x.unidad)===oficina));
+  if(!lista.length) lista=todos;   // datos incompletos: mejor ofrecer todos que bloquear
+  return lista;
+}
+function rtPintarSelect(idSelect, idOficina, idLider, correoActual){
+  const sel=document.getElementById(idSelect);
+  if(!sel) return;
+  const ops=rtOpciones(idOficina, idLider);
+  const esc=x=>String(x||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  sel.innerHTML = ['<option value="">— sin responsable técnico —</option>']
+    .concat(ops.map(x=>`<option value="${esc(x.correo)}">${esc(x.nombre||x.correo)}</option>`)).join('');
+  if(correoActual){
+    // Si el asignado no está en la lista filtrada, se agrega para no perderlo
+    if(!ops.some(x=>_rtNorm(x.correo)===_rtNorm(correoActual))){
+      const info=_rtPorCorreo(correoActual);
+      sel.insertAdjacentHTML('beforeend',
+        `<option value="${esc(correoActual)}">${esc((info&&info.nombre)||correoActual)}</option>`);
+    }
+    sel.value=correoActual;
+  }
+}
+window.rtPintarSelect = rtPintarSelect;
+
+// Devuelve los tres valores listos para guardar
+function rtValores(idSelect){
+  const sel=document.getElementById(idSelect);
+  const correo=sel ? (sel.value||'').trim() : '';
+  const info=_rtPorCorreo(correo);
+  return { correo, nombre:(info&&info.nombre)||'', celular:(info&&info.celular)||'' };
+}
+window.rtValores = rtValores;
+</script>
+
 </body>
 </html>
