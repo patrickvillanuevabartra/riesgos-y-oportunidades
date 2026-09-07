@@ -2006,12 +2006,6 @@ window.cargarMapaRespProceso = cargarMapaRespProceso;
 
 // Autocompleta responsable de proceso / celular / correo según la oficina elegida.
 async function autocompletarRespProceso(selOficinaId, repId, celId, correoId){
-  // El desplegable de responsables técnicos depende de la oficina y del
-  // responsable de proceso, así que se repinta cada vez que cambian.
-  setTimeout(function(){
-    const idSel = selOficinaId.indexOf('ed_')===0 ? 'ed_resp_tec' : 'f_resp_tec';
-    if(document.getElementById(idSel)) rtPintarSelect(idSel, selOficinaId, repId, '');
-  }, 0);
   const sel = document.getElementById(selOficinaId);
   const oficina = sel && sel.selectedOptions && sel.selectedOptions[0] ? sel.selectedOptions[0].text.trim() : '';
   const elRep = document.getElementById(repId);
@@ -2020,6 +2014,7 @@ async function autocompletarRespProceso(selOficinaId, repId, celId, correoId){
   const ph = '—';
   if (!oficina || (sel.selectedOptions[0] && sel.selectedOptions[0].value==='')) {
     if(elRep) elRep.textContent = ph; if(elCel) elCel.textContent = ph; if(elCor) elCor.textContent = ph;
+    rtRepintar(selOficinaId, repId);
     return;
   }
   const mapa = await cargarMapaRespProceso();
@@ -2027,8 +2022,23 @@ async function autocompletarRespProceso(selOficinaId, repId, celId, correoId){
   if(elRep) elRep.textContent = info.responsable || '(sin responsable registrado)';
   if(elCel) elCel.textContent = info.celular || '(sin celular)';
   if(elCor) elCor.textContent = info.correo || '(sin correo)';
+  // Ahora que la oficina y el responsable de proceso están resueltos,
+  // se repinta el desplegable de técnicos con el filtro correcto.
+  rtRepintar(selOficinaId, repId);
 }
 window.autocompletarRespProceso = autocompletarRespProceso;
+
+// Repinta el desplegable de técnicos del formulario que corresponda.
+// _RT_PENDIENTE lleva el correo ya asignado cuando se abre el editor.
+let _RT_PENDIENTE = '';
+async function rtRepintar(selOficinaId, repId){
+  const idSel = selOficinaId.indexOf('ed_')===0 ? 'ed_resp_tec' : 'f_resp_tec';
+  if(!document.getElementById(idSel)) return;
+  await cargarRespTecnicos();          // por si aún no estaba en memoria
+  rtPintarSelect(idSel, selOficinaId, repId, _RT_PENDIENTE);
+  _RT_PENDIENTE = '';
+}
+window.rtRepintar = rtRepintar;
 
 // === Notificar al responsable por WhatsApp / Correo, usando PLANTILLAS personalizables ===
 // Mapa de marcadores {campo} → valor real del riesgo.
@@ -2143,7 +2153,7 @@ async function _avanceUltimoReporte(r){
     const est = v[RF.estado.col] || '';
     return {
       avance: (pct!=='' && pct!=null) ? (parseInt(pct)||0)+'%' : '',
-      ultimo_estado: est
+      ultimo_estado: estadoSegunAvance(est, pct)
     };
   }catch(_){ return {avance:'', ultimo_estado:''}; }
 }
@@ -3275,7 +3285,7 @@ async function cargarAvanceMedidas(){
     const d = await API.records(CONFIG.ENTITIES.REPORTES);
     const fechaComp = s => { const m=String(s||'').match(/(\d{2})-(\d{2})-(\d{4})\s*(\d{2}):(\d{2}):(\d{2})/); return m?new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5],+m[6]).getTime():0; };
     const infoReporte = {};
-    (d.records||[]).forEach(r=>{ infoReporte[r.id] = { estado:(r.values||{})[RF.estado.col]||'', ts:fechaComp(r.created_at) }; });
+    (d.records||[]).forEach(r=>{ const vv=(r.values||{}); infoReporte[r.id] = { estado:vv[RF.estado.col]||'', pct:vv[RF.pct_completado.col], ts:fechaComp(r.created_at) }; });
 
     const cont = { 'Pendiente':0, 'En Proceso':0, 'Culminado/Ejecutado':0 };
     recs.forEach(r=>{
@@ -3284,8 +3294,10 @@ async function cargarAvanceMedidas(){
       if(subIds.length){
         // Estado del reporte MÁS RECIENTE por fecha (no por posición en la lista)
         let mejorTs=-1, mejorEstado='Pendiente';
-        subIds.forEach(id=>{ const inf=infoReporte[id]; if(inf && inf.ts>=mejorTs){ mejorTs=inf.ts; mejorEstado=inf.estado||'Pendiente'; } });
-        estado = mejorEstado;
+        let mejorPct=null;
+        subIds.forEach(id=>{ const inf=infoReporte[id]; if(inf && inf.ts>=mejorTs){ mejorTs=inf.ts; mejorEstado=inf.estado||'Pendiente'; mejorPct=inf.pct; } });
+        // Mismo criterio que la tabla: al 100% la medida cuenta como culminada
+        estado = estadoSegunAvance(mejorEstado, mejorPct) || 'Pendiente';
       }
       if(cont[estado]!==undefined) cont[estado]++;
     });
@@ -3615,6 +3627,16 @@ function nivel1De(r){
       || leerRelacion(r, 'Tipo de proceso', F.tipo_proceso.id)
       || 'Sin proceso';
 }
+
+// Al llegar al 100% de avance, la medida se da por culminada aunque el último
+// reporte se haya guardado como Parcial. Evita la lectura contradictoria de
+// «100% · En Proceso» en la tabla y en el tablero.
+function estadoSegunAvance(est, pct){
+  const n = parseInt(pct);
+  if(!isNaN(n) && n >= 100) return 'Culminado/Ejecutado';
+  return est;
+}
+window.estadoSegunAvance = estadoSegunAvance;
 
 function estadoPill(est){
   const c = est==='Culminado/Ejecutado'?'est-culm':est==='En Proceso'?'est-proc':est==='Observado'?'est-obs':'est-pend';
@@ -4550,11 +4572,11 @@ async function cargarUltimosEstados(filasConReportes) {
         if (ts >= mejorFecha) { mejorFecha = ts; mejor = rec; }
       }
       const v = (mejor && mejor.values) ? mejor.values : {};
-      const est = v[RF.estado.col] || '';
+      const pctRaw = v[RF.pct_completado.col];
+      const est = estadoSegunAvance(v[RF.estado.col] || '', pctRaw);
       const cel = document.getElementById('estado-'+f.id);
       if (cel) cel.innerHTML = est ? estadoPill(est) : '—';
       // % avance = % completado del reporte más reciente
-      const pctRaw = v[RF.pct_completado.col];
       const cav = document.getElementById('avance-'+f.id);
       let pctMedidas = NaN;
       if (cav) {
@@ -6510,6 +6532,9 @@ function _editarRiesgoInterno(riesgoId){
   const r = STATE.matriz.find(x=>x.id===riesgoId);
   if(!r) return;
   EDIT_ACTUAL = riesgoId;
+  // El técnico ya asignado se guarda aquí para volver a seleccionarlo cuando
+  // el desplegable termine de pintarse con su filtro.
+  _RT_PENDIENTE = (_rtDelRiesgo(r)[0]||'');
   const v = r.values||{};
   const F = CONFIG.MATRIZ_FIELDS;
   const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
@@ -7697,12 +7722,19 @@ window.rtPuedeTrabajar = rtPuedeTrabajar;
 
 /* ===== Desplegable del formulario ===== */
 function rtOpciones(idOficina, idLider){
-  const oficina=_rtNorm((document.getElementById(idOficina)||{}).value||'');
+  // El desplegable de oficina guarda un identificador interno en value; el nombre
+  // visible está en el texto de la opción, que es lo que hay que comparar.
+  const selO=document.getElementById(idOficina);
+  const oficina=_rtNorm(selO && selO.selectedOptions && selO.selectedOptions[0] ? selO.selectedOptions[0].text : '');
   const el=document.getElementById(idLider);
-  const lider=_rtNorm(el ? (el.value!==undefined?el.value:el.textContent) : '');
+  let lider = el ? (el.tagName==='SELECT' ? el.value : el.textContent) : '';
+  lider = _rtNorm(lider);
+  if(lider==='—' || lider.indexOf('(sin ')===0) lider='';   // píldora vacía
   const todos=_RT_LISTA||[];
   let lista=todos.filter(x => (lider && _rtNorm(x.lider)===lider) || (oficina && _rtNorm(x.unidad)===oficina));
-  if(!lista.length) lista=todos;   // datos incompletos: mejor ofrecer todos que bloquear
+  // Si no hay coincidencias se ofrecen todos, pero avisando: casi siempre
+  // significa que en el catálogo el Líder o la Unidad no están escritos igual.
+  if(!lista.length){ lista=todos.slice(); lista._sinFiltro=true; }
   return lista;
 }
 function rtPintarSelect(idSelect, idOficina, idLider, correoActual){
@@ -7710,7 +7742,10 @@ function rtPintarSelect(idSelect, idOficina, idLider, correoActual){
   if(!sel) return;
   const ops=rtOpciones(idOficina, idLider);
   const esc=x=>String(x||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-  sel.innerHTML = ['<option value="">— sin responsable técnico —</option>']
+  const aviso = ops._sinFiltro
+    ? '<option value="" disabled>— sin coincidencias para esta oficina: se muestran todos —</option>'
+    : '';
+  sel.innerHTML = ['<option value="">— sin responsable técnico —</option>', aviso]
     .concat(ops.map(x=>`<option value="${esc(x.correo)}">${esc(x.nombre||x.correo)}</option>`)).join('');
   if(correoActual){
     // Si el asignado no está en la lista filtrada, se agrega para no perderlo
