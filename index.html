@@ -2066,13 +2066,13 @@ function _datosNotif(r){
     // — Proceso / responsables —
     proceso: rutaProcesoDe(r)||'—',
     oficina: (oficinaDe(r)==='Sin oficina asignada'?'':oficinaDe(r)),
-    responsable: leerTexto(r,F.resp_proceso_txt,true)||'',
+    responsable: ((_rtRespVigente(r)||{}).responsable) || leerTexto(r,F.resp_proceso_txt,true)||'',
     tecCorreo: (_rtDelRiesgo(r)[0]||''),
     tecNombre: leerTexto(r,RT_NOMBRE,true)||'',
     tecMio: _rtEsMio(r),
     puedeTrab: rtPuedeTrabajar(r),
-    celular: leerTexto(r,F.resp_celular,true)||'',
-    correo: leerTexto(r,F.resp_correo,true)||'',
+    celular: ((_rtRespVigente(r)||{}).celular) || leerTexto(r,F.resp_celular,true)||'',
+    correo: ((_rtRespVigente(r)||{}).correo) || leerTexto(r,F.resp_correo,true)||'',
     // — Evaluación inherente —
     probabilidad: limpiarSel(gv('Probabilidad riesgo inherente',F.prob_riesgo_inh)),
     impacto: limpiarSel(gv('Impacto riesgo inherente',F.imp_riesgo_inh)),
@@ -4381,6 +4381,9 @@ function filtrarSeguimientoEnVivo(){ filtrarSeguimientoPorOficina(); } // compat
 window.filtrarSeguimientoEnVivo = filtrarSeguimientoEnVivo;
 
 async function renderSeguimiento() {
+  // El responsable de cada oficina se resuelve en vivo: hay que tener cargada
+  // su tabla antes de pintar las filas y de decidir los permisos.
+  try{ await cargarMapaRespProceso(); }catch(_){}
   const tb = document.getElementById('tablaSeguimiento');
   try {
     let recs = await loadMatriz();
@@ -7724,9 +7727,27 @@ function rtPuedeTrabajar(r){
 }
 // ¿El usuario en sesión es el responsable de proceso de este riesgo?
 // Se compara con el correo que el aplicativo autocompleta al elegir la oficina.
+/* Devuelve el responsable VIGENTE del proceso de este riesgo, consultando la
+   tabla de responsables por su oficina. Antes se usaba el nombre y el correo que
+   quedaron copiados dentro del riesgo, y se desactualizaban en cuanto la oficina
+   cambiaba de responsable en QuintaDB. */
+function _rtRespVigente(r){
+  const mapa = (typeof MAPA_RESP_PROCESO!=='undefined' && MAPA_RESP_PROCESO) ? MAPA_RESP_PROCESO : {};
+  let ofi='';
+  try{ ofi = (typeof oficinaDe==='function') ? oficinaDe(r) : ''; }catch(e){}
+  if(!ofi || ofi==='Sin oficina asignada') return null;
+  return mapa[_rtNorm(ofi)] || null;
+}
+window._rtRespVigente=_rtRespVigente;
+
 function _rtEsResponsableProceso(r){
   const yo=_rtNorm(SESION&&SESION.usuario);
-  if(!yo || typeof F==='undefined' || !F.resp_correo) return false;
+  if(!yo) return false;
+  const vig=_rtRespVigente(r);
+  if(vig && vig.correo && _rtNorm(vig.correo)===yo) return true;
+  // Respaldo: el correo guardado dentro del riesgo, por si esa oficina no
+  // figurara en la tabla de responsables.
+  if(typeof F==='undefined' || !F.resp_correo) return false;
   return _rtNorm(leerTexto(r, F.resp_correo, true)) === yo;
 }
 window.rtPuedeTrabajar = rtPuedeTrabajar;
