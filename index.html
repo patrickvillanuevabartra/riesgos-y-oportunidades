@@ -942,6 +942,48 @@
       </div>
       <div id="usuariosLista"><p class="hint">Cargando usuarios…</p></div>
     </div>
+
+    <details class="card" id="cardReemplazo" style="padding:0;margin-top:18px">
+      <summary style="padding:16px 22px;cursor:pointer;font-weight:600;color:var(--slate);font-size:15px">
+        🔧 Corregir un proceso que cambió de nombre o de código
+        <span style="font-weight:400;color:var(--mist);font-size:13px;margin-left:8px">— úsalo cuando un riesgo avise «proceso desactualizado»</span>
+      </summary>
+      <div style="padding:0 22px 22px">
+
+        <div style="background:#f5f9f7;border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px;font-size:13.5px;line-height:1.6;color:var(--slate)">
+          <p style="margin:0 0 10px"><strong>¿Cuándo se usa?</strong><br>
+          Cuando al pasar el mouse sobre el ⚠️ de un riesgo aparece el aviso <em>«proceso desactualizado: … ya no existe en el inventario»</em>.</p>
+
+          <p style="margin:0 0 10px"><strong>¿Por qué pasa?</strong><br>
+          Cada riesgo guarda el nombre del proceso escrito dentro, como una copia. Si ese proceso se renombra o se elimina en el inventario, los riesgos se quedan con el nombre anterior y dejan de encontrarlo.</p>
+
+          <p style="margin:0 0 10px"><strong>¿Qué hace esta herramienta?</strong><br>
+          Cambia un texto por otro en todos los riesgos de una sola vez. Tú indicas cuál es el texto viejo y cuál el nuevo.</p>
+
+          <p style="margin:0 0 10px"><strong>Ejemplo</strong><br>
+          El proceso <code>M01.05.02.03.02 Identificar dificultades…</code> ahora se llama <code>M01.05.02.03.01 Seguimiento de las asignaturas</code>.<br>
+          Copias el nombre viejo completo en el primer campo y el nuevo en el segundo. Los riesgos quedan apuntando al proceso correcto.</p>
+
+          <p style="margin:0 0 10px"><strong>Pasos</strong><br>
+          1. Copia el texto viejo del aviso ⚠️ del riesgo.<br>
+          2. Busca en el inventario cómo se llama ahora ese proceso y copia su nombre completo.<br>
+          3. Pega uno en cada campo y pulsa <strong>Buscar</strong>.<br>
+          4. Revisa cuántos riesgos van a cambiar. Si el número cuadra, pulsa <strong>Reemplazar</strong>.</p>
+
+          <p style="margin:0;color:#b26a00"><strong>Antes de reemplazar:</strong> descarga el Excel de Seguimiento. El cambio no se puede deshacer.</p>
+        </div>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:260px"><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Texto actual (el que ya no existe)</label>
+            <input id="rpViejo" placeholder="M01.05.02.03.02 Identificar dificultades…" style="padding:9px 11px;border:1px solid var(--line);border-radius:9px;font:inherit;width:100%"></div>
+          <div style="flex:1;min-width:260px"><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Texto nuevo (el correcto)</label>
+            <input id="rpNuevo" placeholder="M01.05.02.03.01 Seguimiento de las asignaturas" style="padding:9px 11px;border:1px solid var(--line);border-radius:9px;font:inherit;width:100%"></div>
+          <button class="btn" onclick="rpBuscar()" id="rpBtnBuscar">Buscar</button>
+          <button class="btn btn-primary" onclick="rpReemplazar()" id="rpBtnAplicar" disabled>Reemplazar</button>
+        </div>
+        <div id="rpSalida" style="margin-top:14px;font-size:13px"></div>
+      </div>
+    </details>
   </section>
 
   <!-- Modal crear/editar usuario -->
@@ -7799,6 +7841,96 @@ function rtValores(idSelect){
   return { correo, nombre:(info&&info.nombre)||'', celular:(info&&info.celular)||'' };
 }
 window.rtValores = rtValores;
+</script>
+
+<script>
+/* ===== Reemplazo de texto en bloque (riesgos) =====
+   Cada riesgo guarda el nombre del proceso como texto copiado, no como vínculo.
+   Si el proceso se renombra o se elimina en el inventario, los riesgos quedan con
+   el nombre anterior. Esta herramienta cambia ese texto en todos los registros.
+   Se escribe con pausas: sin ellas QuintaDB corta por exceso de peticiones. */
+let _RP_HALLAZGOS = null;
+
+function _rpEsId(k){ return /^[a-zA-Z0-9_\-]{22}$/.test(String(k)); }
+// Cada registro trae la clave con el identificador cuyo valor es el nombre de la
+// columna: de ahí se saca la correspondencia para poder escribir.
+function _rpMapa(v){
+  const m={};
+  Object.keys(v||{}).forEach(k=>{ if(_rpEsId(k) && typeof v[k]==='string' && v[k].trim()) m[v[k].trim()]=k; });
+  return m;
+}
+function _rpSalida(html){ document.getElementById('rpSalida').innerHTML = html; }
+
+async function rpBuscar(){
+  const viejo=(document.getElementById('rpViejo').value||'').trim();
+  const nuevo=(document.getElementById('rpNuevo').value||'').trim();
+  document.getElementById('rpBtnAplicar').disabled = true;
+  _RP_HALLAZGOS = null;
+  if(!viejo || !nuevo){ _rpSalida('<span style="color:var(--danger,#c0392b)">Completa los dos campos.</span>'); return; }
+  if(viejo===nuevo){ _rpSalida('<span style="color:var(--danger,#c0392b)">Los dos textos son iguales.</span>'); return; }
+  _rpSalida('Buscando…');
+
+  const hallazgos=[]; const porTabla={};
+  for(const [tabla, ent] of Object.entries(CONFIG.ENTITIES)){
+    let d;
+    try{ d = await API.records(ent); }catch(e){ continue; }
+    (d.records||[]).forEach(r=>{
+      const v=r.values||{}; const campos={};
+      Object.keys(v).forEach(k=>{
+        const val=v[k];
+        if(typeof val==='string' && val.includes(viejo) && k!==val) campos[k]=val.split(viejo).join(nuevo);
+      });
+      if(Object.keys(campos).length){
+        hallazgos.push({tabla, ent, id:r.id, campos, mapa:_rpMapa(v)});
+        porTabla[tabla]=(porTabla[tabla]||0)+1;
+      }
+    });
+  }
+
+  if(!hallazgos.length){
+    _rpSalida('No se encontró ese texto en ningún registro. Comprueba que lo copiaste completo y tal cual aparece.');
+    return;
+  }
+  _RP_HALLAZGOS = { viejo, nuevo, lista:hallazgos };
+  document.getElementById('rpBtnAplicar').disabled = false;
+  const filas = Object.entries(porTabla).map(([t,n])=>`<tr><td style="padding:3px 12px 3px 0">${t}</td><td style="text-align:right"><strong>${n}</strong></td></tr>`).join('');
+  _rpSalida(`<table style="width:auto;font-size:13px">${filas}</table>
+    <p style="margin:8px 0 0">Se cambiará el texto en <strong>${hallazgos.length}</strong> registro(s).</p>
+    <p style="margin:6px 0 0;color:var(--mist)">Descarga el Excel antes de continuar: el cambio no se puede deshacer.</p>`);
+}
+window.rpBuscar = rpBuscar;
+
+async function rpReemplazar(){
+  if(!_RP_HALLAZGOS) return;
+  const {viejo, nuevo, lista} = _RP_HALLAZGOS;
+  if(!confirm('Se reemplazará en '+lista.length+' registro(s):\n\n'+viejo+'\n\npor:\n\n'+nuevo+'\n\nEsta acción no se puede deshacer. ¿Continuar?')) return;
+
+  const btn=document.getElementById('rpBtnAplicar');
+  btn.disabled=true;
+  const esperar = ms => new Promise(r=>setTimeout(r, ms));
+  let ok=0; const errores=[]; let n=0;
+  for(const h of lista){
+    try{
+      const campos={};
+      for(const k in h.campos){
+        const fid = _rpEsId(k) ? k : h.mapa[k];
+        if(!fid) throw new Error('columna no identificada: '+k);
+        campos[fid]=h.campos[k];
+      }
+      await API.saveForm(h.id, campos, h.ent); ok++;
+    }catch(e){ errores.push(h.tabla+' · '+e.message); }
+    n++;
+    btn.textContent='Reemplazando… '+n+'/'+lista.length;
+    await esperar(n % 20 === 0 ? 3000 : 400);
+  }
+  btn.textContent='Reemplazar';
+  _RP_HALLAZGOS=null;
+  const detalle = errores.length ? `<p style="color:var(--danger,#c0392b);margin:8px 0 0">${errores.length} registro(s) no se pudieron actualizar:<br>${errores.slice(0,5).join('<br>')}</p>` : '';
+  _rpSalida(`<strong>${ok}</strong> registro(s) actualizados.${detalle}
+    <p style="margin:8px 0 0">Recarga la página para ver los cambios.</p>`);
+  toast(ok+' registro(s) actualizados. Recarga la página.');
+}
+window.rpReemplazar = rpReemplazar;
 </script>
 
 </body>
