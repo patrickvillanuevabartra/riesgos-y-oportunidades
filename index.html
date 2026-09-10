@@ -687,9 +687,10 @@
           3. Pega uno en cada campo y pulsa <strong>Buscar</strong>.<br>
           4. Revisa cuántos riesgos van a cambiar. Si el número cuadra, pulsa <strong>Reemplazar</strong>.</p>
 
-          <p style="margin:0 0 10px"><strong>¿Hasta dónde llega el cambio?</strong><br>
-          Si eres <strong>responsable de proceso o responsable técnico</strong>, el reemplazo se aplica solo a los riesgos de tu oficina.<br>
-          Si eres <strong>administrador</strong>, se aplica a todos los registros de todas las tablas.</p>
+          <p style="margin:0 0 10px"><strong>¿Quién puede hacer este cambio?</strong><br>
+          Solo el <strong>administrador</strong>. Se trata de un cambio en la estructura de procesos, y tiene que quedar igual para toda la Facultad: si cada oficina corrigiera por su cuenta, el mismo proceso terminaría con nombres distintos según quién lo tocó.</p>
+
+          <p style="margin:0 0 10px" id="rpAvisoRol"></p>
 
           <p style="margin:0;color:#b26a00"><strong>Antes de reemplazar:</strong> descarga el Excel de Seguimiento. El cambio no se puede deshacer.</p>
         </div>
@@ -7856,6 +7857,28 @@ window.rtValores = rtValores;
    Se escribe con pausas: sin ellas QuintaDB corta por exceso de peticiones. */
 let _RP_HALLAZGOS = null;
 
+/* Solo el administrador ejecuta el reemplazo. Los responsables de proceso y
+   técnicos ven la explicación y a quién avisar, para que sepan qué hacer cuando
+   les aparezca el aviso «proceso desactualizado» en uno de sus riesgos. */
+function _rpEsAdmin(){ return typeof puedeVerTodo==='function' ? puedeVerTodo() : false; }
+
+function rpAjustarPorRol(){
+  const nota=document.getElementById('rpAvisoRol');
+  if(!nota) return;
+  if(_rpEsAdmin()){ nota.innerHTML=''; return; }
+  nota.innerHTML = '<span style="display:block;background:#fff6e5;border:1px solid #f0d9a8;border-radius:9px;padding:11px 13px;color:#8a5a00">'
+    + '<strong>Esta herramienta es de solo lectura para ti.</strong><br>'
+    + 'Si en alguno de tus riesgos aparece el aviso <em>«proceso desactualizado»</em>, avisa al administrador del sistema '
+    + 'indicando el código del riesgo y el texto del proceso que ya no existe. Él hará la corrección para toda la Facultad '
+    + 'y el aviso desaparecerá.</span>';
+  ['rpViejo','rpNuevo','rpBtnBuscar','rpBtnAplicar'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){ el.disabled=true; el.style.opacity='.5'; el.style.cursor='not-allowed'; }
+  });
+}
+window.rpAjustarPorRol = rpAjustarPorRol;
+document.addEventListener('DOMContentLoaded', ()=>setTimeout(rpAjustarPorRol, 800));
+
 function _rpEsId(k){ return /^[a-zA-Z0-9_\-]{22}$/.test(String(k)); }
 // Cada registro trae la clave con el identificador cuyo valor es el nombre de la
 // columna: de ahí se saca la correspondencia para poder escribir.
@@ -7867,6 +7890,7 @@ function _rpMapa(v){
 function _rpSalida(html){ document.getElementById('rpSalida').innerHTML = html; }
 
 async function rpBuscar(){
+  if(!_rpEsAdmin()){ rpAjustarPorRol(); return; }
   const viejo=(document.getElementById('rpViejo').value||'').trim();
   const nuevo=(document.getElementById('rpNuevo').value||'').trim();
   document.getElementById('rpBtnAplicar').disabled = true;
@@ -7877,9 +7901,8 @@ async function rpBuscar(){
 
   // Alcance según el rol: quien no es administrador solo corrige los riesgos de
   // su propia oficina. Así un error de escritura no puede afectar a toda la Facultad.
-  const global = (typeof puedeVerTodo==='function') && puedeVerTodo();
-  const tablas = global ? Object.entries(CONFIG.ENTITIES)
-                        : [['MATRIZ', CONFIG.ENTITIES.MATRIZ]];
+  const global = true;   // solo el administrador llega hasta aquí
+  const tablas = Object.entries(CONFIG.ENTITIES);
 
   const hallazgos=[]; const porTabla={};
   for(const [tabla, ent] of tablas){
@@ -7920,6 +7943,7 @@ async function rpBuscar(){
 window.rpBuscar = rpBuscar;
 
 async function rpReemplazar(){
+  if(!_rpEsAdmin()){ rpAjustarPorRol(); return; }
   if(!_RP_HALLAZGOS) return;
   const {viejo, nuevo, lista} = _RP_HALLAZGOS;
   if(!confirm('Se reemplazará en '+lista.length+' registro(s):\n\n'+viejo+'\n\npor:\n\n'+nuevo+'\n\nEsta acción no se puede deshacer. ¿Continuar?')) return;
