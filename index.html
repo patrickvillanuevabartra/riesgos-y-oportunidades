@@ -660,50 +660,24 @@
       <div id="filtrosLista"></div>
     </div>
 
-    <details class="card" id="cardReemplazo" style="padding:0;margin-top:18px">
+
+
+    <details class="card" id="cardSyncProc" style="padding:0;margin-top:18px" ontoggle="if(this.open) syncProcAnalizar()">
       <summary style="padding:16px 22px;cursor:pointer;font-weight:600;color:var(--slate);font-size:15px">
-        🔧 Corregir un proceso que cambió de nombre o de código
-        <span style="font-weight:400;color:var(--mist);font-size:13px;margin-left:8px">— úsalo cuando un riesgo avise «proceso desactualizado»</span>
+        🔄 Control de sincronización con el Inventario
+        <span style="font-weight:400;color:var(--mist);font-size:13px;margin-left:8px">— revisa si algún riesgo apunta a un proceso desactualizado</span>
       </summary>
       <div style="padding:0 22px 22px">
-
-        <div style="background:#f5f9f7;border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px;font-size:13.5px;line-height:1.6;color:var(--slate)">
-          <p style="margin:0 0 10px"><strong>¿Cuándo se usa?</strong><br>
-          Cuando al pasar el mouse sobre el ⚠️ de un riesgo aparece el aviso <em>«proceso desactualizado: … ya no existe en el inventario»</em>.</p>
-
-          <p style="margin:0 0 10px"><strong>¿Por qué pasa?</strong><br>
-          Cada riesgo guarda el nombre del proceso escrito dentro, como una copia. Si ese proceso se renombra o se elimina en el inventario, los riesgos se quedan con el nombre anterior y dejan de encontrarlo.</p>
-
-          <p style="margin:0 0 10px"><strong>¿Qué hace esta herramienta?</strong><br>
-          Cambia un texto por otro en todos los riesgos de una sola vez. Tú indicas cuál es el texto viejo y cuál el nuevo.</p>
-
-          <p style="margin:0 0 10px"><strong>Ejemplo</strong><br>
-          El proceso <code>M01.05.02.03.02 Identificar dificultades…</code> ahora se llama <code>M01.05.02.03.01 Seguimiento de las asignaturas</code>.<br>
-          Copias el nombre viejo completo en el primer campo y el nuevo en el segundo. Los riesgos quedan apuntando al proceso correcto.</p>
-
-          <p style="margin:0 0 10px"><strong>Pasos</strong><br>
-          1. Copia el texto viejo del aviso ⚠️ del riesgo.<br>
-          2. Busca en el inventario cómo se llama ahora ese proceso y copia su nombre completo.<br>
-          3. Pega uno en cada campo y pulsa <strong>Buscar</strong>.<br>
-          4. Revisa cuántos riesgos van a cambiar. Si el número cuadra, pulsa <strong>Reemplazar</strong>.</p>
-
-          <p style="margin:0 0 10px"><strong>¿Quién puede hacer este cambio?</strong><br>
-          Solo el <strong>administrador</strong>. Se trata de un cambio en la estructura de procesos, y tiene que quedar igual para toda la Facultad: si cada oficina corrigiera por su cuenta, el mismo proceso terminaría con nombres distintos según quién lo tocó.</p>
-
-          <p style="margin:0 0 10px" id="rpAvisoRol"></p>
-
-          <p style="margin:0;color:#b26a00"><strong>Antes de reemplazar:</strong> descarga el Excel de Seguimiento. El cambio no se puede deshacer.</p>
+        <div style="background:#f5f9f7;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 16px;font-size:13.5px;line-height:1.6;color:var(--slate)">
+          <p style="margin:0 0 8px"><strong>¿Qué es esto?</strong><br>
+          Compara el proceso que tiene guardado cada riesgo con el Inventario de procesos, y muestra lo que ya no coincide.</p>
+          <p style="margin:0 0 8px"><strong>¿Por qué se desincronizan?</strong><br>
+          Cada riesgo guarda el nombre del proceso escrito dentro, como una copia. Si ese proceso se renombra o se elimina en el inventario, la copia se queda con la versión anterior y aparece el aviso ⚠️ <em>«proceso desactualizado»</em> en la tabla.</p>
+          <p style="margin:0 0 8px"><strong>¿Cambia algo por su cuenta?</strong><br>
+          No. Aquí solo se detecta; cada corrección la decides tú con el botón de su fila.</p>
+          <p style="margin:0" id="spAvisoRol"></p>
         </div>
-
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
-          <div style="flex:1;min-width:260px"><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Texto actual (el que ya no existe)</label>
-            <input id="rpViejo" placeholder="M01.05.02.03.02 Identificar dificultades…" style="padding:9px 11px;border:1px solid var(--line);border-radius:9px;font:inherit;width:100%"></div>
-          <div style="flex:1;min-width:260px"><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Texto nuevo (el correcto)</label>
-            <input id="rpNuevo" placeholder="M01.05.02.03.01 Seguimiento de las asignaturas" style="padding:9px 11px;border:1px solid var(--line);border-radius:9px;font:inherit;width:100%"></div>
-          <button class="btn" onclick="rpBuscar()" id="rpBtnBuscar">Buscar</button>
-          <button class="btn btn-primary" onclick="rpReemplazar()" id="rpBtnAplicar" disabled>Reemplazar</button>
-        </div>
-        <div id="rpSalida" style="margin-top:14px;font-size:13px"></div>
+        <div id="spSalida" style="font-size:13px">Analizando…</div>
       </div>
     </details>
 
@@ -7850,130 +7824,150 @@ window.rtValores = rtValores;
 </script>
 
 <script>
-/* ===== Reemplazo de texto en bloque (riesgos) =====
-   Cada riesgo guarda el nombre del proceso como texto copiado, no como vínculo.
-   Si el proceso se renombra o se elimina en el inventario, los riesgos quedan con
-   el nombre anterior. Esta herramienta cambia ese texto en todos los registros.
-   Se escribe con pausas: sin ellas QuintaDB corta por exceso de peticiones. */
-let _RP_HALLAZGOS = null;
-
-/* Solo el administrador ejecuta el reemplazo. Los responsables de proceso y
-   técnicos ven la explicación y a quién avisar, para que sepan qué hacer cuando
-   les aparezca el aviso «proceso desactualizado» en uno de sus riesgos. */
-function _rpEsAdmin(){ return typeof puedeVerTodo==='function' ? puedeVerTodo() : false; }
-
-function rpAjustarPorRol(){
-  const nota=document.getElementById('rpAvisoRol');
-  if(!nota) return;
-  if(_rpEsAdmin()){ nota.innerHTML=''; return; }
-  nota.innerHTML = '<span style="display:block;background:#fff6e5;border:1px solid #f0d9a8;border-radius:9px;padding:11px 13px;color:#8a5a00">'
-    + '<strong>Esta herramienta es de solo lectura para ti.</strong><br>'
-    + 'Si en alguno de tus riesgos aparece el aviso <em>«proceso desactualizado»</em>, avisa al administrador del sistema '
-    + 'indicando el código del riesgo y el texto del proceso que ya no existe. Él hará la corrección para toda la Facultad '
-    + 'y el aviso desaparecerá.</span>';
-  ['rpViejo','rpNuevo','rpBtnBuscar','rpBtnAplicar'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el){ el.disabled=true; el.style.opacity='.5'; el.style.cursor='not-allowed'; }
-  });
-}
-window.rpAjustarPorRol = rpAjustarPorRol;
-document.addEventListener('DOMContentLoaded', ()=>setTimeout(rpAjustarPorRol, 800));
-
-function _rpEsId(k){ return /^[a-zA-Z0-9_\-]{22}$/.test(String(k)); }
-// Cada registro trae la clave con el identificador cuyo valor es el nombre de la
-// columna: de ahí se saca la correspondencia para poder escribir.
-function _rpMapa(v){
+/* ===== Control de sincronización con el Inventario (riesgos) =====
+   Cada riesgo guarda el nombre del proceso como texto copiado. Este panel lo
+   compara con el Inventario y detecta dos situaciones:
+     · renombrado  → el proceso existe pero con otro nombre
+     · inexistente → ese código ya no está en el Inventario
+   El administrador corrige con un botón por fila; el resto solo consulta. */
+function _spEsAdmin(){ return typeof puedeVerTodo==='function' ? puedeVerTodo() : false; }
+function _spNorm(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toLowerCase(); }
+function _spEsc(x){ return String(x||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function _spEsId(k){ return /^[a-zA-Z0-9_\-]{22}$/.test(String(k)); }
+function _spMapa(v){
   const m={};
-  Object.keys(v||{}).forEach(k=>{ if(_rpEsId(k) && typeof v[k]==='string' && v[k].trim()) m[v[k].trim()]=k; });
+  Object.keys(v||{}).forEach(k=>{ if(_spEsId(k) && typeof v[k]==='string' && v[k].trim()) m[v[k].trim()]=k; });
   return m;
 }
-function _rpSalida(html){ document.getElementById('rpSalida').innerHTML = html; }
 
-async function rpBuscar(){
-  if(!_rpEsAdmin()){ rpAjustarPorRol(); return; }
-  const viejo=(document.getElementById('rpViejo').value||'').trim();
-  const nuevo=(document.getElementById('rpNuevo').value||'').trim();
-  document.getElementById('rpBtnAplicar').disabled = true;
-  _RP_HALLAZGOS = null;
-  if(!viejo || !nuevo){ _rpSalida('<span style="color:var(--danger,#c0392b)">Completa los dos campos.</span>'); return; }
-  if(viejo===nuevo){ _rpSalida('<span style="color:var(--danger,#c0392b)">Los dos textos son iguales.</span>'); return; }
-  _rpSalida('Buscando…');
+let _SP_CASOS = null;
 
-  // Alcance según el rol: quien no es administrador solo corrige los riesgos de
-  // su propia oficina. Así un error de escritura no puede afectar a toda la Facultad.
-  const global = true;   // solo el administrador llega hasta aquí
-  const tablas = Object.entries(CONFIG.ENTITIES);
+async function syncProcAnalizar(){
+  const out=document.getElementById('spSalida');
+  const nota=document.getElementById('spAvisoRol');
+  if(nota){
+    nota.innerHTML = _spEsAdmin() ? '' :
+      '<span style="display:block;background:#fff6e5;border:1px solid #f0d9a8;border-radius:9px;padding:11px 13px;color:#8a5a00">'
+      + '<strong>Solo consulta.</strong> La corrección la hace el administrador, porque afecta a toda la Facultad. '
+      + 'Si aquí aparece alguno de tus riesgos, avísale indicándole el código del riesgo y el proceso que figura.</span>';
+  }
+  out.innerHTML='Analizando…';
 
-  const hallazgos=[]; const porTabla={};
-  for(const [tabla, ent] of tablas){
-    if(!ent) continue;
+  // Nombres vigentes en el inventario: código → texto completo
+  const vig={};
+  try{
+    const inv = await loadInventario();
+    (inv||[]).forEach(r=>{
+      const v=r.values||{};
+      Object.values(INV_COLS).forEach(col=>{
+        const t=String(v[col]||'').trim();
+        const m=t.match(/^([A-Z]\d{2}(?:\.\d{2})+)\s+(.*)$/);
+        if(m) vig[m[1]]=t;
+      });
+    });
+  }catch(e){ out.innerHTML='No se pudo leer el Inventario: '+e.message; return; }
+
+  if(!Object.keys(vig).length){ out.innerHTML='No se pudo leer el Inventario. Recarga la página e inténtalo de nuevo.'; return; }
+
+  const renombrados=new Map(), inexistentes=new Map();
+  (STATE.matriz||[]).forEach(r=>{
+    const ruta = (typeof leerTexto==='function' ? leerTexto(r, F.proceso_txt, true) : '') || '';
+    String(ruta).split('›').forEach(seg=>{
+      const t=seg.trim();
+      const m=t.match(/^([A-Z]\d{2}(?:\.\d{2})+)\s+(.+)$/);
+      if(!m) return;
+      const cod=m[1];
+      if(!vig[cod]){ if(!inexistentes.has(cod)) inexistentes.set(cod,t); }
+      else if(_spNorm(vig[cod])!==_spNorm(t)){ if(!renombrados.has(cod)) renombrados.set(cod,{antes:t, ahora:vig[cod]}); }
+    });
+  });
+
+  let html='';
+  if(renombrados.size){
+    html+='<h3 style="margin:0 0 6px;font-size:15px">Procesos renombrados en el Inventario ('+renombrados.size+')</h3>';
+    html+='<p class="hint" style="margin:0 0 8px"><strong>Qué significa:</strong> el proceso se renombró en el Inventario y en los riesgos quedó el nombre anterior.<br><strong>Qué hacer:</strong> pulsa <strong>Actualizar</strong> y el nombre nuevo se copia a todos los riesgos afectados.</p>';
+    html+='<div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--paper);text-align:left"><th style="padding:8px 10px">Código</th><th style="padding:8px 10px">Dice en los riesgos</th><th style="padding:8px 10px">Dice en el Inventario</th><th></th></tr></thead><tbody>';
+    let ix=0;
+    renombrados.forEach((d,cod)=>{
+      html+='<tr style="border-bottom:1px solid var(--line)" id="sp_'+ix+'">'
+        + '<td style="padding:8px 10px"><code>'+cod+'</code></td>'
+        + '<td style="padding:8px 10px;color:#b26a00">'+_spEsc(d.antes)+'</td>'
+        + '<td style="padding:8px 10px;color:var(--brand)">'+_spEsc(d.ahora)+'</td>'
+        + '<td style="padding:8px 10px;text-align:right">'
+        + (_spEsAdmin()
+            ? '<button class="btn btn-sm" onclick="syncProcActualizar(this)" data-fila="sp_'+ix+'" data-antes="'+_spEsc(d.antes)+'" data-ahora="'+_spEsc(d.ahora)+'">Actualizar</button>'
+            : '<span style="color:var(--mist);font-size:12px">—</span>')
+        + '</td></tr>';
+      ix++;
+    });
+    html+='</tbody></table></div>';
+  }
+
+  if(inexistentes.size){
+    html+='<h3 style="margin:20px 0 6px;font-size:15px">Procesos que ya no existen en el Inventario ('+inexistentes.size+')</h3>';
+    html+='<p class="hint" style="margin:0 0 8px"><strong>Qué significa:</strong> ese código ya no está en el Inventario, porque el proceso se eliminó o se le cambió el código.<br><strong>Qué hacer:</strong> busca en el Inventario con qué nombre quedó. Si lo encuentras, aparecerá arriba como renombrado. Si se eliminó de verdad, hay que decidir con la Subcomisión a qué proceso pasan esos riesgos y volver a seleccionarlo editando cada riesgo.</p>';
+    html+='<div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:var(--paper);text-align:left"><th style="padding:8px 10px">Código</th><th style="padding:8px 10px">Texto guardado en los riesgos</th></tr></thead><tbody>';
+    inexistentes.forEach((t,cod)=>{
+      html+='<tr style="border-bottom:1px solid var(--line)"><td style="padding:8px 10px"><code style="color:#c0392b">'+cod+'</code></td><td style="padding:8px 10px">'+_spEsc(t)+'</td></tr>';
+    });
+    html+='</tbody></table></div>';
+  }
+
+  if(!renombrados.size && !inexistentes.size){
+    html='<p class="hint" style="margin:0">✓ Todos los procesos citados en los riesgos coinciden con el Inventario.</p>';
+  }
+  out.innerHTML=html;
+}
+window.syncProcAnalizar = syncProcAnalizar;
+
+async function syncProcActualizar(btn){
+  if(!_spEsAdmin()) return;
+  const antes=btn.getAttribute('data-antes')||'', ahora=btn.getAttribute('data-ahora')||'';
+  if(!confirm('Se reemplazará en todos los registros:\n\n'+antes+'\n\npor:\n\n'+ahora+'\n\nEsta acción no se puede deshacer.')) return;
+  btn.disabled=true; btn.textContent='Buscando…';
+
+  const lista=[];
+  for(const [tabla, ent] of Object.entries(CONFIG.ENTITIES)){
     let d;
     try{ d = await API.records(ent); }catch(e){ continue; }
     (d.records||[]).forEach(r=>{
-      if(!global){
-        // Solo los riesgos de su oficina
-        let ofi='';
-        try{ ofi = (typeof oficinaDe==='function') ? oficinaDe(r) : ''; }catch(e){}
-        if(typeof _registroVisibleOficina==='function'){ if(!_registroVisibleOficina(ofi)) return; }
-        else if(SESION && SESION.oficina && _rtNorm(ofi)!==_rtNorm(SESION.oficina)) return;
-      }
       const v=r.values||{}; const campos={};
       Object.keys(v).forEach(k=>{
         const val=v[k];
-        if(typeof val==='string' && val.includes(viejo) && k!==val) campos[k]=val.split(viejo).join(nuevo);
+        if(typeof val==='string' && val.includes(antes) && k!==val) campos[k]=val.split(antes).join(ahora);
       });
-      if(Object.keys(campos).length){
-        hallazgos.push({tabla, ent, id:r.id, campos, mapa:_rpMapa(v)});
-        porTabla[tabla]=(porTabla[tabla]||0)+1;
-      }
+      if(Object.keys(campos).length) lista.push({ent, id:r.id, campos, mapa:_spMapa(v), tabla});
     });
   }
 
-  if(!hallazgos.length){
-    _rpSalida('No se encontró ese texto en ningún registro. Comprueba que lo copiaste completo y tal cual aparece.');
-    return;
-  }
-  _RP_HALLAZGOS = { viejo, nuevo, lista:hallazgos };
-  document.getElementById('rpBtnAplicar').disabled = false;
-  const filas = Object.entries(porTabla).map(([t,n])=>`<tr><td style="padding:3px 12px 3px 0">${t}</td><td style="text-align:right"><strong>${n}</strong></td></tr>`).join('');
-  _rpSalida(`<table style="width:auto;font-size:13px">${filas}</table>
-    <p style="margin:8px 0 0">Se cambiará el texto en <strong>${hallazgos.length}</strong> registro(s)${global?'':' de tu oficina'}.</p>
-    <p style="margin:6px 0 0;color:var(--mist)">Descarga el Excel antes de continuar: el cambio no se puede deshacer.</p>`);
-}
-window.rpBuscar = rpBuscar;
-
-async function rpReemplazar(){
-  if(!_rpEsAdmin()){ rpAjustarPorRol(); return; }
-  if(!_RP_HALLAZGOS) return;
-  const {viejo, nuevo, lista} = _RP_HALLAZGOS;
-  if(!confirm('Se reemplazará en '+lista.length+' registro(s):\n\n'+viejo+'\n\npor:\n\n'+nuevo+'\n\nEsta acción no se puede deshacer. ¿Continuar?')) return;
-
-  const btn=document.getElementById('rpBtnAplicar');
-  btn.disabled=true;
   const esperar = ms => new Promise(r=>setTimeout(r, ms));
   let ok=0; const errores=[]; let n=0;
   for(const h of lista){
     try{
       const campos={};
       for(const k in h.campos){
-        const fid = _rpEsId(k) ? k : h.mapa[k];
+        const fid=_spEsId(k)?k:h.mapa[k];
         if(!fid) throw new Error('columna no identificada: '+k);
         campos[fid]=h.campos[k];
       }
       await API.saveForm(h.id, campos, h.ent); ok++;
     }catch(e){ errores.push(h.tabla+' · '+e.message); }
-    n++;
-    btn.textContent='Reemplazando… '+n+'/'+lista.length;
+    n++; btn.textContent='Actualizando… '+n+'/'+lista.length;
     await esperar(n % 20 === 0 ? 3000 : 400);
   }
-  btn.textContent='Reemplazar';
-  _RP_HALLAZGOS=null;
-  const detalle = errores.length ? `<p style="color:var(--danger,#c0392b);margin:8px 0 0">${errores.length} registro(s) no se pudieron actualizar:<br>${errores.slice(0,5).join('<br>')}</p>` : '';
-  _rpSalida(`<strong>${ok}</strong> registro(s) actualizados.${detalle}
-    <p style="margin:8px 0 0">Recarga la página para ver los cambios.</p>`);
-  toast(ok+' registro(s) actualizados. Recarga la página.');
+
+  if(ok){
+    toast(ok+' registro(s) actualizados.');
+    STATE.matriz=[];
+    try{ await loadMatriz(true); }catch(_){}
+    await syncProcAnalizar();
+    if(typeof renderSeguimiento==='function') renderSeguimiento();
+  } else {
+    btn.disabled=false; btn.textContent='Reintentar';
+    toast('No se actualizó nada. '+(errores[0]||''), true);
+  }
 }
-window.rpReemplazar = rpReemplazar;
+window.syncProcActualizar = syncProcActualizar;
 </script>
 
 </body>
