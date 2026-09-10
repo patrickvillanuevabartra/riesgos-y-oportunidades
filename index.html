@@ -660,6 +660,52 @@
       <div id="filtrosLista"></div>
     </div>
 
+    <details class="card" id="cardReemplazo" style="padding:0;margin-top:18px">
+      <summary style="padding:16px 22px;cursor:pointer;font-weight:600;color:var(--slate);font-size:15px">
+        🔧 Corregir un proceso que cambió de nombre o de código
+        <span style="font-weight:400;color:var(--mist);font-size:13px;margin-left:8px">— úsalo cuando un riesgo avise «proceso desactualizado»</span>
+      </summary>
+      <div style="padding:0 22px 22px">
+
+        <div style="background:#f5f9f7;border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px;font-size:13.5px;line-height:1.6;color:var(--slate)">
+          <p style="margin:0 0 10px"><strong>¿Cuándo se usa?</strong><br>
+          Cuando al pasar el mouse sobre el ⚠️ de un riesgo aparece el aviso <em>«proceso desactualizado: … ya no existe en el inventario»</em>.</p>
+
+          <p style="margin:0 0 10px"><strong>¿Por qué pasa?</strong><br>
+          Cada riesgo guarda el nombre del proceso escrito dentro, como una copia. Si ese proceso se renombra o se elimina en el inventario, los riesgos se quedan con el nombre anterior y dejan de encontrarlo.</p>
+
+          <p style="margin:0 0 10px"><strong>¿Qué hace esta herramienta?</strong><br>
+          Cambia un texto por otro en todos los riesgos de una sola vez. Tú indicas cuál es el texto viejo y cuál el nuevo.</p>
+
+          <p style="margin:0 0 10px"><strong>Ejemplo</strong><br>
+          El proceso <code>M01.05.02.03.02 Identificar dificultades…</code> ahora se llama <code>M01.05.02.03.01 Seguimiento de las asignaturas</code>.<br>
+          Copias el nombre viejo completo en el primer campo y el nuevo en el segundo. Los riesgos quedan apuntando al proceso correcto.</p>
+
+          <p style="margin:0 0 10px"><strong>Pasos</strong><br>
+          1. Copia el texto viejo del aviso ⚠️ del riesgo.<br>
+          2. Busca en el inventario cómo se llama ahora ese proceso y copia su nombre completo.<br>
+          3. Pega uno en cada campo y pulsa <strong>Buscar</strong>.<br>
+          4. Revisa cuántos riesgos van a cambiar. Si el número cuadra, pulsa <strong>Reemplazar</strong>.</p>
+
+          <p style="margin:0 0 10px"><strong>¿Hasta dónde llega el cambio?</strong><br>
+          Si eres <strong>responsable de proceso o responsable técnico</strong>, el reemplazo se aplica solo a los riesgos de tu oficina.<br>
+          Si eres <strong>administrador</strong>, se aplica a todos los registros de todas las tablas.</p>
+
+          <p style="margin:0;color:#b26a00"><strong>Antes de reemplazar:</strong> descarga el Excel de Seguimiento. El cambio no se puede deshacer.</p>
+        </div>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+          <div style="flex:1;min-width:260px"><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Texto actual (el que ya no existe)</label>
+            <input id="rpViejo" placeholder="M01.05.02.03.02 Identificar dificultades…" style="padding:9px 11px;border:1px solid var(--line);border-radius:9px;font:inherit;width:100%"></div>
+          <div style="flex:1;min-width:260px"><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Texto nuevo (el correcto)</label>
+            <input id="rpNuevo" placeholder="M01.05.02.03.01 Seguimiento de las asignaturas" style="padding:9px 11px;border:1px solid var(--line);border-radius:9px;font:inherit;width:100%"></div>
+          <button class="btn" onclick="rpBuscar()" id="rpBtnBuscar">Buscar</button>
+          <button class="btn btn-primary" onclick="rpReemplazar()" id="rpBtnAplicar" disabled>Reemplazar</button>
+        </div>
+        <div id="rpSalida" style="margin-top:14px;font-size:13px"></div>
+      </div>
+    </details>
+
     <div id="segTotales" style="margin-bottom:12px"></div>
     <div class="card"><div class="tabla-wrap" style="padding:6px 4px"><table class="tabla-cards">
       <thead><tr>
@@ -943,47 +989,6 @@
       <div id="usuariosLista"><p class="hint">Cargando usuarios…</p></div>
     </div>
 
-    <details class="card" id="cardReemplazo" style="padding:0;margin-top:18px">
-      <summary style="padding:16px 22px;cursor:pointer;font-weight:600;color:var(--slate);font-size:15px">
-        🔧 Corregir un proceso que cambió de nombre o de código
-        <span style="font-weight:400;color:var(--mist);font-size:13px;margin-left:8px">— úsalo cuando un riesgo avise «proceso desactualizado»</span>
-      </summary>
-      <div style="padding:0 22px 22px">
-
-        <div style="background:#f5f9f7;border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:16px;font-size:13.5px;line-height:1.6;color:var(--slate)">
-          <p style="margin:0 0 10px"><strong>¿Cuándo se usa?</strong><br>
-          Cuando al pasar el mouse sobre el ⚠️ de un riesgo aparece el aviso <em>«proceso desactualizado: … ya no existe en el inventario»</em>.</p>
-
-          <p style="margin:0 0 10px"><strong>¿Por qué pasa?</strong><br>
-          Cada riesgo guarda el nombre del proceso escrito dentro, como una copia. Si ese proceso se renombra o se elimina en el inventario, los riesgos se quedan con el nombre anterior y dejan de encontrarlo.</p>
-
-          <p style="margin:0 0 10px"><strong>¿Qué hace esta herramienta?</strong><br>
-          Cambia un texto por otro en todos los riesgos de una sola vez. Tú indicas cuál es el texto viejo y cuál el nuevo.</p>
-
-          <p style="margin:0 0 10px"><strong>Ejemplo</strong><br>
-          El proceso <code>M01.05.02.03.02 Identificar dificultades…</code> ahora se llama <code>M01.05.02.03.01 Seguimiento de las asignaturas</code>.<br>
-          Copias el nombre viejo completo en el primer campo y el nuevo en el segundo. Los riesgos quedan apuntando al proceso correcto.</p>
-
-          <p style="margin:0 0 10px"><strong>Pasos</strong><br>
-          1. Copia el texto viejo del aviso ⚠️ del riesgo.<br>
-          2. Busca en el inventario cómo se llama ahora ese proceso y copia su nombre completo.<br>
-          3. Pega uno en cada campo y pulsa <strong>Buscar</strong>.<br>
-          4. Revisa cuántos riesgos van a cambiar. Si el número cuadra, pulsa <strong>Reemplazar</strong>.</p>
-
-          <p style="margin:0;color:#b26a00"><strong>Antes de reemplazar:</strong> descarga el Excel de Seguimiento. El cambio no se puede deshacer.</p>
-        </div>
-
-        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
-          <div style="flex:1;min-width:260px"><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Texto actual (el que ya no existe)</label>
-            <input id="rpViejo" placeholder="M01.05.02.03.02 Identificar dificultades…" style="padding:9px 11px;border:1px solid var(--line);border-radius:9px;font:inherit;width:100%"></div>
-          <div style="flex:1;min-width:260px"><label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Texto nuevo (el correcto)</label>
-            <input id="rpNuevo" placeholder="M01.05.02.03.01 Seguimiento de las asignaturas" style="padding:9px 11px;border:1px solid var(--line);border-radius:9px;font:inherit;width:100%"></div>
-          <button class="btn" onclick="rpBuscar()" id="rpBtnBuscar">Buscar</button>
-          <button class="btn btn-primary" onclick="rpReemplazar()" id="rpBtnAplicar" disabled>Reemplazar</button>
-        </div>
-        <div id="rpSalida" style="margin-top:14px;font-size:13px"></div>
-      </div>
-    </details>
   </section>
 
   <!-- Modal crear/editar usuario -->
@@ -7870,11 +7875,25 @@ async function rpBuscar(){
   if(viejo===nuevo){ _rpSalida('<span style="color:var(--danger,#c0392b)">Los dos textos son iguales.</span>'); return; }
   _rpSalida('Buscando…');
 
+  // Alcance según el rol: quien no es administrador solo corrige los riesgos de
+  // su propia oficina. Así un error de escritura no puede afectar a toda la Facultad.
+  const global = (typeof puedeVerTodo==='function') && puedeVerTodo();
+  const tablas = global ? Object.entries(CONFIG.ENTITIES)
+                        : [['MATRIZ', CONFIG.ENTITIES.MATRIZ]];
+
   const hallazgos=[]; const porTabla={};
-  for(const [tabla, ent] of Object.entries(CONFIG.ENTITIES)){
+  for(const [tabla, ent] of tablas){
+    if(!ent) continue;
     let d;
     try{ d = await API.records(ent); }catch(e){ continue; }
     (d.records||[]).forEach(r=>{
+      if(!global){
+        // Solo los riesgos de su oficina
+        let ofi='';
+        try{ ofi = (typeof oficinaDe==='function') ? oficinaDe(r) : ''; }catch(e){}
+        if(typeof _registroVisibleOficina==='function'){ if(!_registroVisibleOficina(ofi)) return; }
+        else if(SESION && SESION.oficina && _rtNorm(ofi)!==_rtNorm(SESION.oficina)) return;
+      }
       const v=r.values||{}; const campos={};
       Object.keys(v).forEach(k=>{
         const val=v[k];
@@ -7895,7 +7914,7 @@ async function rpBuscar(){
   document.getElementById('rpBtnAplicar').disabled = false;
   const filas = Object.entries(porTabla).map(([t,n])=>`<tr><td style="padding:3px 12px 3px 0">${t}</td><td style="text-align:right"><strong>${n}</strong></td></tr>`).join('');
   _rpSalida(`<table style="width:auto;font-size:13px">${filas}</table>
-    <p style="margin:8px 0 0">Se cambiará el texto en <strong>${hallazgos.length}</strong> registro(s).</p>
+    <p style="margin:8px 0 0">Se cambiará el texto en <strong>${hallazgos.length}</strong> registro(s)${global?'':' de tu oficina'}.</p>
     <p style="margin:6px 0 0;color:var(--mist)">Descarga el Excel antes de continuar: el cambio no se puede deshacer.</p>`);
 }
 window.rpBuscar = rpBuscar;
