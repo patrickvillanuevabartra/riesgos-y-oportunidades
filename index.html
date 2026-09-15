@@ -2630,6 +2630,7 @@ document.getElementById('formRiesgo').addEventListener('submit', async (e) => {
   if(_rt.correo)  put(RT_CORREO,  _rt.correo);
   if(_rt.nombre)  put(RT_NOMBRE,  _rt.nombre);
   if(_rt.celular) put(RT_CELULAR, _rt.celular);
+  if(RT_UNIDAD.id && _rt.unidad) put(RT_UNIDAD, _rt.unidad);
   if(txtRP('f_resp_cel'))  put(F.resp_celular, txtRP('f_resp_cel'));
   if(txtRP('f_resp_cor'))  put(F.resp_correo, txtRP('f_resp_cor'));
 
@@ -6984,6 +6985,7 @@ async function guardarEdit(){
   set(RT_CORREO,  _rte.correo);
   set(RT_NOMBRE,  _rte.nombre);
   set(RT_CELULAR, _rte.celular);
+  if(RT_UNIDAD.id) set(RT_UNIDAD, _rte.unidad||'');
   set(F.resp_celular, txtRPe('ed_resp_cel'));
   set(F.resp_correo, txtRPe('ed_resp_cor'));
 
@@ -7698,6 +7700,10 @@ const RT_ENTITY = 'ddOCoDW51dSikTWP3dVSoL';
 const RT_CORREO  = { id:'dcTLxcId5gW74qW5FcLSkK', col:'Responsables técnicos' };
 const RT_NOMBRE  = { id:'ddN8oFv8jhDik-WRZdGCky', col:'Nombre responsable técnico' };
 const RT_CELULAR = { id:'ddL8kkESjotkb4W4pdNfmP', col:'Celular responsable técnico' };
+// Columna «Unidad responsable técnico»: una misma persona puede ser técnico en
+// varias unidades, así que se guarda a cuál corresponde esta asignación.
+// Si el id queda vacío, el aplicativo funciona igual pero no graba la unidad.
+const RT_UNIDAD  = { id:'dcQ1FdVmjjbikNbmoXpCk4', col:'Unidad responsable técnico' };
 
 let _RT_LISTA = null;
 async function cargarRespTecnicos(forzar){
@@ -7800,7 +7806,12 @@ function rtPintarSelect(idSelect, idOficina, idLider, correoActual){
     ? '<option value="" disabled>— sin coincidencias para esta oficina: se muestran todos —</option>'
     : '';
   sel.innerHTML = ['<option value="">— sin responsable técnico —</option>', aviso]
-    .concat(ops.map(x=>`<option value="${esc(x.correo)}">${esc(x.nombre||x.correo)}</option>`)).join('');
+    .concat(ops.map(x=>{
+      // Sin la unidad, un técnico que atiende tres laboratorios aparece tres veces
+      // con el mismo texto y no hay forma de saber cuál se elige.
+      const etq = String(x.nombre||x.correo) + (x.unidad ? ' — ' + x.unidad : '');
+      return `<option value="${esc(x.correo)}" data-unidad="${esc(x.unidad||'')}">${esc(etq)}</option>`;
+    })).join('');
   if(correoActual){
     // Si el asignado no está en la lista filtrada, se agrega para no perderlo
     if(!ops.some(x=>_rtNorm(x.correo)===_rtNorm(correoActual))){
@@ -7818,7 +7829,11 @@ function rtValores(idSelect){
   const sel=document.getElementById(idSelect);
   const correo=sel ? (sel.value||'').trim() : '';
   const info=_rtPorCorreo(correo);
-  return { correo, nombre:(info&&info.nombre)||'', celular:(info&&info.celular)||'' };
+  // La unidad sale de la opción elegida, no del correo: el mismo correo puede
+  // estar en varias unidades y solo la opción sabe cuál se seleccionó.
+  const unidad = (sel && sel.selectedOptions && sel.selectedOptions[0])
+    ? (sel.selectedOptions[0].getAttribute('data-unidad')||'') : '';
+  return { correo, nombre:(info&&info.nombre)||'', celular:(info&&info.celular)||'', unidad };
 }
 window.rtValores = rtValores;
 </script>
