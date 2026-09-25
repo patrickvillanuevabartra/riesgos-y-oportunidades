@@ -7679,63 +7679,121 @@ window.asisDatos=asisDatos;
 
 
 /* ===================== REPORTE DE AVANCE POR CORREO =====================
-   Solo el administrador. Por oficina: % con reportes de medidas, avance promedio
-   de las medidas y medidas culminadas. Se toman de la tabla de Seguimiento tal como
-   se ve. El envío lo hace el script «Reportes SGOE», que busca él mismo el correo
-   del responsable en la tabla de responsables de proceso. */
-const REPORTE_URL   = 'https://script.google.com/macros/s/AKfycbxURiAsosVJadzK0SJBCQy_TCbb894LD9x8e2XsZ4C9-Vu9csF4EUIVXS9fFTfw-ah7/exec';   // URL de la aplicación web «Reportes SGOE» (termina en /exec)
-const REPORTE_CLAVE = 'sgoe-3c78adb6d278e43be845034b';   // la misma CLAVE_ENVIO configurada en ese script
+   Solo el administrador. Las cifras salen de la tabla de Seguimiento tal como se ve:
+   % de riesgos con reportes de avance, medidas culminadas (100 %) y avance promedio
+   (último % reportado de cada riesgo; los que no tienen reportes cuentan como 0 %).
+   A cada oficina se le sugiere un kudo según su nivel real (escala de 0 a 5). El
+   administrador puede cambiarlo o añadir una nota antes de enviar. El correo lo arma
+   y lo envía el script «Reportes SGOE», que decide él mismo el destinatario. */
+const REPORTE_URL   = 'https://script.google.com/macros/s/AKfycbxURiAsosVJadzK0SJBCQy_TCbb894LD9x8e2XsZ4C9-Vu9csF4EUIVXS9fFTfw-ah7/exec';
+const REPORTE_CLAVE = 'sgoe-3c78adb6d278e43be845034b';
 
+// Misma escala que el script de envío (se muestra aquí para revisar antes de enviar)
 function _repEsAdmin(){ return !!(SESION && SESION.rol==='Administrador'); }
+const REP_NIVELES = ['Por empezar','Primeros pasos','En marcha','Buen ritmo','Destacado','Excelencia'];
+const REP_KUDOS = {
+  n0:{formal:'Contamos contigo',cercano:'¡Porque yo creo en ti!',emoji:'🤝'},
+  n1:{formal:'Buen comienzo',cercano:'¡Todo suma!',emoji:'🌱'},
+  n2:{formal:'¡Muchas gracias!',cercano:'¡Chévere!',emoji:'🙌'},
+  n3:{formal:'¡Bien hecho!',cercano:'¡Bien jugado! Vamos por más',emoji:'👏'},
+  n4:{formal:'¡Buen trabajo!',cercano:'¡Qué trome!',emoji:'🏅'},
+  n5:{formal:'¡Absolutamente fantástico!',cercano:'¡Vales un Perú!',emoji:'🏆'}
+};
+function _repNivel(c){
+  const t=c.total; if(!t) return 0;
+  const pR=c.conReportes/t*100, pC=c.culminadas/t*100;
+  if(pR>=100 && pC>=100) return 5;
+  if(pR>=80 && pC>=50) return 4;
+  if(pR>=80) return 3;
+  if(pR>=50) return 2;
+  if(pR>0) return 1;
+  return 0;
+}
 
 function _repCifrasPorOficina(){
   const celda=(pre,id)=>{ const el=document.getElementById(pre+'-'+id); return el?el.textContent:''; };
-  const num=t=>{ const m=String(t||'').match(/(\d+(?:[.,]\d+)?)\s*%/); return m?Number(m[1].replace(',','.')):null; };
+  const num=t=>{ const x=String(t||'').match(/(\d+(?:[.,]\d+)?)\s*%/); return x?Number(x[1].replace(',','.')):null; };
   const grupos={};
   (window._SEG_FILAS||[]).filter(f=>!f.arch).forEach(f=>{ const o=(f.oficina||'').trim(); if(o) (grupos[o]=grupos[o]||[]).push(f); });
   return Object.keys(grupos).sort().map(ofi=>{
     const fs=grupos[ofi], total=fs.length;
-    const conRep=fs.filter(f=>(f.nReportes||0)>0).length;
-    const avs=fs.map(f=>num(celda('avance',f.id))).filter(x=>x!==null);
-    const prom=avs.length? Math.round(avs.reduce((a,b)=>a+b,0)/avs.length*10)/10 : null;
-    return { oficina:ofi, cifras:{ total, conReportes:conRep, sinReportes: total-conRep, avancePromedio: prom, culminadas: avs.filter(x=>x>=100).length } };
+    let conRep=0, cul=0, suma=0;
+    fs.forEach(f=>{
+      if((f.nReportes||0)>0) conRep++;
+      const pct=num(celda('avance',f.id));
+      suma += pct||0;
+      if(pct!==null && pct>=100) cul++;
+    });
+    const cifras={ total, conReportes:conRep, sinReportes: total-conRep, culminadas:cul, avancePromedio: total? Math.round(suma/total) : 0 };
+    const nivel=_repNivel(cifras);
+    return { oficina:ofi, cifras, nivel, kudo:'n'+nivel, nota:'' };
   });
 }
 function _repSemaforo(parte,total){ const p= total? Math.round(parte/total*100):0; return (p>=80?'🟢':(p>=50?'🟡':'🔴'))+' '+p+' %'; }
+function _repRegistro(){ const r=document.querySelector('input[name=rep_registro]:checked'); return r?r.value:'formal'; }
+function _repOpcionesKudo(sel){
+  const reg=_repRegistro();
+  return Object.keys(REP_KUDOS).map(k=>`<option value="${k}" ${k===sel?'selected':''}>${REP_KUDOS[k].emoji} ${REP_KUDOS[k][reg]}</option>`).join('');
+}
+function repCambiarRegistro(){
+  (window._REP_FILAS||[]).forEach((f,i)=>{ const s=document.getElementById('rep_kudo_'+i); if(s) s.innerHTML=_repOpcionesKudo(f.kudo); });
+}
+function repCambiarKudo(i,v){ window._REP_FILAS[i].kudo=v; }
+function repNota(i){
+  const f=window._REP_FILAS[i];
+  const t=prompt('Nota personal para '+f.oficina+' (opcional, máximo 400 caracteres).\nAparecerá en el correo como «Nota de la Subcomisión».', f.nota||'');
+  if(t===null) return;
+  f.nota=String(t).slice(0,400).trim();
+  const b=document.getElementById('rep_notabtn_'+i); if(b) b.textContent=f.nota?'✎ Nota ✓':'✎ Nota';
+}
+window.repCambiarRegistro=repCambiarRegistro; window.repCambiarKudo=repCambiarKudo; window.repNota=repNota;
 
 async function abrirReporteAvance(){
   if(!_repEsAdmin()){ toast('Solo el administrador puede enviar reportes.', true); return; }
   if(!window._SEG_FILAS && typeof renderSeguimiento==='function'){ try{ await renderSeguimiento(); }catch(_){} }
   const filas=_repCifrasPorOficina();
+  window._REP_FILAS=filas;
   const sinConfig = !REPORTE_URL || !REPORTE_CLAVE;
   const html = `
   <div id="rep_modal" style="position:fixed;inset:0;background:rgba(15,30,22,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
-   <div style="background:var(--card);border-radius:14px;max-width:960px;width:100%;max-height:90vh;overflow:auto;padding:22px 24px">
+   <div style="background:var(--card);border-radius:14px;max-width:1100px;width:100%;max-height:92vh;overflow:auto;padding:22px 24px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <h2 style="margin:0;font-size:20px">📧 Reporte de avance a los responsables de proceso</h2>
       <button class="icon-btn" onclick="document.getElementById('rep_modal').remove()">✕</button>
     </div>
-    <div style="background:#f5f9f7;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0 14px;font-size:13px;line-height:1.55;color:var(--slate)">
-      <b>Qué se envía:</b> a cada responsable, un correo con tres cifras de su oficina: % de riesgos con reportes de medidas, avance promedio de las medidas y medidas culminadas.<br>
-      <b>A quién:</b> al correo registrado en la tabla de responsables de proceso. Si una oficina no tiene correo, se indica y no se envía.<br>
-      <b>Importante:</b> las cifras salen de la tabla de Seguimiento. Espera a que termine de cargar antes de abrir este reporte.<br>
-      <b>Recomendado:</b> primero pulsa <b>Enviarme una prueba</b>; luego envía a los responsables.
+    <details style="background:#f5f9f7;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:10px 0 12px;font-size:13px;line-height:1.55;color:var(--slate)">
+      <summary style="cursor:pointer;font-weight:600;color:var(--brand)">💡 Cómo funciona este reporte y su escala de reconocimiento</summary>
+      <p style="margin:8px 0"><b>Las cifras</b> salen de la tabla de Seguimiento: % de riesgos con reportes de avance, medidas culminadas y avance promedio (último % reportado de cada riesgo; los que no tienen reportes cuentan como 0 %). <b>Espera a que la tabla termine de cargar.</b></p>
+      <p style="margin:0 0 8px"><b>El nivel</b> se calcula solo, de 0 a 5: los <b>reportes</b> son la evidencia de trabajo y las <b>medidas culminadas</b>, el resultado.
+        Los niveles 0 y 1 reciben un mensaje de <b>ánimo</b>; niveles 2 a 5, un <b>reconocimiento</b>. Nunca se felicita sin un logro real.</p>
+      <p style="margin:0 0 8px"><b>0 Por empezar</b> · sin reportes — <b>1 Primeros pasos</b> · menos de 50 % con reportes — <b>2 En marcha</b> · 50 % o más con reportes —
+        <b>3 Buen ritmo</b> · 80 % con reportes — <b>4 Destacado</b> · 80 % con reportes y la mitad de medidas culminadas — <b>5 Excelencia</b> · todo reportado y culminado.</p>
+      <p style="margin:0"><b>Progreso:</b> si una oficina sube de nivel respecto del último envío real, recibe además una felicitación por su avance. Las pruebas no cuentan como envío.</p>
+    </details>
+    <div style="display:flex;gap:18px;align-items:center;margin:0 0 12px;font-size:14px;flex-wrap:wrap">
+      <b>Tono de los kudos:</b>
+      <label><input type="radio" name="rep_registro" value="formal" checked onchange="repCambiarRegistro()"> Formal</label>
+      <label><input type="radio" name="rep_registro" value="cercano" onchange="repCambiarRegistro()"> Cercano (peruano)</label>
+      <span class="hint">El formal es el recomendado para Decanato y comités.</span>
     </div>
-    ${sinConfig?`<div style="background:#fff6e5;border:1px solid #f0d9a8;border-radius:9px;padding:11px 13px;margin-bottom:12px;color:#8a5a00"><b>Falta configurar el envío.</b> Completa <code>REPORTE_URL</code> y <code>REPORTE_CLAVE</code> en este archivo con los datos del script «Reportes SGOE».</div>`:''}
+    ${sinConfig?`<div style="background:#fff6e5;border:1px solid #f0d9a8;border-radius:9px;padding:11px 13px;margin-bottom:12px;color:#8a5a00"><b>Falta configurar el envío.</b></div>`:''}
     <div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:13px">
       <thead><tr style="background:var(--paper);text-align:left">
         <th style="padding:8px"><input type="checkbox" checked onchange="document.querySelectorAll('.rep_chk').forEach(c=>c.checked=this.checked)"></th>
-        <th style="padding:8px">Oficina</th><th style="padding:8px;text-align:right">Riesgos</th>
-        <th style="padding:8px;text-align:right">Con reportes</th><th style="padding:8px;text-align:right">Avance promedio</th>
-        <th style="padding:8px;text-align:right">Culminadas</th><th style="padding:8px">Resultado</th>
+        <th style="padding:8px">Oficina</th>
+        <th style="padding:8px;text-align:right">Con reportes</th><th style="padding:8px;text-align:right">Culminadas</th>
+        <th style="padding:8px;text-align:right">Avance</th><th style="padding:8px">Nivel</th>
+        <th style="padding:8px">Kudo</th><th style="padding:8px"></th><th style="padding:8px">Resultado</th>
       </tr></thead><tbody>
       ${filas.map((f,i)=>`<tr style="border-bottom:1px solid var(--line)">
         <td style="padding:7px 8px"><input type="checkbox" class="rep_chk" data-i="${i}" checked></td>
-        <td style="padding:7px 8px">${f.oficina.replace(/</g,'&lt;')}</td>
-        <td style="padding:7px 8px;text-align:right">${f.cifras.total}</td>
-        <td style="padding:7px 8px;text-align:right">${_repSemaforo(f.cifras.conReportes,f.cifras.total)} <span class="hint">· ${f.cifras.conReportes} de ${f.cifras.total}</span></td>
-        <td style="padding:7px 8px;text-align:right">${f.cifras.avancePromedio===null?'<span class="hint">sin registros</span>':f.cifras.avancePromedio+' %'}</td>
-        <td style="padding:7px 8px;text-align:right">${f.cifras.culminadas} de ${f.cifras.total}</td>
+        <td style="padding:7px 8px">${f.oficina.replace(/</g,'&lt;')} <span class="hint">· ${f.cifras.total}</span></td>
+        <td style="padding:7px 8px;text-align:right;white-space:nowrap">${_repSemaforo(f.cifras.conReportes,f.cifras.total)} <span class="hint">· ${f.cifras.conReportes}/${f.cifras.total}</span></td>
+        <td style="padding:7px 8px;text-align:right;white-space:nowrap">${_repSemaforo(f.cifras.culminadas,f.cifras.total)} <span class="hint">· ${f.cifras.culminadas}/${f.cifras.total}</span></td>
+        <td style="padding:7px 8px;text-align:right">${f.cifras.avancePromedio} %</td>
+        <td style="padding:7px 8px;white-space:nowrap"><b>${f.nivel}</b> · ${REP_NIVELES[f.nivel]}</td>
+        <td style="padding:7px 8px"><select id="rep_kudo_${i}" onchange="repCambiarKudo(${i},this.value)" style="font-size:12px;padding:3px 5px;border-radius:6px;border:1px solid var(--line)">${_repOpcionesKudo(f.kudo)}</select></td>
+        <td style="padding:7px 8px"><button class="btn btn-sm" id="rep_notabtn_${i}" onclick="repNota(${i})">✎ Nota</button></td>
         <td style="padding:7px 8px" id="rep_res_${i}"></td></tr>`).join('')}
       </tbody></table></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">
@@ -7744,7 +7802,6 @@ async function abrirReporteAvance(){
     </div>
    </div></div>`;
   document.body.insertAdjacentHTML('beforeend', html);
-  window._REP_FILAS=filas;
 }
 window.abrirReporteAvance=abrirReporteAvance;
 
@@ -7753,18 +7810,19 @@ async function enviarReporteAvance(modo){
   const sel=[...document.querySelectorAll('.rep_chk')].filter(c=>c.checked).map(c=>Number(c.getAttribute('data-i')));
   if(!sel.length){ toast('Marca al menos una oficina.', true); return; }
   if(modo==='real' && !confirm('Se enviará el reporte a los responsables de '+sel.length+' oficina(s).\n\n¿Ya revisaste la prueba? ¿Continuar?')) return;
-  const envios=sel.map(i=>({ oficina:_REP_FILAS[i].oficina, cifras:_REP_FILAS[i].cifras }));
+  const envios=sel.map(i=>({ oficina:_REP_FILAS[i].oficina, cifras:_REP_FILAS[i].cifras, kudo:_REP_FILAS[i].kudo, nota:_REP_FILAS[i].nota }));
   sel.forEach(i=>{ const c=document.getElementById('rep_res_'+i); if(c) c.textContent='Enviando…'; });
   try{
     const r=await fetch(REPORTE_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ clave:REPORTE_CLAVE, app:'riesgos', modo, envios }) });
+      body: JSON.stringify({ clave:REPORTE_CLAVE, app:'riesgos', modo, registro:_repRegistro(), envios }) });
     const d=await r.json();
     if(!d.ok){ toast('No se pudo enviar: '+(d.error||'error desconocido'), true); sel.forEach(i=>{ const c=document.getElementById('rep_res_'+i); if(c) c.textContent=''; }); return; }
     (d.resultados||[]).forEach(res=>{
       const i=_REP_FILAS.findIndex(f=>f.oficina===res.oficina);
       const c=document.getElementById('rep_res_'+i);
-      if(c) c.innerHTML = res.ok ? `<span style="color:var(--brand)">✓ ${res.prueba?'prueba enviada':'enviado a '+String(res.para).replace(/</g,'&lt;')}</span>`
-                                : `<span style="color:#c0392b">✕ ${String(res.motivo||'').replace(/</g,'&lt;')}</span>`;
+      if(c) c.innerHTML = res.ok
+        ? `<span style="color:var(--brand)">✓ ${res.prueba?'prueba enviada':'enviado'}${res.subio?' · 🚀 subió de nivel':''}</span>`
+        : `<span style="color:#c0392b">✕ ${String(res.motivo||'').replace(/</g,'&lt;')}</span>`;
     });
     toast(modo==='prueba' ? 'Pruebas enviadas a tu correo. Revísalas antes de enviar a los responsables.' : 'Reportes enviados.');
   }catch(e){ toast('No se pudo contactar con el servicio de envío: '+e.message, true); }
