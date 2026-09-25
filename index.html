@@ -7756,11 +7756,12 @@ async function abrirReporteAvance(){
   const sinConfig = !REPORTE_URL || !REPORTE_CLAVE;
   const html = `
   <div id="rep_modal" style="position:fixed;inset:0;background:rgba(15,30,22,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px">
-   <div style="background:var(--card);border-radius:14px;max-width:1100px;width:100%;max-height:92vh;overflow:auto;padding:22px 24px">
+   <div style="background:var(--card);border-radius:14px;max-width:1100px;width:100%;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;padding:18px 22px 0">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
       <h2 style="margin:0;font-size:20px">📧 Reporte de avance a los responsables de proceso</h2>
       <button class="icon-btn" onclick="document.getElementById('rep_modal').remove()">✕</button>
     </div>
+    <div style="flex:1;min-height:0;overflow:auto;padding-right:4px">
     <details style="background:#f5f9f7;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:10px 0 12px;font-size:13px;line-height:1.55;color:var(--slate)">
       <summary style="cursor:pointer;font-weight:600;color:var(--brand)">💡 Cómo funciona este reporte y su escala de reconocimiento</summary>
       <p style="margin:8px 0"><b>Las cifras</b> salen de la tabla de Seguimiento: % de riesgos con reportes de avance, medidas culminadas y avance promedio (último % reportado de cada riesgo; los que no tienen reportes cuentan como 0 %). <b>Espera a que la tabla termine de cargar.</b></p>
@@ -7796,15 +7797,23 @@ async function abrirReporteAvance(){
         <td style="padding:7px 8px"><button class="btn btn-sm" id="rep_notabtn_${i}" onclick="repNota(${i})">✎ Nota</button></td>
         <td style="padding:7px 8px" id="rep_res_${i}"></td></tr>`).join('')}
       </tbody></table></div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">
-      <button class="btn" ${sinConfig?'disabled':''} onclick="enviarReporteAvance('prueba')">Enviarme una prueba</button>
-      <button class="btn btn-primary" ${sinConfig?'disabled':''} onclick="enviarReporteAvance('real')">Enviar a los responsables seleccionados</button>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--line);margin:12px -22px 0;padding:12px 22px;background:var(--card);border-radius:0 0 14px 14px">
+      <div id="rep_resumen" style="flex:1;min-width:260px;font-size:13px;line-height:1.45"></div>
+      <button class="btn" id="rep_btn_prueba" ${sinConfig?'disabled':''} onclick="enviarReporteAvance('prueba')">Enviarme una prueba</button>
+      <button class="btn btn-primary" id="rep_btn_real" ${sinConfig?'disabled':''} onclick="enviarReporteAvance('real')">Enviar a los responsables seleccionados</button>
     </div>
    </div></div>`;
   document.body.insertAdjacentHTML('beforeend', html);
 }
 window.abrirReporteAvance=abrirReporteAvance;
 
+/* Muestra el estado del envío junto a los botones y los bloquea mientras se envía,
+   para que no se pulse dos veces. */
+function _repEstado(html, enviando){
+  const r=document.getElementById('rep_resumen'); if(r) r.innerHTML=html||'';
+  ['rep_btn_prueba','rep_btn_real'].forEach(id=>{ const b=document.getElementById(id); if(b) b.disabled=!!enviando; });
+}
 async function enviarReporteAvance(modo){
   if(!_repEsAdmin()) return;
   const sel=[...document.querySelectorAll('.rep_chk')].filter(c=>c.checked).map(c=>Number(c.getAttribute('data-i')));
@@ -7812,11 +7821,13 @@ async function enviarReporteAvance(modo){
   if(modo==='real' && !confirm('Se enviará el reporte a los responsables de '+sel.length+' oficina(s).\n\n¿Ya revisaste la prueba? ¿Continuar?')) return;
   const envios=sel.map(i=>({ oficina:_REP_FILAS[i].oficina, cifras:_REP_FILAS[i].cifras, kudo:_REP_FILAS[i].kudo, nota:_REP_FILAS[i].nota }));
   sel.forEach(i=>{ const c=document.getElementById('rep_res_'+i); if(c) c.textContent='Enviando…'; });
+  _repEstado('<span style="color:var(--slate)">⏳ Enviando '+sel.length+' correo(s)… puede tardar unos segundos. No cierres esta ventana.</span>', true);
   try{
     const r=await fetch(REPORTE_URL,{ method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify({ clave:REPORTE_CLAVE, app:'riesgos', modo, registro:_repRegistro(), envios }) });
     const d=await r.json();
-    if(!d.ok){ toast('No se pudo enviar: '+(d.error||'error desconocido'), true); sel.forEach(i=>{ const c=document.getElementById('rep_res_'+i); if(c) c.textContent=''; }); return; }
+    if(!d.ok){ toast('No se pudo enviar: '+(d.error||'error desconocido'), true); sel.forEach(i=>{ const c=document.getElementById('rep_res_'+i); if(c) c.textContent=''; });
+      _repEstado('<span style="color:#c0392b">✕ <b>No se envió nada.</b> '+String(d.error||'Error desconocido').replace(/</g,'&lt;')+'</span>', false); return; }
     (d.resultados||[]).forEach(res=>{
       const i=_REP_FILAS.findIndex(f=>f.oficina===res.oficina);
       const c=document.getElementById('rep_res_'+i);
@@ -7824,8 +7835,16 @@ async function enviarReporteAvance(modo){
         ? `<span style="color:var(--brand)">✓ ${res.prueba?'prueba enviada':'enviado'}${res.subio?' · 🚀 subió de nivel':''}</span>`
         : `<span style="color:#c0392b">✕ ${String(res.motivo||'').replace(/</g,'&lt;')}</span>`;
     });
-    toast(modo==='prueba' ? 'Pruebas enviadas a tu correo. Revísalas antes de enviar a los responsables.' : 'Reportes enviados.');
-  }catch(e){ toast('No se pudo contactar con el servicio de envío: '+e.message, true); }
+    const res=d.resultados||[];
+    const ok=res.filter(x=>x.ok).length, mal=res.length-ok, subieron=res.filter(x=>x.ok&&x.subio).length;
+    let html = modo==='prueba'
+      ? `<span style="color:var(--brand)">✅ <b>${ok} prueba(s) enviada(s) a tu correo.</b></span> Revisa tu bandeja de entrada, y también la carpeta de spam. Cada una llega con el asunto «[PRUEBA · para …]».`
+      : `<span style="color:var(--brand)">✅ <b>${ok} reporte(s) enviado(s) a los responsables.</b></span>${subieron?` 🚀 ${subieron} oficina(s) subieron de nivel.`:''} <span class="hint">Enviados hoy: ${d.enviados_hoy||0} de 120.</span>`;
+    if(mal) html += `<br><span style="color:#c0392b">⚠️ <b>${mal} no se enviaron.</b> El motivo figura en la columna «Resultado»; casi siempre es que la oficina no tiene correo en la tabla de responsables de proceso.</span>`;
+    _repEstado(html, false);
+    toast(modo==='prueba' ? ok+' prueba(s) enviada(s) a tu correo.' : ok+' reporte(s) enviado(s).');
+  }catch(e){ toast('No se pudo contactar con el servicio de envío: '+e.message, true);
+    _repEstado('<span style="color:#c0392b">✕ <b>No se pudo contactar con el servicio de envío.</b> Revisa tu conexión y vuelve a intentarlo.</span>', false); }
 }
 window.enviarReporteAvance=enviarReporteAvance;
 
