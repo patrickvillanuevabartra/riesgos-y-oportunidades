@@ -1204,7 +1204,89 @@ function toggleLoginPass(){
 }
 window.toggleLoginPass = toggleLoginPass;
 
+/* ===================== SESIÓN ESTABLE =====================
+   Antes la sesión solo vivía en la memoria de la pestaña: cualquier recarga la
+   borraba. Y el navegador recarga pestañas por su cuenta (Chrome suspende las que
+   no se miran, el equipo entra en reposo, el celular cambia de aplicación). Para el
+   usuario parecía que el sistema lo expulsaba sin motivo.
+   Mismos principios que estabilizaron el Portal del Coordinador:
+   1. La sesión se guarda en el navegador por 12 horas y se prolonga mientras se usa.
+   2. Se revalida en segundo plano contra la tabla de usuarios. SOLO un rechazo
+      explícito la cierra (usuario desactivado o eliminado, contraseña cambiada).
+      Un fallo de red o un servidor lento NUNCA saca al usuario.
+   3. Un solo ingreso a la vez. Nunca se guarda la contraseña, solo su huella. */
+const SES_KEY = 'sgoe_sesion_riesgos';
+const SES_HORAS = 12;
+function _guardarSesion(){ try{ if(SESION) localStorage.setItem(SES_KEY, JSON.stringify({ s:SESION, v:Date.now()+SES_HORAS*3600e3 })); }catch(_){} }
+function _borrarSesion(){ try{ localStorage.removeItem(SES_KEY); }catch(_){} }
+function _leerSesionGuardada(){
+  try{ const o=JSON.parse(localStorage.getItem(SES_KEY)||'null'); if(o && o.s && o.s.usuario && o.v>Date.now()) return o.s; }catch(_){}
+  return null;
+}
+async function _hashTxt(t){
+  const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode('sgoe|'+String(t)));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+// Mientras se use, la sesión se prolonga
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible' && SESION){ _guardarSesion(); _revalidarSesion(); } });
+setInterval(()=>{ if(SESION) _guardarSesion(); }, 10*60*1000);
+
+let _REVALIDANDO=false, _ULTIMA_REVAL=0;
+async function _revalidarSesion(){
+  if(!SESION || _REVALIDANDO || Date.now()-_ULTIMA_REVAL<5*60*1000) return;
+  _REVALIDANDO=true; _ULTIMA_REVAL=Date.now();
+  try{
+    let recs;
+    try{ recs=((await API.records(CONFIG.ENTITIES.USUARIOS))||{}).records||[]; }catch(e){ return; }  // red o servidor: no se expulsa
+    if(!recs.length) return;   // respuesta vacía sospechosa: tampoco se expulsa
+    const L=x=>(x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
+    const mios=recs.filter(r=>L((r.values||{})['Usuario'])===SESION.usuario);
+    let activos=mios.filter(r=>L((r.values||{})['Activo'])==='Sí');
+    if(SESION.ph){
+      const conHuella=[];
+      for(const r of activos){ if(await _hashTxt(L((r.values||{})['Contraseña']))===SESION.ph) conHuella.push(r); }
+      if(activos.length && !conHuella.length){ _expulsar('Tu contraseña fue cambiada. Vuelve a ingresar con la nueva.'); return; }
+      activos=conHuella;
+    }
+    if(!mios.length){ _expulsar('Tu usuario ya no existe en el sistema. Consulta al administrador.'); return; }
+    if(!activos.length){ _expulsar('Tu usuario fue desactivado. Consulta al administrador.'); return; }
+    // Rol y oficinas se toman de la base: si el administrador los cambió, se aplican
+    const v=activos[0].values||{};
+    let rol=L(v['Rol'])||'Oficina'; if(!['Administrador','Gestor','Oficina'].includes(rol)) rol='Oficina';
+    const m=new Map();
+    activos.forEach(r=>_parseOficinas(L((r.values||{})['Oficina asignada'])).forEach(o=>{ const t=String(o||'').replace(/\s+/g,' ').trim(); if(t && !m.has(t.toLowerCase())) m.set(t.toLowerCase(), t); }));
+    const oficinas=[...m.values()];
+    const cambio = rol!==SESION.rol || oficinas.join('|')!==(SESION.oficinas||[]).join('|');
+    if(cambio){
+      SESION.rol=rol; SESION.oficinas=oficinas; SESION.oficina=oficinas[0]||''; SESION.recordId=activos[0].id;
+      _guardarSesion();
+      toast('Tus permisos fueron actualizados por el administrador. Recargando…');
+      setTimeout(()=>location.reload(), 1800);
+    }
+  }finally{ _REVALIDANDO=false; }
+}
+function _expulsar(msg){
+  _borrarSesion();
+  try{ toast(msg, true); }catch(_){}
+  setTimeout(()=>{ SESION=null; location.reload(); }, 2600);
+}
+// Al abrir o recargar la página: si hay una sesión vigente, se entra directo
+window.addEventListener('load', ()=>{
+  if(SESION) return;
+  const s=_leerSesionGuardada(); if(!s) return;
+  SESION=s;
+  try{ entrarApp(); }catch(e){ console.warn('[sesión] no se pudo reanudar:', e.message); SESION=null; return; }
+  _guardarSesion();
+  setTimeout(_revalidarSesion, 6000);
+});
+
 async function hacerLogin(){
+  if(window._LOGIN_EN_CURSO) return;   // un solo ingreso a la vez
+  window._LOGIN_EN_CURSO=true;
+  try{ await _hacerLoginInterno(); } finally { window._LOGIN_EN_CURSO=false; }
+}
+
+async function _hacerLoginInterno(){
   const u = (document.getElementById('login_user').value||'').trim();
   const p = (document.getElementById('login_pass').value||'').trim();
   const err = document.getElementById('login_error');
@@ -1214,7 +1296,10 @@ async function hacerLogin(){
   if(!u || !p){ mostrarError('Ingresa usuario y contraseña.'); return; }
   btn.disabled=true; btn.textContent='Verificando…';
   try{
-    const data = await API.records(CONFIG.ENTITIES.USUARIOS);
+    // Si el servidor tarda la primera vez, se reintenta una vez antes de dar error
+    let data;
+    try{ data = await API.records(CONFIG.ENTITIES.USUARIOS); }
+    catch(e1){ btn.textContent='Reintentando…'; await new Promise(r=>setTimeout(r,1500)); data = await API.records(CONFIG.ENTITIES.USUARIOS); }
     const recs = data.records||[];
     const limpio = x => (x && !/^[a-zA-Z0-9_\-]{22}$/.test(String(x))) ? String(x).trim() : '';
     // Puede haber VARIOS registros con el mismo usuario+contraseña (uno por oficina, forma
@@ -1243,6 +1328,8 @@ async function hacerLogin(){
     const oficinas = [...setOfi.values()];
     const nombre = _leerNombreUsuario(v);
     SESION = { rol, usuario:limpio(v['Usuario']), nombre, oficina:oficinas[0]||'', oficinas, recordId: encontrado.id };
+    try{ SESION.ph = await _hashTxt(p); }catch(_){}
+    _guardarSesion();
     // Se recuerda solo el nombre de usuario. La contraseña NO: de eso se encarga el navegador.
     try{ localStorage.setItem('mi_ultimo_usuario_riesgos', u); }catch(_){}
     // Aviso SOLO para administradores cuando detecta registros duplicados que conviene unificar.
@@ -1303,7 +1390,7 @@ function mostrarBarraSesion(){
   nav.appendChild(cont);
 }
 
-function cerrarSesion(){ SESION = null; location.reload(); }
+function cerrarSesion(){ _borrarSesion(); SESION = null; location.reload(); }
 window.cerrarSesion = cerrarSesion;
 
 // ¿El registro pertenece a ALGUNA oficina del usuario? (Administrador y Gestor ven todo)
@@ -7718,13 +7805,15 @@ function _repCifrasPorOficina(){
   return Object.keys(grupos).sort().map(ofi=>{
     const fs=grupos[ofi], total=fs.length;
     let conRep=0, cul=0, suma=0;
+    const porNivel={1:{total:0,conReportes:0},2:{total:0,conReportes:0},3:{total:0,conReportes:0},4:{total:0,conReportes:0}};
     fs.forEach(f=>{
+      const g=porNivel[f.nivel]; if(g){ g.total++; if((f.nReportes||0)>0) g.conReportes++; }
       if((f.nReportes||0)>0) conRep++;
       const pct=num(celda('avance',f.id));
       suma += pct||0;
       if(pct!==null && pct>=100) cul++;
     });
-    const cifras={ total, conReportes:conRep, sinReportes: total-conRep, culminadas:cul, avancePromedio: total? Math.round(suma/total) : 0 };
+    const cifras={ total, conReportes:conRep, sinReportes: total-conRep, culminadas:cul, avancePromedio: total? Math.round(suma/total) : 0, porNivel };
     const nivel=_repNivel(cifras);
     return { oficina:ofi, cifras, nivel, kudo:'n'+nivel, nota:'' };
   });
@@ -7741,7 +7830,7 @@ function repCambiarRegistro(){
 function repCambiarKudo(i,v){ window._REP_FILAS[i].kudo=v; }
 function repNota(i){
   const f=window._REP_FILAS[i];
-  const t=prompt('Nota personal para '+f.oficina+' (opcional, máximo 400 caracteres).\nAparecerá en el correo como «Nota de la Subcomisión».', f.nota||'');
+  const t=prompt('Nota personal para '+f.oficina+' (opcional, máximo 400 caracteres).\nAparecerá en el correo como «Nota de la Coordinación de Calidad».', f.nota||'');
   if(t===null) return;
   f.nota=String(t).slice(0,400).trim();
   const b=document.getElementById('rep_notabtn_'+i); if(b) b.textContent=f.nota?'✎ Nota ✓':'✎ Nota';
@@ -7765,7 +7854,7 @@ async function abrirReporteAvance(){
     <details style="background:#f5f9f7;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin:10px 0 12px;font-size:13px;line-height:1.55;color:var(--slate)">
       <summary style="cursor:pointer;font-weight:600;color:var(--brand)">💡 Cómo funciona este reporte y su escala de reconocimiento</summary>
       <p style="margin:8px 0"><b>Las cifras</b> salen de la tabla de Seguimiento: % de riesgos con reportes de avance, medidas culminadas y avance promedio (último % reportado de cada riesgo; los que no tienen reportes cuentan como 0 %). <b>Espera a que la tabla termine de cargar.</b></p>
-      <p style="margin:0 0 8px"><b>El nivel</b> se calcula solo, de 0 a 5: los <b>reportes</b> son la evidencia de trabajo y las <b>medidas culminadas</b>, el resultado.
+      <p style="margin:0 0 8px"><b>La etapa de avance</b> de la oficina se calcula sola, en seis pasos: los <b>reportes</b> son la evidencia de trabajo y las <b>medidas culminadas</b>, el resultado.
         Los niveles 0 y 1 reciben un mensaje de <b>ánimo</b>; niveles 2 a 5, un <b>reconocimiento</b>. Nunca se felicita sin un logro real.</p>
       <p style="margin:0 0 8px"><b>0 Por empezar</b> · sin reportes — <b>1 Primeros pasos</b> · menos de 50 % con reportes — <b>2 En marcha</b> · 50 % o más con reportes —
         <b>3 Buen ritmo</b> · 80 % con reportes — <b>4 Destacado</b> · 80 % con reportes y la mitad de medidas culminadas — <b>5 Excelencia</b> · todo reportado y culminado.</p>
@@ -7783,7 +7872,7 @@ async function abrirReporteAvance(){
         <th style="padding:8px"><input type="checkbox" checked onchange="document.querySelectorAll('.rep_chk').forEach(c=>c.checked=this.checked)"></th>
         <th style="padding:8px">Oficina</th>
         <th style="padding:8px;text-align:right">Con reportes</th><th style="padding:8px;text-align:right">Culminadas</th>
-        <th style="padding:8px;text-align:right">Avance</th><th style="padding:8px">Nivel</th>
+        <th style="padding:8px;text-align:right">Avance</th><th style="padding:8px">Etapa de avance</th>
         <th style="padding:8px">Kudo</th><th style="padding:8px"></th><th style="padding:8px">Resultado</th>
       </tr></thead><tbody>
       ${filas.map((f,i)=>`<tr style="border-bottom:1px solid var(--line)">
@@ -7792,7 +7881,7 @@ async function abrirReporteAvance(){
         <td style="padding:7px 8px;text-align:right;white-space:nowrap">${_repSemaforo(f.cifras.conReportes,f.cifras.total)} <span class="hint">· ${f.cifras.conReportes}/${f.cifras.total}</span></td>
         <td style="padding:7px 8px;text-align:right;white-space:nowrap">${_repSemaforo(f.cifras.culminadas,f.cifras.total)} <span class="hint">· ${f.cifras.culminadas}/${f.cifras.total}</span></td>
         <td style="padding:7px 8px;text-align:right">${f.cifras.avancePromedio} %</td>
-        <td style="padding:7px 8px;white-space:nowrap"><b>${f.nivel}</b> · ${REP_NIVELES[f.nivel]}</td>
+        <td style="padding:7px 8px;white-space:nowrap">${REP_NIVELES[f.nivel]} <span style="letter-spacing:1px;color:var(--brand)">${'●'.repeat(f.nivel+1)}</span><span style="letter-spacing:1px;color:#cfd5d2">${'●'.repeat(5-f.nivel)}</span></td>
         <td style="padding:7px 8px"><select id="rep_kudo_${i}" onchange="repCambiarKudo(${i},this.value)" style="font-size:12px;padding:3px 5px;border-radius:6px;border:1px solid var(--line)">${_repOpcionesKudo(f.kudo)}</select></td>
         <td style="padding:7px 8px"><button class="btn btn-sm" id="rep_notabtn_${i}" onclick="repNota(${i})">✎ Nota</button></td>
         <td style="padding:7px 8px" id="rep_res_${i}"></td></tr>`).join('')}
