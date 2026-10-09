@@ -1699,8 +1699,22 @@ async function guardarUsuario(){
     });
     if(choque){
       const rolActual = _limpioU((choque.values||{})['Rol'])||'sin rol';
-      toast('Ya existe el usuario "'+usuario+'" (rol: '+rolActual+'). No lo dupliques: edítalo. Para varias oficinas, marca todas en su registro; para que además vea toda la Facultad, marca «👁 Además, puede consultar toda la Facultad» en su registro.', true);
       btn.disabled=false; btn.textContent='Guardar usuario';
+      const nuevasOfi = (rol==='Oficina') ? oficinasArr.slice() : [];
+      const quiereVer = (rol==='Gestor' || rol==='Administrador') || (rol==='Oficina' && (document.getElementById('us_vertodo')||{}).checked);
+      await editarUsuario(choque.id);
+      if(rolActual==='Oficina'){
+        document.querySelectorAll('#us_oficinas_lista input[type=checkbox]').forEach(c=>{ if(nuevasOfi.some(o=>o.toLowerCase()===String(c.value).toLowerCase())) c.checked=true; });
+        const vt=document.getElementById('us_vertodo');
+        if(vt && quiereVer){
+          vt.checked=true; const caja=vt.closest('label')||vt;
+          try{ caja.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){}
+          caja.style.boxShadow='0 0 0 3px #f5b041'; setTimeout(()=>{ caja.style.boxShadow=''; }, 4000);
+        }
+        toast('"'+usuario+'" ya existe (rol Oficina). Te abrí su registro'+(quiereVer?' con «👁 Además, puede consultar toda la Facultad» ya marcado':'')+'. Solo pulsa «Guardar usuario».');
+      } else {
+        toast('"'+usuario+'" ya existe (rol: '+rolActual+'). Te abrí su registro para modificarlo; no se crea un duplicado.');
+      }
       return;
     }
   }catch(_){ /* si falla la verificación, continúa (no bloquea por un error de red) */ }
