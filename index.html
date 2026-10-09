@@ -989,6 +989,10 @@
               <input id="us_oficina_buscar" placeholder="Filtrar oficinas…" oninput="filtrarOficinasUsuario()" style="margin-bottom:6px">
               <div id="us_oficinas_lista" style="max-height:180px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;padding:8px 10px;display:flex;flex-direction:column;gap:6px"></div>
             </div>
+            <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:9px 11px;border:1px dashed #9cc0e6;border-radius:9px;background:#f4f9ff;cursor:pointer;font-weight:400">
+              <input type="checkbox" id="us_vertodo" style="margin-top:3px">
+              <span><strong>👁 Además, puede consultar toda la Facultad</strong><br><span class="hint">Verá los riesgos y oportunidades de todas las oficinas, pero solo podrá registrar, editar y reportar en las oficinas marcadas arriba. Ej.: la responsable de Tutoría que también revisa el avance de toda la Facultad.</span></span>
+            </label>
           </div>
           <div class="field full"><label>Activo</label><select id="us_activo"><option>Sí</option><option>No</option></select></div>
         </div>
@@ -1255,10 +1259,12 @@ async function _revalidarSesion(){
     let rol=L(v['Rol'])||'Oficina'; if(!['Administrador','Gestor','Oficina'].includes(rol)) rol='Oficina';
     const m=new Map();
     activos.forEach(r=>_parseOficinas(L((r.values||{})['Oficina asignada'])).forEach(o=>{ const t=String(o||'').replace(/\s+/g,' ').trim(); if(t && !m.has(t.toLowerCase())) m.set(t.toLowerCase(), t); }));
-    const oficinas=[...m.values()];
-    const cambio = rol!==SESION.rol || oficinas.join('|')!==(SESION.oficinas||[]).join('|');
+    const _todasOfi=[...m.values()];
+    const verTodo = rol==='Oficina' && _todasOfi.some(_esMarcaVerTodo);
+    const oficinas=_todasOfi.filter(o=>!_esMarcaVerTodo(o));
+    const cambio = rol!==SESION.rol || oficinas.join('|')!==(SESION.oficinas||[]).join('|') || !!verTodo!==!!SESION.verTodo;
     if(cambio){
-      SESION.rol=rol; SESION.oficinas=oficinas; SESION.oficina=oficinas[0]||''; SESION.recordId=activos[0].id;
+      SESION.rol=rol; SESION.oficinas=oficinas; SESION.verTodo=verTodo; SESION.oficina=oficinas[0]||''; SESION.recordId=activos[0].id;
       _guardarSesion();
       toast('Tus permisos fueron actualizados por el administrador. Recargando…');
       setTimeout(()=>location.reload(), 1800);
@@ -1325,9 +1331,11 @@ async function _hacerLoginInterno(){
         const k=norm(o).toLowerCase(); if(k && !setOfi.has(k)) setOfi.set(k, norm(o));
       });
     });
-    const oficinas = [...setOfi.values()];
+    const _todasOfi = [...setOfi.values()];
+    const verTodo = rol==='Oficina' && _todasOfi.some(_esMarcaVerTodo);
+    const oficinas = _todasOfi.filter(o=>!_esMarcaVerTodo(o));
     const nombre = _leerNombreUsuario(v);
-    SESION = { rol, usuario:limpio(v['Usuario']), nombre, oficina:oficinas[0]||'', oficinas, recordId: encontrado.id };
+    SESION = { rol, usuario:limpio(v['Usuario']), nombre, oficina:oficinas[0]||'', oficinas, verTodo, recordId: encontrado.id };
     try{ SESION.ph = await _hashTxt(p); }catch(_){}
     _guardarSesion();
     // Se recuerda solo el nombre de usuario. La contraseña NO: de eso se encarga el navegador.
@@ -1357,6 +1365,13 @@ function esAdmin(){ return SESION && SESION.rol==='Administrador'; }
 function puedeCrear(){ return esAdmin(); }                  // solo Administrador crea
 function puedeEliminar(){ return esAdmin(); }               // solo Administrador elimina/archiva
 function puedeVerTodo(){ return SESION && (SESION.rol==='Administrador' || SESION.rol==='Gestor'); }
+// Rol Oficina + permiso adicional de CONSULTA de toda la Facultad (solo lectura fuera de sus oficinas).
+// Se guarda como una marca dentro de "Oficina asignada": no requiere columna nueva en QuintaDB.
+const VER_TODO_MARCA='[Consulta: toda la Facultad]';
+function _esMarcaVerTodo(o){ return String(o||'').replace(/\s+/g,' ').trim().toLowerCase()===VER_TODO_MARCA.toLowerCase(); }
+window._esMarcaVerTodo=_esMarcaVerTodo;
+function puedeConsultarTodo(){ return !!(SESION && (puedeVerTodo() || (SESION.rol==='Oficina' && SESION.verTodo))); }
+window.puedeConsultarTodo=puedeConsultarTodo;
 
 // Ajusta la interfaz según el rol
 function aplicarPermisos(){
@@ -1381,7 +1396,7 @@ function mostrarBarraSesion(){
   // Mostrar nombre (si existe) y, para rol Oficina, sus oficinas.
   const nombre = SESION.nombre || SESION.usuario;
   const listaOfi = (SESION.oficinas && SESION.oficinas.length) ? SESION.oficinas.join(' · ') : (SESION.oficina||'');
-  const sub = (SESION.rol==='Oficina') ? (listaOfi||'Oficina') : SESION.rol;
+  const sub = (SESION.rol==='Oficina') ? ((listaOfi||'Oficina')+(SESION.verTodo?' · 👁 consulta toda la Facultad':'')) : SESION.rol;
   const tooltip = `${SESION.usuario} · ${SESION.rol}${listaOfi?(' · '+listaOfi):''}`;
   cont.innerHTML = `<span title="${tooltip.replace(/"/g,'&quot;')}" style="line-height:1.2">👤 <strong>${nombre.replace(/</g,'&lt;')}</strong>`
     + `<br><span style="opacity:.8;font-size:11px">${sub.replace(/</g,'&lt;')}</span></span>`
@@ -1397,6 +1412,13 @@ window.cerrarSesion = cerrarSesion;
 // Un usuario puede tener varias oficinas (SESION.oficinas); basta que coincida con una.
 function _registroVisible(r){
   if(!SESION) return false;
+  if(puedeConsultarTodo()) return true;
+  return _registroDeMisOficinas(r);
+}
+window._registroVisible = _registroVisible;
+// ¿El registro es de una de MIS oficinas? (decide si se puede EDITAR)
+function _registroDeMisOficinas(r){
+  if(!SESION) return false;
   if(puedeVerTodo()) return true;
   const norm = s => String(s||'').replace(/\s+/g,' ').trim().toLowerCase();
   const objetivo = norm(oficinaDe(r));
@@ -1404,7 +1426,11 @@ function _registroVisible(r){
   const mias = (SESION.oficinas && SESION.oficinas.length) ? SESION.oficinas : (SESION.oficina?[SESION.oficina]:[]);
   return mias.some(o=>norm(o)===objetivo);
 }
-window._registroVisible = _registroVisible;
+window._registroDeMisOficinas = _registroDeMisOficinas;
+// Solo consulta: usuario Oficina con "ver todo" mirando un registro de otra oficina.
+function _soloConsulta(r){ return !!(SESION && SESION.rol==='Oficina' && SESION.verTodo && r && !_registroDeMisOficinas(r)); }
+window._soloConsulta=_soloConsulta;
+function _avisoSoloConsulta(){ toast('👁 Este registro es de otra oficina: puedes consultarlo, pero no modificarlo.', true); }
 
 /* ============================================================
    GESTIÓN DE USUARIOS (pestaña Administración, solo admin)
@@ -1445,7 +1471,8 @@ function descargarUsuariosExcel(){
     const nombre=_leerNombreUsuario(v)||'—';
     const usuario=_limpioU(v['Usuario'])||'—';
     const rol=_limpioU(v['Rol'])||'Oficina';
-    const oficinas=(rol==='Oficina') ? (_parseOficinas(_limpioU(v['Oficina asignada'])).join('; ')||'—') : '(ve todo)';
+    const _ofs=_parseOficinas(_limpioU(v['Oficina asignada']));
+    const oficinas=(rol==='Oficina') ? ((_ofs.filter(o=>!_esMarcaVerTodo(o)).join('; ')||'—')+(_ofs.some(_esMarcaVerTodo)?' (+ consulta toda la Facultad)':'')) : '(ve todo)';
     const activo=_limpioU(v['Activo'])==='No'?'No':'Sí';
     filasHtml += `<tr>
       <td style="text-align:center">${i+1}</td>
@@ -1505,7 +1532,8 @@ function renderUsuariosTabla(){
     const nombreCelda = nombreReal ? nombreReal.replace(/</g,'&lt;') : '<span style="color:var(--mist)">—</span>';
     const usuario=_limpioU(v['Usuario']), pass=_limpioU(v['Contraseña']), rol=_limpioU(v['Rol'])||'Oficina';
     const oficinaTxt=_limpioU(v['Oficina asignada'])||'—';
-    const oficinaVista=(rol==='Oficina')? (_parseOficinas(oficinaTxt).join(' · ')||'—') : '<span style="color:var(--mist)">(ve todo)</span>';
+    const _ofs=_parseOficinas(oficinaTxt);
+    const oficinaVista=(rol==='Oficina')? ((_ofs.filter(o=>!_esMarcaVerTodo(o)).join(' · ').replace(/</g,'&lt;')||'—')+(_ofs.some(_esMarcaVerTodo)?' <span title="Además puede consultar (solo lectura) toda la Facultad" style="display:inline-block;margin-left:4px;padding:1px 7px;border-radius:10px;background:#e8f1fb;color:#1f5a96;font-size:11px;font-weight:600;white-space:nowrap">👁 + consulta todo</span>':'')) : '<span style="color:var(--mist)">(ve todo)</span>';
     const activo=_limpioU(v['Activo']);
     const activoBadge = activo==='Sí' ? '<span style="color:#0f8f5e;font-weight:600">● Sí</span>' : '<span style="color:#c0392b;font-weight:600">● No</span>';
     const passEsc = (pass||'').replace(/"/g,'&quot;').replace(/'/g,"\\'");
@@ -1614,6 +1642,7 @@ async function abrirFormUsuario(){
   document.getElementById('us_activo').value='Sí';
   const bq=document.getElementById('us_oficina_buscar'); if(bq) bq.value='';
   await poblarOficinasUsuario([]);
+  const vt0=document.getElementById('us_vertodo'); if(vt0) vt0.checked=false;
   toggleOficinaUsuario();
   const bg=document.getElementById('us_guardar'); if(bg){ bg.disabled=false; bg.textContent='Guardar usuario'; }
   document.getElementById('modalUsuario').classList.remove('hidden');
@@ -1634,8 +1663,10 @@ async function editarUsuario(id){
   document.getElementById('us_rol').value = _limpioU(v['Rol'])||'';
   document.getElementById('us_activo').value = _limpioU(v['Activo'])==='No'?'No':'Sí';
   const bq=document.getElementById('us_oficina_buscar'); if(bq) bq.value='';
-  const marcadas = _parseOficinas(_limpioU(v['Oficina asignada']));
+  const _todas = _parseOficinas(_limpioU(v['Oficina asignada']));
+  const marcadas = _todas.filter(o=>!_esMarcaVerTodo(o));
   await poblarOficinasUsuario(marcadas);
+  const vt=document.getElementById('us_vertodo'); if(vt) vt.checked=_todas.some(_esMarcaVerTodo);
   toggleOficinaUsuario();
   const bg=document.getElementById('us_guardar'); if(bg){ bg.disabled=false; bg.textContent='Guardar usuario'; }
   document.getElementById('modalUsuario').classList.remove('hidden');
@@ -1647,8 +1678,10 @@ async function guardarUsuario(){
   const g = id => document.getElementById(id).value.trim();
   const nombre=g('us_nombre'), usuario=g('us_usuario'), pass=g('us_password'), rol=g('us_rol'), activo=g('us_activo');
   // Oficinas múltiples: checkboxes marcados, guardadas separadas por ';'
-  let oficinasArr = (rol==='Oficina') ? _oficinasMarcadas() : [];
+  let oficinasArr = (rol==='Oficina') ? _oficinasMarcadas().filter(o=>!_esMarcaVerTodo(o)) : [];
   let oficina = oficinasArr.join('; ');
+  const _vtChk=document.getElementById('us_vertodo');
+  if(rol==='Oficina' && oficinasArr.length && _vtChk && _vtChk.checked) oficina += '; '+VER_TODO_MARCA;
   if(!usuario || !pass){ toast('Usuario y contraseña son obligatorios.', true); return; }
   if(!rol){ toast('Selecciona un rol.', true); return; }
   if(rol==='Oficina' && !oficinasArr.length){ toast('El rol Oficina requiere al menos una oficina asignada.', true); return; }
@@ -1666,7 +1699,7 @@ async function guardarUsuario(){
     });
     if(choque){
       const rolActual = _limpioU((choque.values||{})['Rol'])||'sin rol';
-      toast('Ya existe el usuario "'+usuario+'" (rol: '+rolActual+'). No lo dupliques: edítalo. Para varias oficinas, marca todas en su registro; para darle más permisos, cámbiale el rol a Administrador (que ya ve todo).', true);
+      toast('Ya existe el usuario "'+usuario+'" (rol: '+rolActual+'). No lo dupliques: edítalo. Para varias oficinas, marca todas en su registro; para que además vea toda la Facultad, marca «👁 Además, puede consultar toda la Facultad» en su registro.', true);
       btn.disabled=false; btn.textContent='Guardar usuario';
       return;
     }
@@ -4334,7 +4367,7 @@ async function descargarExcel(){
   try{
     let recs = await loadMatriz();
     // Respetar el control de acceso por oficina (igual que la vista Seguimiento).
-    if(SESION && !puedeVerTodo()) recs = recs.filter(r=>_registroVisible(r));
+    if(SESION && !puedeConsultarTodo()) recs = recs.filter(r=>_registroVisible(r));
     const F = CONFIG.MATRIZ_FIELDS;
     const g = (r,nombre,id) => { const v=r.values||{}; const x=v[nombre]; if(x && x!==nombre) return x; return v[id]||''; };
     // Mismo filtrado que la vista
@@ -4502,7 +4535,7 @@ async function renderSeguimiento() {
   try {
     let recs = await loadMatriz();
     // Control de acceso: en Seguimiento el usuario solo ve/trabaja los registros de su oficina.
-    if(SESION && !puedeVerTodo()) recs = recs.filter(r=>_registroVisible(r));
+    if(SESION && !puedeConsultarTodo()) recs = recs.filter(r=>_registroVisible(r));
     // Precargar en paralelo el diccionario de procesos y el índice de subregistros
     await Promise.allSettled([ precargarMaestrasProceso(), precargarSubcache() ]);
     const F = CONFIG.MATRIZ_FIELDS;
@@ -4548,7 +4581,7 @@ async function renderSeguimiento() {
       const _certRaw = vR['Certificación de Implementación del Control'] || vR[CONFIG.MATRIZ_FIELDS.certificacion_control.id] || '';
       const certificacion = (_certRaw && !String(_certRaw).includes('Certificación')) ? String(_certRaw).trim() : '';
       return {id:r.id, op, desc, codigo:codigoDe(r), proc, procFuente, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch, tieneMonitoreo, monIds, nMon:monIds.length, ctrlTxt, certificacion,
-        tecCorreo:(_rtDelRiesgo(r)[0]||''), tecNombre:(leerTexto(r,RT_NOMBRE,true)||''), tecMio:_rtEsMio(r), puedeTrab:rtPuedeTrabajar(r)};
+        tecCorreo:(_rtDelRiesgo(r)[0]||''), tecNombre:(leerTexto(r,RT_NOMBRE,true)||''), tecMio:_rtEsMio(r), puedeTrab:rtPuedeTrabajar(r), soloCons:_soloConsulta(r)};
     })
     // Filtro por el selector Todos/Riesgos/Oportunidades
     .filter(f => SEG_TIPO==='todos' || (SEG_TIPO==='oportunidades'?f.op:!f.op))
@@ -4620,10 +4653,10 @@ async function renderSeguimiento() {
         <td data-label="¿Procede reevaluación?" id="procede-${f.id}" title="Evaluando condiciones…"><span class="hint" style="font-size:11.5px">…</span></td>
         <td class="cards-acciones" style="text-align:right;vertical-align:middle;padding:5px 4px">
           <div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;width:116px;margin-left:auto">
-          <button class="icon-btn" title="${f.puedeTrab===false?'Este riesgo tiene otro responsable técnico':'Reporte de acciones a la(s) medida(s) de respuesta'}" onclick="abrirReporteAcciones('${f.id}')" ${f.puedeTrab===false?'disabled style="opacity:.35;cursor:not-allowed"':''}>📋</button>
+          <button class="icon-btn" title="${f.puedeTrab===false?(f.soloCons?'Registro de otra oficina: solo consulta':'Este riesgo tiene otro responsable técnico'):'Reporte de acciones a la(s) medida(s) de respuesta'}" onclick="abrirReporteAcciones('${f.id}')" ${f.puedeTrab===false?'disabled style="opacity:.35;cursor:not-allowed"':''}>📋</button>
           ${f.tieneMonitoreo?`<button class="icon-btn" id="btnmon-${f.id}" title="Control y Seguimiento (se habilita cuando las medidas estén al 100%)" onclick="abrirMetasMonitoreo('${f.id}')" style="border-color:var(--brand-2);display:none">🎯</button>`:''}
           <button class="icon-btn" title="Ver detalle" onclick="verDetalle('${f.id}')">👁</button>
-          <button class="icon-btn" title="${f.puedeTrab===false?'Este riesgo tiene otro responsable técnico':'Editar'}" onclick="editarRiesgo('${f.id}')" ${f.puedeTrab===false?'disabled style="opacity:.35;cursor:not-allowed"':''}>✏️</button>
+          <button class="icon-btn" title="${f.puedeTrab===false?(f.soloCons?'Registro de otra oficina: solo consulta':'Este riesgo tiene otro responsable técnico'):'Editar'}" onclick="editarRiesgo('${f.id}')" ${f.puedeTrab===false?'disabled style="opacity:.35;cursor:not-allowed"':''}>✏️</button>
           ${puedeVerTodo()?`<button class="icon-btn" title="Notificar por WhatsApp" onclick="notificarWhatsApp('${f.id}')">📱</button>
           <button class="icon-btn" title="Notificar por correo" onclick="notificarCorreo('${f.id}')">✉️</button>`:''}
           ${puedeEliminar()?`<button class="icon-btn" title="${f.arch?'Reactivar (desarchivar)':'Archivar'}" onclick="archivarRiesgo('${f.id}')">${f.arch?'♻️':'🗄️'}</button>
@@ -5102,6 +5135,7 @@ window.cerrarModalSimple = cerrarModalSimple;
 async function abrirReporteAcciones(riesgoId){
   let r = STATE.matriz.find(x=>x.id===riesgoId);
   if(!r) return;
+  if(_soloConsulta(r)){ _avisoSoloConsulta(); return; }
   const F = CONFIG.MATRIZ_FIELDS;
   document.getElementById('modalAcciones').classList.remove('hidden');
   const cont0 = document.getElementById('acc_cont');
@@ -5223,6 +5257,7 @@ window.medidasAl100 = medidasAl100;
 async function abrirMetasMonitoreo(riesgoId){
   let r = STATE.matriz.find(x=>x.id===riesgoId);
   if(!r) return;
+  if(_soloConsulta(r)){ _avisoSoloConsulta(); return; }
   // Guarda: el monitoreo del control solo se habilita cuando las medidas de
   // respuesta están al 100% (último reporte de acciones = 100%).
   const okMedidas = await medidasAl100(riesgoId);
@@ -5921,6 +5956,7 @@ window.guardarMonitoreo = guardarMonitoreo;
 // === Editar / eliminar metas y reportes de monitoreo ===
 // Eliminar un subregistro (meta o reporte de monitoreo)
 async function eliminarSubregistro(riesgoId, subId, tipo){
+  { const _rq=(STATE.matriz||[]).find(x=>x.id===riesgoId); if(_rq && _soloConsulta(_rq)){ _avisoSoloConsulta(); return; } }
   if(!confirm('¿Eliminar este '+(tipo==='meta'?'registro de meta':'reporte de monitoreo')+'? Esta acción no se puede deshacer.')) return;
   try{
     await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+subId+'.json','DELETE');
@@ -5934,6 +5970,7 @@ window.eliminarSubregistro = eliminarSubregistro;
 
 // Editar una meta: carga sus valores en el formulario de añadir meta y cambia el botón a "Actualizar"
 async function editarMeta(riesgoId, metaId){
+  { const _rq=(STATE.matriz||[]).find(x=>x.id===riesgoId); if(_rq && _soloConsulta(_rq)){ _avisoSoloConsulta(); return; } }
   try{
     const sub = await getSub('metas', metaId);
     const v = (sub && sub.values) || {};
@@ -6000,6 +6037,7 @@ window.actualizarMeta = actualizarMeta;
 
 // Editar un reporte de monitoreo
 async function editarMonitoreo(riesgoId, monId){
+  { const _rq=(STATE.matriz||[]).find(x=>x.id===riesgoId); if(_rq && _soloConsulta(_rq)){ _avisoSoloConsulta(); return; } }
   try{
     const sub = await getSub('monitoreo', monId);
     const v = (sub && sub.values) || {};
@@ -6646,6 +6684,8 @@ window.archivarRiesgo = archivarRiesgo;
 // === Editar riesgo (campos principales editables) ===
 function editarRiesgo(riesgoId){
   try{
+    const _r0=(STATE.matriz||[]).find(x=>x.id===riesgoId);
+    if(_r0 && _soloConsulta(_r0)){ _avisoSoloConsulta(); return; }
     _editarRiesgoInterno(riesgoId);
   }catch(err){
     console.error('[editarRiesgo] ERROR:', err);
@@ -7118,7 +7158,7 @@ async function renderReeval() {
   try {
     let recs = (await loadMatriz()).filter(r=>!esArchivado(r));
     // Control de acceso: en Reevaluación el usuario solo ve los registros de su oficina.
-    if(SESION && !puedeVerTodo()) recs = recs.filter(r=>_registroVisible(r));
+    if(SESION && !puedeConsultarTodo()) recs = recs.filter(r=>_registroVisible(r));
     await precargarMaestrasProceso(); // garantizar diccionario id→nombre
     const F = CONFIG.MATRIZ_FIELDS;
     const get=(r,def,nombre)=>(r.values||{})[nombre] ?? (r.values||{})[def.id] ?? '';
@@ -7175,7 +7215,9 @@ async function renderReeval() {
       if(celProc) celProc.innerHTML = info.procede
         ? '<span class="tag tag-proc">Procede</span>'
         : `<span class="tag tag-noproc" title="${(info.motivo||'').replace(/"/g,'&quot;')}">No procede</span>`;
-      if(celAct) celAct.innerHTML = info.procede
+      if(celAct) celAct.innerHTML = _soloConsulta(r)
+        ? '<span class="hint" style="font-size:12px" title="Registro de otra oficina: solo consulta">👁 Solo consulta</span>'
+        : info.procede
         ? `<button class="btn btn-primary" style="padding:6px 14px;font-size:13px" onclick="abrirReeval('${r.id}')">Reevaluar</button>`
         : `<span class="hint" style="font-size:12px" title="${(info.motivo||'').replace(/"/g,'&quot;')}">🔒 Bloqueado</span>`;
     }
@@ -7297,6 +7339,7 @@ window.bloquearSiSegunAvance = bloquearSiSegunAvance;
 function abrirReeval(riesgoId){
   const r = STATE.matriz.find(x=>x.id===riesgoId);
   if(!r) return;
+  if(_soloConsulta(r)){ _avisoSoloConsulta(); return; }
   REEVAL_ACTUAL = riesgoId;
   const F=CONFIG.MATRIZ_FIELDS;
   const get=(rr,def,nombre)=>(rr.values||{})[nombre] ?? (rr.values||{})[def.id] ?? '';
@@ -8126,6 +8169,7 @@ function _rtEsMio(r){
 // Permiso final sobre un riesgo
 function rtPuedeTrabajar(r){
   if(typeof puedeVerTodo==='function' && puedeVerTodo()) return true;  // admin y gestor
+  if(_soloConsulta(r)) return false;   // otra oficina: solo consulta
   // El responsable de proceso conserva acceso a TODOS los riesgos de su oficina:
   // es quien los reparte entre sus técnicos y debe poder reasignarlos después.
   if(_rtEsResponsableProceso(r)) return true;
