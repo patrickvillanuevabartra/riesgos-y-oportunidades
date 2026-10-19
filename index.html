@@ -5735,6 +5735,30 @@ function rfEstado(riesgoId, pref){
   return e;
 }
 window.rfMejorarFormulario=rfMejorarFormulario; window.rfEstado=rfEstado;
+// Riesgo de nivel 4: al escribir la fórmula del indicador, se muestra qué irá
+// en el numerador y en el denominador del monitoreo (o se avisa si no se reconoce).
+function rfPreviewFormula(pref){
+  const fEl=document.getElementById(pref+'_formula'), tEl=document.getElementById(pref+'_tipo_ind');
+  if(!fEl) return;
+  let box=document.getElementById(pref+'_formula_prev');
+  if(!box){ box=document.createElement('div'); box.id=pref+'_formula_prev';
+    box.style.cssText='font-size:12px;line-height:1.45;border-radius:8px;padding:6px 10px;margin-top:6px;display:none';
+    fEl.insertAdjacentElement('afterend', box); }
+  const f=fEl.value.trim(), razon=String(tEl&&tEl.value||'').toLowerCase().startsWith('raz');
+  const pinta=(ok,html)=>{ box.style.display='block'; box.style.background=ok?'#eaf7ef':'#fff8e6'; box.style.border='1px solid '+(ok?'#a9d8b8':'#f0c987'); box.style.color=ok?'#1d6b3a':'#8a6100'; box.innerHTML=html; };
+  if(!f){ box.style.display='none'; return; }
+  if(!razon){ pinta(true,'Indicador <b>absoluto</b>: en el monitoreo se registra un solo número.'); return; }
+  const trozos=f.split(/[()+\-*/×÷=%]|\b\d+(?:[.,]\d+)?\b/).map(x=>x.trim()).filter(Boolean);
+  const vars=[]; trozos.forEach(t=>{ const n=t.replace(/^[^\wÁÉÍÓÚÑáéíóúñ°%]+|[^\wÁÉÍÓÚÑáéíóúñ°%]+$/g,'').trim();
+    if(n && /[a-zA-ZÁÉÍÓÚÑáéíóúñ]/.test(n) && !vars.some(x=>x.toLowerCase()===n.toLowerCase())) vars.push(n); });
+  if(vars.length===2 && f.indexOf('/')>f.indexOf(vars[0]))
+    pinta(true,'En el monitoreo: <b>numerador</b> = '+_rfEsc(vars[0])+' · <b>denominador</b> = '+_rfEsc(vars[1])+'.');
+  else pinta(false,'⚠️ Para un indicador de <b>razón</b>, escriba la fórmula así: <i>(lo que se cuenta / el total) × 100</i>. Ej.: (N° de equipos con mantenimiento ejecutado / N° de equipos programados) × 100. Así el monitoreo muestra qué va en cada casilla.');
+}
+document.addEventListener('input', e=>{ const id=e.target&&e.target.id; if(id==='f_formula'||id==='ed_formula') rfPreviewFormula(id.split('_')[0]); });
+document.addEventListener('change', e=>{ const id=e.target&&e.target.id; if(id==='f_tipo_ind'||id==='ed_tipo_ind') rfPreviewFormula(id.split('_')[0]); });
+window.rfPreviewFormula=rfPreviewFormula;
+
 
 function calcularValorIndicador(num, den, tipo){
   const n = parseFloat(num);
@@ -6806,6 +6830,7 @@ function _editarRiesgoInterno(riesgoId){
   const r = STATE.matriz.find(x=>x.id===riesgoId);
   if(!r) return;
   EDIT_ACTUAL = riesgoId;
+  setTimeout(()=>{ try{ rfPreviewFormula('ed'); }catch(_){ } }, 600);   // vista previa de la fórmula (nivel 4)
   // El técnico ya asignado se guarda aquí para volver a seleccionarlo cuando
   // el desplegable termine de pintarse con su filtro.
   _RT_PENDIENTE = (_rtDelRiesgo(r)[0]||'');
