@@ -2191,12 +2191,22 @@ window.autocompletarRespProceso = autocompletarRespProceso;
 // Repinta el desplegable de técnicos del formulario que corresponda.
 // _RT_PENDIENTE lleva el correo ya asignado cuando se abre el editor.
 let _RT_PENDIENTE = '';
+// Y la unidad (laboratorio) de ese técnico: un mismo técnico puede atender
+// varios laboratorios con el mismo correo, y solo la unidad dice cuál era.
+let _RT_PEND_UNIDAD = '';
 async function rtRepintar(selOficinaId, repId){
   const idSel = selOficinaId.indexOf('ed_')===0 ? 'ed_resp_tec' : 'f_resp_tec';
-  if(!document.getElementById(idSel)) return;
+  const sel = document.getElementById(idSel);
+  if(!sel) return;
+  // Si no hay un valor pendiente de cargar, se conserva lo que el usuario ya eligió.
+  let correo = _RT_PENDIENTE, unidad = _RT_PEND_UNIDAD;
+  if(!correo && sel.value){
+    correo = sel.value;
+    unidad = (sel.selectedOptions[0] && sel.selectedOptions[0].getAttribute('data-unidad')) || '';
+  }
   await cargarRespTecnicos();          // por si aún no estaba en memoria
-  rtPintarSelect(idSel, selOficinaId, repId, _RT_PENDIENTE);
-  _RT_PENDIENTE = '';
+  rtPintarSelect(idSel, selOficinaId, repId, correo, unidad);
+  _RT_PENDIENTE = ''; _RT_PEND_UNIDAD = '';
 }
 window.rtRepintar = rtRepintar;
 
@@ -6718,6 +6728,7 @@ function _editarRiesgoInterno(riesgoId){
   // El técnico ya asignado se guarda aquí para volver a seleccionarlo cuando
   // el desplegable termine de pintarse con su filtro.
   _RT_PENDIENTE = (_rtDelRiesgo(r)[0]||'');
+  _RT_PEND_UNIDAD = (typeof leerTexto==='function' && RT_UNIDAD.id) ? (leerTexto(r, RT_UNIDAD, true)||'') : '';
   const v = r.values||{};
   const F = CONFIG.MATRIZ_FIELDS;
   const cur = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
@@ -8235,7 +8246,7 @@ function rtOpciones(idOficina, idLider){
   if(!lista.length){ lista=todos.slice(); lista._sinFiltro=true; }
   return lista;
 }
-function rtPintarSelect(idSelect, idOficina, idLider, correoActual){
+function rtPintarSelect(idSelect, idOficina, idLider, correoActual, unidadActual){
   const sel=document.getElementById(idSelect);
   if(!sel) return;
   const ops=rtOpciones(idOficina, idLider);
@@ -8257,7 +8268,15 @@ function rtPintarSelect(idSelect, idOficina, idLider, correoActual){
       sel.insertAdjacentHTML('beforeend',
         `<option value="${esc(correoActual)}">${esc((info&&info.nombre)||correoActual)}</option>`);
     }
-    sel.value=correoActual;
+    // Con el mismo correo puede haber varias opciones (una por laboratorio):
+    // se elige la de la unidad guardada; si no hay, la de la oficina del riesgo.
+    const iguales=[...sel.options].filter(o=>o.value && _rtNorm(o.value)===_rtNorm(correoActual));
+    const selO=document.getElementById(idOficina);
+    const ofi=_rtNorm(selO && selO.selectedOptions && selO.selectedOptions[0] ? selO.selectedOptions[0].text : '');
+    const elegida = iguales.find(o=>unidadActual && _rtNorm(o.getAttribute('data-unidad'))===_rtNorm(unidadActual))
+                 || iguales.find(o=>ofi && _rtNorm(o.getAttribute('data-unidad'))===ofi)
+                 || iguales[0];
+    if(elegida) elegida.selected=true; else sel.value=correoActual;
   }
 }
 window.rtPintarSelect = rtPintarSelect;
