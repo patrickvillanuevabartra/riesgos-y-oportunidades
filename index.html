@@ -5368,6 +5368,7 @@ async function renderMonPaneMetas(riesgoId, r){
     }catch(e){}
   }
   llenarPeriodoSel(riesgoId, ''); // poblar el desplegable de periodos factibles
+  try{ rfMejorarFormulario(riesgoId,'meta'); }catch(_){ }
 }
 window.renderMonPaneMetas = renderMonPaneMetas;
 
@@ -5411,6 +5412,7 @@ async function renderMonPaneRep(riesgoId, r){
   if(monIds.length){
     try { document.getElementById('monlist-'+riesgoId).innerHTML = await renderMonitoreoHTML(monIds, riesgoId); }catch(e){}
   }
+  try{ rfMejorarFormulario(riesgoId,'mon'); }catch(_){ }
 }
 window.renderMonPaneRep = renderMonPaneRep;
 
@@ -5657,6 +5659,83 @@ async function renderPanelMonitoreo(riesgoId, r){
 //  • "Razón": numerador / denominador × 100 (porcentaje). Requiere denominador ≠ 0.
 //  • "Absoluto" (o sin denominador): el valor es el propio numerador.
 // Devuelve number o null si no se puede calcular.
+
+// ===== Indicaciones y «estado de los datos» en metas y monitoreo del control =====
+// Lo mismo que en la Matriz de Indicadores: bajo cada casilla, cómo registrarla;
+// una casilla vacía es un dato PENDIENTE (no un cero); y un recuadro avisa si los
+// números no tienen sentido. Los avisos no impiden guardar.
+function _rfEsc(t){ return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
+function _rfNorm(t){ return String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+// Nombres de lo de arriba y lo de abajo, sacados de la fórmula del riesgo («A / B × 100»).
+function rfVariablesFormula(riesgoId){
+  const r = STATE.matriz.find(x=>x.id===riesgoId); if(!r) return null;
+  const v = r.values||{};
+  const ed = document.getElementById('ed_formula');
+  let f = (ed && ed.value.trim()) ? ed.value.trim() : (v['Fórmula del indicador']||'');
+  if(!f || f==='Fórmula del indicador') return null;
+  const trozos = String(f).split(/[()+\-*/×÷=%]|\b\d+(?:[.,]\d+)?\b/).map(s=>s.trim()).filter(Boolean);
+  const vars=[];
+  trozos.forEach(t=>{ const n=t.replace(/^[^\wÁÉÍÓÚÑáéíóúñ°%]+|[^\wÁÉÍÓÚÑáéíóúñ°%]+$/g,'').trim();
+    if(n && /[a-zA-ZÁÉÍÓÚÑáéíóúñ]/.test(n) && !vars.some(x=>x.toLowerCase()===n.toLowerCase())) vars.push(n); });
+  if(vars.length!==2) return null;
+  const fn=_rfNorm(f), a=_rfNorm(vars[0]), b=_rfNorm(vars[1]);
+  const i0=fn.indexOf(a), is=fn.indexOf('/', i0+a.length), i1=fn.indexOf(b, i0+a.length);
+  if(i0<0 || is<0 || i1<0 || !(is<i1)) return null;
+  return { arriba: vars[0], abajo: vars[1] };
+}
+// Agrega nombre de la variable, indicación y recuadro de estado a un formulario.
+// pref: 'meta' (programación de metas) o 'mon' (reporte de monitoreo).
+function rfMejorarFormulario(riesgoId, pref){
+  const num=document.getElementById(pref+'_num_'+riesgoId); if(!num) return;
+  const den=document.getElementById(pref+'_den_'+riesgoId);
+  const esRazon=String(tipoIndicadorDe(riesgoId)).toLowerCase().startsWith('raz');
+  const nombres=esRazon ? rfVariablesFormula(riesgoId) : null;
+  const pistas = pref==='meta'
+    ? { num: esRazon ? 'Lo que quieres alcanzar al cierre del periodo. Para fijarlo: total proyectado × porcentaje deseado. Ej.: 200 × 30 % = 60.'
+                     : 'El valor que quieres alcanzar al cierre del periodo.',
+        den: 'El total que proyectas para el periodo (según el plan o el registro oficial).' }
+    : { num: esRazon ? 'Lo logrado a la fecha del corte. Cuente solo lo que tenga evidencia.'
+                     : 'El valor medido a la fecha del corte, con evidencia.',
+        den: 'El total real del mismo periodo de la meta.' };
+  const adorna=(inp, nombre, pista)=>{
+    if(!inp || inp.dataset.rfOk) return; inp.dataset.rfOk='1';
+    inp.placeholder='dato pendiente';
+    const lab=inp.closest('.field') && inp.closest('.field').querySelector('label');
+    if(lab && nombre) lab.insertAdjacentHTML('beforeend', ' <span style="font-weight:400;color:var(--mist)">— '+_rfEsc(nombre)+'</span>');
+    inp.insertAdjacentHTML('afterend', '<div class="pista-var" style="font-size:11.5px;color:var(--mist);line-height:1.4;margin-top:4px">'+_rfEsc(pista)+'</div>');
+  };
+  adorna(num, nombres&&nombres.arriba, pistas.num);
+  adorna(den, nombres&&nombres.abajo, pistas.den);
+  // Recuadro de estado debajo del valor calculado
+  const pill=document.getElementById(pref==='meta' ? 'meta_val_'+riesgoId : 'mon_real_val_'+riesgoId);
+  const campo=pill && pill.closest('.field');
+  if(campo && !document.getElementById('rfest_'+pref+'_'+riesgoId)){
+    campo.insertAdjacentHTML('afterend','<div class="field full" id="rfest_'+pref+'_'+riesgoId+'" style="font-size:12.5px;line-height:1.45;border-radius:8px;padding:7px 10px;display:none"></div>');
+  }
+  rfEstado(riesgoId, pref);
+}
+function rfEstado(riesgoId, pref){
+  const box=document.getElementById('rfest_'+pref+'_'+riesgoId); if(!box) return null;
+  const n=(document.getElementById(pref+'_num_'+riesgoId)||{}).value, dEl=document.getElementById(pref+'_den_'+riesgoId);
+  const d=dEl ? dEl.value : null;
+  const esRazon=String(tipoIndicadorDe(riesgoId)).toLowerCase().startsWith('raz');
+  const vac=v=>v==null||String(v).trim()==='';
+  const pinta=(tipo, html)=>{
+    const c={ ok:['#eaf7ef','#a9d8b8','#1d6b3a'], av:['#fff8e6','#f0c987','#8a6100'], no:['#f3f4f6','#d1d5db','#4b5563'] }[tipo];
+    box.style.display='block'; box.style.background=c[0]; box.style.border='1px solid '+c[1]; box.style.color=c[2]; box.innerHTML=html;
+  };
+  const faltan=[n].concat(esRazon?[d]:[]).filter(vac).length, total=esRazon?2:1;
+  let e='ok';
+  if(faltan===total){ pinta('no','✏️ <b>Ingrese los datos.</b> Una casilla vacía es un dato pendiente; escriba 0 solo si lo comprobó.'); e='pend'; }
+  else if(faltan){ pinta('no','⏳ <b>Falta un dato.</b> El valor se calcula cuando estén los dos. Una casilla vacía no se toma como cero.'); e='pend'; }
+  else if(parseFloat(n)<0 || (esRazon && parseFloat(d)<0)){ pinta('av','⚠️ <b>Revise:</b> hay un número negativo.'); e='av'; }
+  else if(esRazon && parseFloat(d)===0){ pinta('no','➖ <b>No aplica:</b> el total (denominador) es 0, así que el indicador no se puede calcular. Revise el dato; si de verdad es 0, anótelo en la observación.'); e='no'; }
+  else if(esRazon && parseFloat(n)>parseFloat(d)){ pinta('av','⚠️ <b>Revise:</b> el numerador ('+n+') es mayor que el denominador ('+d+'), así que el resultado pasa de 100 %. Casi siempre es un error de conteo o de periodo.'); e='av'; }
+  else pinta('ok','✅ <b>Datos completos.</b>');
+  return e;
+}
+window.rfMejorarFormulario=rfMejorarFormulario; window.rfEstado=rfEstado;
+
 function calcularValorIndicador(num, den, tipo){
   const n = parseFloat(num);
   if(isNaN(n)) return null;
@@ -5691,6 +5770,7 @@ function calcValorMeta(riesgoId){
   const esRazon = String(tipo).toLowerCase().startsWith('raz');
   if(val!=null){ if(pill) pill.textContent = val + (esRazon?'%':''); if(hid) hid.value = val; }
   else { if(pill) pill.textContent='—'; if(hid) hid.value=''; }
+  rfEstado(riesgoId,'meta');
 }
 window.calcValorMeta = calcValorMeta;
 
@@ -5706,6 +5786,7 @@ function calcValorReal(riesgoId){
   if(val!=null){ if(pill) pill.textContent = val + (esRazon?'%':''); if(hid) hid.value = val; }
   else { if(pill) pill.textContent='—'; if(hid) hid.value=''; }
   calcAvanceMon(riesgoId); // recalcular % cumplimiento con el nuevo valor real
+  rfEstado(riesgoId,'mon');
 }
 window.calcValorReal = calcValorReal;
 
