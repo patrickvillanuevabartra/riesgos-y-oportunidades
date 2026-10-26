@@ -1062,11 +1062,10 @@ const API = {
     if (data.error) throw new Error(data.error);
     return data;
   },
-  records(entityId) {
-    return this.call(
-      `/apps/${CONFIG.APP_ID}/dtypes/entity/${entityId}.json`,
-      'GET', { name_value: 1, fetch_all: true, per_page: 2000 }
-    );
+  records(entityId, sinCache) {
+    const q = { name_value: 1, fetch_all: true, per_page: 2000 };
+    if (sinCache) q._ts = Date.now();   // datos frescos (p. ej. un técnico recién registrado)
+    return this.call(`/apps/${CONFIG.APP_ID}/dtypes/entity/${entityId}.json`, 'GET', q);
   },
   createRecord(entityId, values, rel_values) {
     const body = { values };
@@ -2205,6 +2204,10 @@ async function rtRepintar(selOficinaId, repId){
     unidad = (sel.selectedOptions[0] && sel.selectedOptions[0].getAttribute('data-unidad')) || '';
   }
   await cargarRespTecnicos();          // por si aún no estaba en memoria
+  // ¿Ningún técnico para esta oficina? Puede haberse registrado recién: se relee la tabla.
+  { const op=rtOpciones(selOficinaId, repId), k=_rtNorm(op._oficina||'');
+    window._RT_RELEIDAS = window._RT_RELEIDAS || {};
+    if(op._sinFiltro && k && !window._RT_RELEIDAS[k]){ window._RT_RELEIDAS[k]=1; await cargarRespTecnicos(true); } }
   rtPintarSelect(idSel, selOficinaId, repId, correo, unidad);
   _RT_PENDIENTE = ''; _RT_PEND_UNIDAD = '';
 }
@@ -8266,7 +8269,7 @@ async function cargarRespTecnicos(forzar){
     return (!t || /^(Field_|Seleccione$)/.test(t)) ? '' : t; };
   const out=[];
   try{
-    const data = await API.records(RT_ENTITY);
+    const data = await API.records(RT_ENTITY, !!forzar);
     (data.records||[]).forEach(r=>{
       const v=r.values||{};
       const nombre = limpio(v['Responsable técnico']);
@@ -8349,7 +8352,8 @@ function rtOpciones(idOficina, idLider){
   let lista=todos.filter(x => (lider && _rtNorm(x.lider)===lider) || (oficina && _rtNorm(x.unidad)===oficina));
   // Si no hay coincidencias se ofrecen todos, pero avisando: casi siempre
   // significa que en el catálogo el Líder o la Unidad no están escritos igual.
-  if(!lista.length){ lista=todos.slice(); lista._sinFiltro=true; }
+  // Sin coincidencias NO se ofrecen técnicos de otras oficinas: solo se avisa.
+  if(!lista.length){ lista._sinFiltro=true; lista._oficina = (selO && selO.selectedOptions && selO.selectedOptions[0]) ? selO.selectedOptions[0].text : ''; }
   return lista;
 }
 function rtPintarSelect(idSelect, idOficina, idLider, correoActual, unidadActual){
@@ -8358,7 +8362,8 @@ function rtPintarSelect(idSelect, idOficina, idLider, correoActual, unidadActual
   const ops=rtOpciones(idOficina, idLider);
   const esc=x=>String(x||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const aviso = ops._sinFiltro
-    ? '<option value="" disabled>— sin coincidencias para esta oficina: se muestran todos —</option>'
+    ? '<option value="" disabled>— No hay responsables técnicos registrados para ' + esc(ops._oficina||'esta oficina') + ' —</option>'
+      + '<option value="" disabled>  Regístrelos en la tabla «Responsable técnico» (Unidad responsable = esta oficina)</option>'
     : '';
   sel.innerHTML = ['<option value="">— sin responsable técnico —</option>', aviso]
     .concat(ops.map(x=>{
