@@ -4608,7 +4608,8 @@ async function renderSeguimiento() {
       const _certRaw = vR['Certificación de Implementación del Control'] || vR[CONFIG.MATRIZ_FIELDS.certificacion_control.id] || '';
       const certificacion = (_certRaw && !String(_certRaw).includes('Certificación')) ? String(_certRaw).trim() : '';
       return {id:r.id, op, desc, codigo:codigoDe(r), proc, procFuente, oficina, nReportes:sub.length, subIds:sub, procede:pr.procede, procedeTexto:pr.texto, nivel:ni.nivel, idx:ni.idx, desact, arch, tieneMonitoreo, monIds, nMon:monIds.length, ctrlTxt, certificacion,
-        tecCorreo:(_rtDelRiesgo(r)[0]||''), tecNombre:(leerTexto(r,RT_NOMBRE,true)||''), tecMio:_rtEsMio(r), puedeTrab:rtPuedeTrabajar(r), soloCons:_soloConsulta(r)};
+        tecCorreo:(_rtDelRiesgo(r)[0]||''), tecNombre:(leerTexto(r,RT_NOMBRE,true)||''), tecMio:_rtEsMio(r), puedeTrab:rtPuedeTrabajar(r), soloCons:_soloConsulta(r),
+        respProc:(((_rtRespVigente(r)||{}).responsable) || leerTexto(r,CONFIG.MATRIZ_FIELDS.resp_proceso_txt,true) || '')};
     })
     // Filtro por el selector Todos/Riesgos/Oportunidades
     .filter(f => SEG_TIPO==='todos' || (SEG_TIPO==='oportunidades'?f.op:!f.op))
@@ -4658,7 +4659,10 @@ async function renderSeguimiento() {
         <td class="cards-main" data-label="Descripción">
           ${f.codigo?`<span class="cod-tag" title="Código del registro">${f.codigo}</span>`:''}
           ${tipoTag(f)}<a class="riesgo-link" title="${(f.desc||'').replace(/"/g,'&quot;')}" onclick="toggleHistorial('${f.id}')">${f.desc.length>42?f.desc.slice(0,42)+'…':f.desc}</a>
-          ${f.tecMio?`<span class="tag tag-proc" title="Estás registrado como responsable técnico de este riesgo" style="margin-top:3px">★ A tu cargo</span>`:(f.tecCorreo?`<span class="hint" style="display:block;font-size:10.5px" title="${(f.tecNombre||f.tecCorreo).replace(/"/g,'&quot;')}">Técnico: ${(f.tecNombre||f.tecCorreo).slice(0,26)}</span>`:'')}
+          ${f.tecMio?`<span class="tag tag-proc" title="Estás registrado como responsable técnico de este riesgo" style="margin-top:3px">★ A tu cargo</span>`:''}
+          ${f.respProc?`<div style="margin-top:3px;font-size:11.5px;color:var(--mist);line-height:1.3" title="${('Responsable del proceso: '+f.respProc).replace(/"/g,'&quot;')}"><span style="font-weight:700">Proceso:</span> ${String(f.respProc).replace(/</g,'&lt;')}</div>`:''}
+          ${f.tecCorreo?`<div style="margin-top:2px;font-size:11.5px;color:#2b4c9b;line-height:1.3" title="${('Responsable técnico de este riesgo: '+(f.tecNombre||f.tecCorreo)+'. Es quien trabaja e informa sus medidas.').replace(/"/g,'&quot;')}"><span style="font-weight:700">Técnico:</span> ${String(f.tecNombre||(_rtPorCorreo(f.tecCorreo)||{}).nombre||f.tecCorreo).replace(/</g,'&lt;')}</div>`
+            :`<div style="margin-top:2px;font-size:11.5px;color:#9a6b00;line-height:1.3" title="Aún no se asignó un responsable técnico: lo trabaja el responsable de proceso."><span style="font-weight:700">Técnico:</span> sin asignar</div>`}
         </td>
         <td data-label="Origen" title="${((f.procFuente?f.procFuente+': ':'')+(f.proc||'')).replace(/"/g,'&quot;')}" style="font-size:11.5px">${f.procFuente?`<span style="display:block;font-size:9.5px;font-weight:600;color:var(--brand);text-transform:uppercase;letter-spacing:.02em;line-height:1.2">${f.procFuente==='Partes interesadas'?'Partes':f.procFuente}</span>`:''}<span>${f.proc.length>20?f.proc.slice(0,20)+'…':f.proc}</span>${(f.desact && f.procFuente==='Proceso')?` <span title="Proceso desactualizado: «${(f.desact||'').replace(/"/g,'&quot;')}» ya no existe en el inventario. Edite el riesgo y vuelva a seleccionar el proceso." style="cursor:help">⚠️</span>`:''}</td>
         <td data-label="Nivel inherente" style="white-space:nowrap">${nivelBadge(f.nivel, f.op)}</td>
