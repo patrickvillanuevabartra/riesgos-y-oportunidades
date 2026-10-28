@@ -3373,7 +3373,7 @@ let _EPO_DATA=null;
 // Descarga el «Estado por oficina» como libro de Excel con el mismo estilo del reporte
 // de la Matriz de Indicadores (27/10/2026): notas «Cómo leer este reporte», resultado de
 // toda la Facultad y cuadro por oficina con una fila que explica cada columna. Las
-// oficinas van en orden alfabético y sin número de puesto, para no generar comparaciones.
+// oficinas van de mayor a menor nivel de ejecución, sin número de puesto.
 function _rxEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function _rxLibro(hojas){
   const estilos = `<Styles>
@@ -3440,11 +3440,11 @@ function descargarEstadoPorOficina(){
     [{v:filas.length,s:'kpi'},{v:tot.total,s:'kpi'},{v:nR,s:'kpi'},{v:nO,s:'kpi'},{v:nivGlobal[4],s:'kpi'},{v:conRespTot,s:'kpi'},
       totNConTrat>0?pctCelda(avanceGlobal):{v:'sin datos',s:'na'}, pctCelda(ctrlGlobal), {v:tot.e4,s:'kpi'}],
     [],
-    [{v:'2. Resultado por oficina (en orden alfabético)',s:'sec',m:M}],
+    [{v:'2. Resultado por oficina (de mayor a menor nivel de ejecución)',s:'sec',m:M}],
     ['Oficina','Total','Riesgos','Oportunidades','Nivel 4 Intolerable','Nivel 3 Alto','Nivel 2 Medio','Nivel 1 Bajo','Con respuesta','Sin respuesta','Nivel de ejecución','Cumplimiento de control','Controlado'].map(v=>({v,s:'th'})),
     ['Oficina dueña del riesgo','Riesgos + oportunidades','Registrados como riesgo','Registradas como oportunidad','Requieren acción inmediata','Gravedad original alta','Gravedad original media','Gravedad original baja','Ya tienen estrategia y medidas','Aún sin tratamiento definido','Avance promedio de las medidas','Monitoreo de los de nivel 4','Ciclo completo'].map(v=>({v,s:'exp'}))
   ];
-  [...filas].sort((a,b)=>a[0].localeCompare(b[0],'es')).forEach(([ofi,g])=>{
+  filas.forEach(([ofi,g])=>{   // ya vienen de mayor a menor nivel de ejecución, como en el Tablero
     h.push([{v:ofi,s:'td'},{v:g.total,s:'num'},{v:g.nR,s:'num'},{v:g.nO,s:'num'},{v:g.niv[4],s:g.niv[4]?'n4':'num'},{v:g.niv[3],s:'num'},{v:g.niv[2],s:'num'},{v:g.niv[1],s:'num'},
       {v:g.conResp,s:'num'},{v:g.total-g.conResp,s:'num'},
       g.nConTrat>0?pctCelda(g.sumaPct/g.nConTrat):{v:'sin datos',s:'na'}, g.nCtrl>0?pctCelda(g.sumaCtrl/g.nCtrl):{v:'n/a',s:'na'}, {v:g.e4,s:'num'}]);
