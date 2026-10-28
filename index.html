@@ -8014,26 +8014,136 @@ function _repNivel(c){
   return 0;
 }
 
-function _repCifrasPorOficina(){
+/* Rango de fechas (27/10/2026), igual que en la Matriz de Indicadores.
+   Se toma la fecha en que cada cosa se ingresó al sistema:
+   · Riesgos/oportunidades: los que ya existían en la fecha «Hasta».
+   · Reportes de avance: los ingresados entre «Desde» y «Hasta». El avance de cada
+     riesgo es el % del último reporte de ese periodo (sin reportes = 0 %).
+   «Todo, a hoy» da las mismas cifras que la tabla de Seguimiento. */
+function _rgDia(x){
+  if(!x) return '';
+  const s=String(x).trim();
+  let m=s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/);          // día-mes-año (QuintaDB)
+  if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+'-'+m[2]+'-'+m[3];
+  const t=Date.parse(s); return isNaN(t)?'':new Date(t-5*3600*1000).toISOString().slice(0,10);
+}
+function _rgTs(x){
+  const m=String(x||'').match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})\D*(\d{1,2})?:?(\d{2})?:?(\d{2})?/);
+  if(m) return new Date(+m[3],+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0),+(m[6]||0)).getTime();
+  const t=Date.parse(String(x||'')); return isNaN(t)?0:t;
+}
+function _rgHoy(){ return new Date(Date.now()-5*3600*1000).toISOString().slice(0,10); }
+
+async function _repCifrasPorOficina(){
+  const R=window._RG_RANGO||{desde:'',hasta:_rgHoy()};
+  const RF=CONFIG.REPORTE_FIELDS;
   const celda=(pre,id)=>{ const el=document.getElementById(pre+'-'+id); return el?el.textContent:''; };
   const num=t=>{ const x=String(t||'').match(/(\d+(?:[.,]\d+)?)\s*%/); return x?Number(x[1].replace(',','.')):null; };
-  const grupos={};
-  (window._SEG_FILAS||[]).filter(f=>!f.arch).forEach(f=>{ const o=(f.oficina||'').trim(); if(o) (grupos[o]=grupos[o]||[]).push(f); });
-  return Object.keys(grupos).sort().map(ofi=>{
+  try{ await precargarSubcache(); }catch(_){}
+  const enRango=d=> !d || ((!R.hasta || d<=R.hasta) && (!R.desde || d>=R.desde));
+  const grupos={}; let fuera=0;
+  (window._SEG_FILAS||[]).filter(f=>!f.arch).forEach(f=>{
+    const o=(f.oficina||'').trim(); if(!o) return;
+    const rec=(STATE.matriz||[]).find(x=>x.id===f.id);
+    const dc=_rgDia(rec&&rec.created_at);
+    if(dc && R.hasta && dc>R.hasta){ fuera++; return; }       // aún no existía en «Hasta»
+    (grupos[o]=grupos[o]||[]).push(f);
+  });
+  window._RG_FUERA=fuera;
+  const filas=[];
+  for(const ofi of Object.keys(grupos)){
     const fs=grupos[ofi], total=fs.length;
     let conRep=0, cul=0, suma=0;
     const porNivel={1:{total:0,conReportes:0},2:{total:0,conReportes:0},3:{total:0,conReportes:0},4:{total:0,conReportes:0}};
-    fs.forEach(f=>{
-      const g=porNivel[f.nivel]; if(g){ g.total++; if((f.nReportes||0)>0) g.conReportes++; }
-      if((f.nReportes||0)>0) conRep++;
-      const pct=num(celda('avance',f.id));
+    for(const f of fs){
+      let n=0, pct=null, mejor=-1, sinCache=false;
+      for(const rid of (f.subIds||[])){
+        const r=await getSub('reportes',rid);
+        if(!r){ sinCache=true; continue; }
+        if(!enRango(_rgDia(r.created_at))) continue;
+        n++;
+        const ts=_rgTs(r.created_at);
+        if(ts>=mejor){ mejor=ts; const v=(r.values||{})[RF.pct_completado.col]; pct=(v===''||v==null)?null:Math.max(0,Math.min(100,parseInt(v)||0)); }
+      }
+      if(sinCache && !n){ n=f.nReportes||0; pct=num(celda('avance',f.id)); }   // respaldo: lo que muestra la tabla
+      const g=porNivel[f.nivel]; if(g){ g.total++; if(n>0) g.conReportes++; }
+      if(n>0) conRep++;
       suma += pct||0;
       if(pct!==null && pct>=100) cul++;
-    });
+    }
     const cifras={ total, conReportes:conRep, sinReportes: total-conRep, culminadas:cul, avancePromedio: total? Math.round(suma/total) : 0, porNivel };
     const nivel=_repNivel(cifras);
-    return { oficina:ofi, cifras, nivel, kudo:'n'+nivel, nota:'' };
+    filas.push({ oficina:ofi, cifras, nivel, kudo:'n'+nivel, nota:'' });
+  }
+  // De mayor a menor avance (empates: más reportes, luego por nombre)
+  const pr=f=>f.cifras.total? f.cifras.conReportes/f.cifras.total : 0;
+  return filas.sort((a,b)=> b.cifras.avancePromedio-a.cifras.avancePromedio || pr(b)-pr(a) || a.oficina.localeCompare(b.oficina,'es'));
+}
+
+function _rgFechaTxt(ymd){ if(!ymd) return ''; const [y,m,d]=ymd.split('-'); return d+'/'+m+'/'+y; }
+function _rgRangoBarra(){
+  const hoy=_rgHoy(), anio=hoy.slice(0,4);
+  return `<div style="border:1.5px solid var(--brand);border-radius:12px;padding:12px 14px;margin:0 0 12px;background:#f3faf6">
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div style="font-weight:700;font-size:15px;align-self:center">📅 Rango de fechas</div>
+      <label style="font-size:14px;margin:0">Desde<br><input type="date" id="rg_desde" max="${hoy}" style="padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:14px"></label>
+      <label style="font-size:14px;margin:0">Hasta<br><input type="date" id="rg_hasta" value="${hoy}" max="${hoy}" style="padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:14px"></label>
+      <button class="btn btn-primary" onclick="rgBuscar()" style="padding:9px 18px">🔍 Buscar</button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-self:center">
+        <span class="hint" style="align-self:center">Atajos:</span>
+        <button class="btn btn-sm rg-atajo" data-d="" data-h="${anio}-07-31" onclick="rgAtajo('','${anio}-07-31')">Hasta 31 jul ${anio}</button>
+        <button class="btn btn-sm rg-atajo" data-d="${anio}-01-01" data-h="${hoy}" onclick="rgAtajo('${anio}-01-01','${hoy}')">Este año</button>
+        <button class="btn btn-sm rg-atajo" data-d="" data-h="${hoy}" onclick="rgAtajo('','${hoy}')">Todo, a hoy</button>
+      </div>
+    </div>
+    <details style="margin-top:8px;font-size:13px;color:var(--slate)"><summary style="cursor:pointer;color:var(--brand);font-weight:600">¿Qué se cuenta?</summary>
+      <div style="margin-top:6px;line-height:1.55">Se toma la <b>fecha en que cada cosa se ingresó al sistema</b>.<br>
+      • <b>Riesgos y oportunidades:</b> los que ya existían en la fecha «Hasta».<br>
+      • <b>Reportes de avance:</b> los ingresados entre «Desde» y «Hasta». El avance de cada riesgo es el % de su último reporte de ese periodo; sin reportes cuenta 0 %.<br>
+      • <b>«Todo, a hoy»</b> da las mismas cifras que la tabla de Seguimiento.</div></details>
+    <div id="rg_rango_estado" style="margin-top:6px;font-size:14px;font-weight:600;color:var(--brand)"></div>
+  </div>`;
+}
+function _rgMarcarAtajo(){
+  const R=window._RG_RANGO||{};
+  document.querySelectorAll('.rg-atajo').forEach(b=>{
+    const on=(b.dataset.d||'')===(R.desde||'') && (b.dataset.h||'')===(R.hasta||'');
+    if(!b.dataset.txt) b.dataset.txt=b.textContent;
+    b.textContent=(on?'✓ ':'')+b.dataset.txt;
+    b.style.background=on?'var(--brand)':''; b.style.color=on?'#fff':''; b.style.fontWeight=on?'700':'';
   });
+}
+function rgAtajo(d,h){ const a=document.getElementById('rg_desde'), b=document.getElementById('rg_hasta'); if(a) a.value=d; if(b) b.value=h; rgBuscar(); }
+async function rgBuscar(){
+  const hoy=_rgHoy();
+  const desde=(document.getElementById('rg_desde')||{}).value||'', hasta=(document.getElementById('rg_hasta')||{}).value||hoy;
+  if(desde && desde>hasta){ toast('La fecha «Desde» no puede ser posterior a «Hasta».', true); return; }
+  window._RG_RANGO={desde,hasta};
+  _rgMarcarAtajo();
+  const est=document.getElementById('rg_rango_estado'); if(est) est.textContent='⏳ Buscando…';
+  const filas=await _repCifrasPorOficina();
+  window._REP_FILAS=filas;
+  const tb=document.getElementById('rep_tbody'); if(tb) tb.innerHTML=_repFilasHTML(filas);
+  const total=filas.reduce((a,f)=>a+f.cifras.total,0), fuera=window._RG_FUERA||0;
+  const esHoy=!desde && hasta>=hoy;
+  const txt= esHoy ? 'todo lo registrado hasta hoy' : (desde ? 'del '+_rgFechaTxt(desde)+' al '+_rgFechaTxt(hasta) : 'con corte al '+_rgFechaTxt(hasta));
+  if(est) est.innerHTML='✓ Mostrando: '+txt+'. '+total+' riesgos/oportunidades en '+filas.length+' oficinas'+(fuera?` <span class="hint">(${fuera} se registraron después del ${_rgFechaTxt(hasta)} y no entran)</span>`:'')+'.'
+    +(esHoy?'':'<br><span style="color:#8a5a00">⚠️ El correo no menciona el rango de fechas: para enviar a los responsables usa «Todo, a hoy».</span>');
+}
+window.rgAtajo=rgAtajo; window.rgBuscar=rgBuscar;
+
+function _repFilasHTML(filas){
+  return filas.map((f,i)=>`<tr style="border-bottom:1px solid var(--line)">
+        <td style="padding:7px 8px"><input type="checkbox" class="rep_chk" data-i="${i}" checked></td>
+        <td style="padding:7px 8px">${f.oficina.replace(/</g,'&lt;')} <span class="hint">· ${f.cifras.total}</span></td>
+        <td style="padding:7px 8px;text-align:right;white-space:nowrap">${_repSemaforo(f.cifras.conReportes,f.cifras.total)} <span class="hint">· ${f.cifras.conReportes}/${f.cifras.total}</span></td>
+        <td style="padding:7px 8px;text-align:right;white-space:nowrap">${_repSemaforo(f.cifras.culminadas,f.cifras.total)} <span class="hint">· ${f.cifras.culminadas}/${f.cifras.total}</span></td>
+        <td style="padding:7px 8px;text-align:right">${f.cifras.avancePromedio} %</td>
+        <td style="padding:7px 8px;white-space:nowrap">${REP_NIVELES[f.nivel]} <span style="letter-spacing:1px;color:var(--brand)">${'●'.repeat(f.nivel+1)}</span><span style="letter-spacing:1px;color:#cfd5d2">${'●'.repeat(5-f.nivel)}</span></td>
+        <td style="padding:7px 8px"><select id="rep_kudo_${i}" onchange="repCambiarKudo(${i},this.value)" style="font-size:12px;padding:3px 5px;border-radius:6px;border:1px solid var(--line)">${_repOpcionesKudo(f.kudo)}</select></td>
+        <td style="padding:7px 8px"><button class="btn btn-sm" id="rep_notabtn_${i}" onclick="repNota(${i})">✎ Nota</button></td>
+        <td style="padding:7px 8px" id="rep_res_${i}"></td></tr>`).join('');
 }
 function _repSemaforo(parte,total){ const p= total? Math.round(parte/total*100):0; return (p>=80?'🟢':(p>=50?'🟡':'🔴'))+' '+p+' %'; }
 function _repRegistro(){ const r=document.querySelector('input[name=rep_registro]:checked'); return r?r.value:'formal'; }
@@ -8057,7 +8167,8 @@ window.repCambiarRegistro=repCambiarRegistro; window.repCambiarKudo=repCambiarKu
 async function abrirReporteAvance(){
   if(!_repEsAdmin()){ toast('Solo el administrador puede enviar reportes.', true); return; }
   if(!window._SEG_FILAS && typeof renderSeguimiento==='function'){ try{ await renderSeguimiento(); }catch(_){} }
-  const filas=_repCifrasPorOficina();
+  window._RG_RANGO={desde:'',hasta:_rgHoy()};
+  const filas=await _repCifrasPorOficina();
   window._REP_FILAS=filas;
   const sinConfig = !REPORTE_URL || !REPORTE_CLAVE;
   const html = `
@@ -8077,6 +8188,7 @@ async function abrirReporteAvance(){
         <b>3 Buen ritmo</b> · 80 % con reportes — <b>4 Destacado</b> · 80 % con reportes y la mitad de medidas culminadas — <b>5 Excelencia</b> · todo reportado y culminado.</p>
       <p style="margin:0"><b>Progreso:</b> si una oficina sube de nivel respecto del último envío real, recibe además una felicitación por su avance. Las pruebas no cuentan como envío.</p>
     </details>
+    ${_rgRangoBarra()}
     <div style="display:flex;gap:18px;align-items:center;margin:0 0 12px;font-size:14px;flex-wrap:wrap">
       <b>Tono de los kudos:</b>
       <label><input type="radio" name="rep_registro" value="formal" checked onchange="repCambiarRegistro()"> Formal</label>
@@ -8091,18 +8203,7 @@ async function abrirReporteAvance(){
         <th style="padding:8px;text-align:right">Con reportes</th><th style="padding:8px;text-align:right">Culminadas</th>
         <th style="padding:8px;text-align:right">Avance</th><th style="padding:8px">Etapa de avance</th>
         <th style="padding:8px">Kudo</th><th style="padding:8px"></th><th style="padding:8px">Resultado</th>
-      </tr></thead><tbody>
-      ${filas.map((f,i)=>`<tr style="border-bottom:1px solid var(--line)">
-        <td style="padding:7px 8px"><input type="checkbox" class="rep_chk" data-i="${i}" checked></td>
-        <td style="padding:7px 8px">${f.oficina.replace(/</g,'&lt;')} <span class="hint">· ${f.cifras.total}</span></td>
-        <td style="padding:7px 8px;text-align:right;white-space:nowrap">${_repSemaforo(f.cifras.conReportes,f.cifras.total)} <span class="hint">· ${f.cifras.conReportes}/${f.cifras.total}</span></td>
-        <td style="padding:7px 8px;text-align:right;white-space:nowrap">${_repSemaforo(f.cifras.culminadas,f.cifras.total)} <span class="hint">· ${f.cifras.culminadas}/${f.cifras.total}</span></td>
-        <td style="padding:7px 8px;text-align:right">${f.cifras.avancePromedio} %</td>
-        <td style="padding:7px 8px;white-space:nowrap">${REP_NIVELES[f.nivel]} <span style="letter-spacing:1px;color:var(--brand)">${'●'.repeat(f.nivel+1)}</span><span style="letter-spacing:1px;color:#cfd5d2">${'●'.repeat(5-f.nivel)}</span></td>
-        <td style="padding:7px 8px"><select id="rep_kudo_${i}" onchange="repCambiarKudo(${i},this.value)" style="font-size:12px;padding:3px 5px;border-radius:6px;border:1px solid var(--line)">${_repOpcionesKudo(f.kudo)}</select></td>
-        <td style="padding:7px 8px"><button class="btn btn-sm" id="rep_notabtn_${i}" onclick="repNota(${i})">✎ Nota</button></td>
-        <td style="padding:7px 8px" id="rep_res_${i}"></td></tr>`).join('')}
-      </tbody></table></div>
+      </tr></thead><tbody id="rep_tbody">${_repFilasHTML(filas)}</tbody></table></div>
     </div>
     <div style="display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--line);margin:12px -22px 0;padding:12px 22px;background:var(--card);border-radius:0 0 14px 14px">
       <div id="rep_resumen" style="flex:1;min-width:260px;font-size:13px;line-height:1.45"></div>
@@ -8111,6 +8212,9 @@ async function abrirReporteAvance(){
     </div>
    </div></div>`;
   document.body.insertAdjacentHTML('beforeend', html);
+  _rgMarcarAtajo();
+  const est=document.getElementById('rg_rango_estado');
+  if(est) est.textContent='✓ Mostrando: todo lo registrado hasta hoy. '+filas.reduce((a,f)=>a+f.cifras.total,0)+' riesgos/oportunidades en '+filas.length+' oficinas.';
 }
 window.abrirReporteAvance=abrirReporteAvance;
 
