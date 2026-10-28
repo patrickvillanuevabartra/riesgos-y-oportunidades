@@ -3370,59 +3370,95 @@ async function renderEstadoPorOficina(recs){
 }
 let _EPO_DATA=null;
 
-// Descarga la tabla "Estado por oficina" a un .xls (HTML que Excel abre con formato).
+// Descarga el «Estado por oficina» como libro de Excel con el mismo estilo del reporte
+// de la Matriz de Indicadores (27/10/2026): notas «Cómo leer este reporte», resultado de
+// toda la Facultad y cuadro por oficina con una fila que explica cada columna. Las
+// oficinas van en orden alfabético y sin número de puesto, para no generar comparaciones.
+function _rxEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _rxLibro(hojas){
+  const estilos = `<Styles>
+   <Style ss:ID="Default"><Font ss:FontName="Calibri" ss:Size="11"/><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>
+   <Style ss:ID="tit"><Font ss:FontName="Calibri" ss:Size="15" ss:Bold="1" ss:Color="#0F6B47"/></Style>
+   <Style ss:ID="sub"><Font ss:FontName="Calibri" ss:Size="10" ss:Color="#5B6B63"/></Style>
+   <Style ss:ID="sec"><Font ss:FontName="Calibri" ss:Size="12" ss:Bold="1" ss:Color="#0F6B47"/></Style>
+   <Style ss:ID="th"><Font ss:FontName="Calibri" ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#0F8F5E" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>
+     <Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Color="#FFFFFF"/><Border ss:Position="Right" ss:LineStyle="Continuous" ss:Color="#FFFFFF"/></Borders></Style>
+   <Style ss:ID="td"><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Color="#DDE5E0"/></Borders><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>
+   <Style ss:ID="num"><Alignment ss:Horizontal="Center" ss:Vertical="Top"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Color="#DDE5E0"/></Borders></Style>
+   <Style ss:ID="tot"><Font ss:FontName="Calibri" ss:Bold="1"/><Interior ss:Color="#E8F3EC" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style>
+   <Style ss:ID="totl"><Font ss:FontName="Calibri" ss:Bold="1"/><Interior ss:Color="#E8F3EC" ss:Pattern="Solid"/></Style>
+   <Style ss:ID="ok"><Font ss:FontName="Calibri" ss:Bold="1" ss:Color="#1F7A3F"/><Interior ss:Color="#DDF2E3" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style>
+   <Style ss:ID="no"><Font ss:FontName="Calibri" ss:Bold="1" ss:Color="#B03A2E"/><Interior ss:Color="#FBE3E0" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style>
+   <Style ss:ID="mid"><Font ss:FontName="Calibri" ss:Bold="1" ss:Color="#8A6100"/><Interior ss:Color="#FFF1CC" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style>
+   <Style ss:ID="na"><Font ss:FontName="Calibri" ss:Color="#7A8580"/><Alignment ss:Horizontal="Center"/></Style>
+   <Style ss:ID="midt"><Font ss:FontName="Calibri" ss:Color="#5A3D00"/><Interior ss:Color="#FFF3C4" ss:Pattern="Solid"/><Alignment ss:Vertical="Top" ss:WrapText="1"/></Style>
+   <Style ss:ID="exp"><Font ss:FontName="Calibri" ss:Size="9" ss:Italic="1" ss:Color="#5A3D00"/><Interior ss:Color="#FFF3C4" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center" ss:Vertical="Top" ss:WrapText="1"/></Style>
+   <Style ss:ID="n4"><Font ss:FontName="Calibri" ss:Bold="1" ss:Color="#FFFFFF"/><Interior ss:Color="#C0392B" ss:Pattern="Solid"/><Alignment ss:Horizontal="Center"/></Style>
+   <Style ss:ID="kpi"><Font ss:FontName="Calibri" ss:Size="13" ss:Bold="1"/><Alignment ss:Horizontal="Center"/></Style>
+  </Styles>`;
+  const xml = hojas.map(h=>{
+    const nombre=_rxEsc(String(h.nombre).slice(0,31));
+    const cols=(h.anchos||[]).map(w=>`<Column ss:Width="${w}"/>`).join('');
+    const filas=h.filas.map(f=>{
+      if(!f||!f.length) return '<Row/>';
+      return '<Row>'+f.map(c=>{
+        const o=(c!==null&&typeof c==='object')?c:{v:c};
+        const esNum=typeof o.v==='number'&&isFinite(o.v);
+        return `<Cell${o.s?` ss:StyleID="${o.s}"`:''}${o.m?` ss:MergeAcross="${o.m}"`:''}><Data ss:Type="${esNum?'Number':'String'}">${_rxEsc(o.v)}</Data></Cell>`;
+      }).join('')+'</Row>';
+    }).join('');
+    const fijar=h.fijar?`<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><FreezePanes/><FrozenNoSplit/><SplitHorizontal>${h.fijar}</SplitHorizontal><TopRowBottomPane>${h.fijar}</TopRowBottomPane><ActivePane>2</ActivePane></WorksheetOptions>`:'';
+    return `<Worksheet ss:Name="${nombre}"><Table>${cols}${filas}</Table>${fijar}</Worksheet>`;
+  }).join('');
+  return '<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?>'
+    +'<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40">'
+    +estilos+xml+'</Workbook>';
+}
 function descargarEstadoPorOficina(){
   if(!_EPO_DATA){ toast('Primero abre el Tablero para generar los datos.', true); return; }
   const {filas, tot, nivGlobal, avanceGlobal, ctrlGlobal, totNConTrat, conRespTot} = _EPO_DATA;
-  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const pct = v => (v==null?'':Math.round(v)+'%');
-  let filasHtml='';
-  filas.forEach(([ofi,g],i)=>{
-    const avance = g.nConTrat>0 ? Math.round(g.sumaPct/g.nConTrat) : '';
-    const ctrl = g.nCtrl>0 ? Math.round(g.sumaCtrl/g.nCtrl) : 'n/a';
-    filasHtml += `<tr>
-      <td style="text-align:center">${i+1}</td>
-      <td>${esc(ofi)}</td>
-      <td style="text-align:center">${g.total}</td>
-      <td style="text-align:center">${g.niv[4]}</td>
-      <td style="text-align:center">${g.niv[3]}</td>
-      <td style="text-align:center">${g.niv[2]}</td>
-      <td style="text-align:center">${g.niv[1]}</td>
-      <td style="text-align:center">${g.conResp}</td>
-      <td style="text-align:center">${avance===''?'':avance+'%'}</td>
-      <td style="text-align:center">${ctrl==='n/a'?'n/a':ctrl+'%'}</td>
-      <td style="text-align:center">${g.e4}</td>
-    </tr>`;
+  const st = p => p>=80?'ok':p>=50?'mid':'no';
+  let fecha=''; try{ fecha=new Date().toLocaleDateString('es-PE',{day:'numeric',month:'long',year:'numeric'}); }catch(_){ fecha=new Date().toISOString().slice(0,10); }
+  const nR=filas.reduce((a,[,g])=>a+g.nR,0), nO=filas.reduce((a,[,g])=>a+g.nO,0);
+  const M=12;
+  const pctCelda = (v)=> v==null ? {v:'n/a',s:'na'} : {v:Math.round(v)+' %',s:st(Math.round(v))};
+  const h=[
+    [{v:'Reporte de riesgos y oportunidades por oficina',s:'tit',m:M}],
+    [{v:'Matriz de Riesgos y Oportunidades · SGOE ISO 21001 · Facultad de Ingeniería URP · Estado al '+fecha,s:'sub',m:M}],
+    [],
+    [{v:'CÓMO LEER ESTE REPORTE',s:'sec',m:M}],
+    [{v:'• Total: todos los riesgos y oportunidades que tiene registrados la oficina.',s:'midt',m:M}],
+    [{v:'• Nivel 4 a 1: cuántos riesgos hay en cada nivel inherente (su gravedad original): 4 Intolerable · 3 Alto · 2 Medio · 1 Bajo. Los de nivel 4 requieren acción inmediata.',s:'midt',m:M}],
+    [{v:'• Con respuesta: registros que ya tienen definida su estrategia de respuesta (mitigar, explotar…) y sus medidas concretas. Incluye los que están en ejecución o ya controlados. «Sin respuesta» es la diferencia con el total.',s:'midt',m:M}],
+    [{v:'• Nivel de ejecución: avance promedio de las medidas de la oficina (% completado). Los riesgos ya controlados cuentan como 100 %. Léalo siempre junto al total: no es lo mismo 80 % sobre 11 registros que 100 % sobre 1.',s:'midt',m:M}],
+    [{v:'• Cumplimiento de control: % de cumplimiento del monitoreo del control en los riesgos de nivel 4. Si aún no hay reportes de monitoreo cuenta como 0 % (monitoreo pendiente). «n/a» = la oficina no tiene riesgos de nivel 4.',s:'midt',m:M}],
+    [{v:'• Controlado: medidas al 100 % y culminadas; en los de nivel 4 se exige además que el control esté certificado u operativo.',s:'midt',m:M}],
+    [{v:'• Colores: verde 80 % o más · amarillo 50 % a 79 % · rojo menos de 50 %.',s:'midt',m:M}],
+    [],
+    [{v:'1. Resultado de toda la Facultad',s:'sec',m:M}],
+    ['Oficinas','Registros','Riesgos','Oportunidades','Nivel 4 (intolerables)','Con respuesta','Nivel de ejecución','Cumplimiento de control','Controlados'].map(v=>({v,s:'th'})),
+    [{v:filas.length,s:'kpi'},{v:tot.total,s:'kpi'},{v:nR,s:'kpi'},{v:nO,s:'kpi'},{v:nivGlobal[4],s:'kpi'},{v:conRespTot,s:'kpi'},
+      totNConTrat>0?pctCelda(avanceGlobal):{v:'sin datos',s:'na'}, pctCelda(ctrlGlobal), {v:tot.e4,s:'kpi'}],
+    [],
+    [{v:'2. Resultado por oficina (en orden alfabético)',s:'sec',m:M}],
+    ['Oficina','Total','Riesgos','Oportunidades','Nivel 4 Intolerable','Nivel 3 Alto','Nivel 2 Medio','Nivel 1 Bajo','Con respuesta','Sin respuesta','Nivel de ejecución','Cumplimiento de control','Controlado'].map(v=>({v,s:'th'})),
+    ['Oficina dueña del riesgo','Riesgos + oportunidades','Registrados como riesgo','Registradas como oportunidad','Requieren acción inmediata','Gravedad original alta','Gravedad original media','Gravedad original baja','Ya tienen estrategia y medidas','Aún sin tratamiento definido','Avance promedio de las medidas','Monitoreo de los de nivel 4','Ciclo completo'].map(v=>({v,s:'exp'}))
+  ];
+  [...filas].sort((a,b)=>a[0].localeCompare(b[0],'es')).forEach(([ofi,g])=>{
+    h.push([{v:ofi,s:'td'},{v:g.total,s:'num'},{v:g.nR,s:'num'},{v:g.nO,s:'num'},{v:g.niv[4],s:g.niv[4]?'n4':'num'},{v:g.niv[3],s:'num'},{v:g.niv[2],s:'num'},{v:g.niv[1],s:'num'},
+      {v:g.conResp,s:'num'},{v:g.total-g.conResp,s:'num'},
+      g.nConTrat>0?pctCelda(g.sumaPct/g.nConTrat):{v:'sin datos',s:'na'}, g.nCtrl>0?pctCelda(g.sumaCtrl/g.nCtrl):{v:'n/a',s:'na'}, {v:g.e4,s:'num'}]);
   });
-  const avG = totNConTrat>0 ? Math.round(avanceGlobal)+'%' : '';
-  const ctrlG = ctrlGlobal!=null ? Math.round(ctrlGlobal)+'%' : 'n/a';
-  const totalHtml = `<tr style="font-weight:bold;background:#e8f3ec">
-    <td></td><td>TOTAL</td><td style="text-align:center">${tot.total}</td>
-    <td style="text-align:center">${nivGlobal[4]}</td><td style="text-align:center">${nivGlobal[3]}</td>
-    <td style="text-align:center">${nivGlobal[2]}</td><td style="text-align:center">${nivGlobal[1]}</td>
-    <td style="text-align:center">${conRespTot}</td><td style="text-align:center">${avG}</td>
-    <td style="text-align:center">${ctrlG}</td><td style="text-align:center">${tot.e4}</td>
-  </tr>`;
-  const hoy = new Date().toLocaleDateString('es-PE');
-  const tabla = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body>
-    <table border="1" style="border-collapse:collapse;font-family:Cambria,serif;font-size:11pt">
-      <tr><td colspan="11" style="font-weight:bold;font-size:13pt;background:#1f7a3d;color:#fff;padding:6px">Estado de riesgos y oportunidades por oficina — ${hoy}</td></tr>
-      <tr style="font-weight:bold;background:#2b7fc9;color:#fff">
-        <td style="text-align:center">#</td><td>Oficina</td><td style="text-align:center">Total</td>
-        <td style="text-align:center">Nivel 4 (Intolerable)</td><td style="text-align:center">Nivel 3 (Alto)</td>
-        <td style="text-align:center">Nivel 2 (Medio)</td><td style="text-align:center">Nivel 1 (Bajo)</td>
-        <td style="text-align:center">Con respuesta</td><td style="text-align:center">Nivel de ejecución</td>
-        <td style="text-align:center">Cumplim. de control</td><td style="text-align:center">Controlado</td>
-      </tr>
-      ${filasHtml}${totalHtml}
-    </table></body></html>`;
-  const blob = new Blob(['\ufeff'+tabla], {type:'application/vnd.ms-excel;charset=utf-8'});
+  h.push([{v:'TOTAL',s:'totl'},{v:tot.total,s:'tot'},{v:nR,s:'tot'},{v:nO,s:'tot'},{v:nivGlobal[4],s:'tot'},{v:nivGlobal[3],s:'tot'},{v:nivGlobal[2],s:'tot'},{v:nivGlobal[1],s:'tot'},
+    {v:conRespTot,s:'tot'},{v:tot.total-conRespTot,s:'tot'},{v:totNConTrat>0?Math.round(avanceGlobal)+' %':'sin datos',s:'tot'},{v:ctrlGlobal!=null?Math.round(ctrlGlobal)+' %':'n/a',s:'tot'},{v:tot.e4,s:'tot'}]);
+  const xml=_rxLibro([{ nombre:'Riesgos por oficina', anchos:[250,55,60,85,80,65,65,65,80,80,90,100,75], filas:h, fijar:19 }]);
+  const blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download=`Estado_por_oficina_${new Date().toISOString().slice(0,10)}.xls`;
+  a.download=`Reporte_riesgos_por_oficina_${new Date().toISOString().slice(0,10)}.xls`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
-  toast('Descargando la tabla en Excel…');
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast('Descargado. Si Excel avisa que el formato y la extensión no coinciden, pulse «Sí»: el contenido es correcto.');
 }
 window.descargarEstadoPorOficina = descargarEstadoPorOficina;
 window.renderEstadoPorOficina=renderEstadoPorOficina;
