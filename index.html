@@ -3262,7 +3262,6 @@ async function renderEstadoPorOficina(recs){
 
     let html='<div class="tabla-wrap"><table style="width:100%;border-collapse:collapse;font-size:13.5px">'
       +'<thead><tr style="text-align:left;color:var(--mist);font-size:11px;text-transform:uppercase;letter-spacing:.03em">'
-      +'<th style="padding:9px 10px;text-align:center;width:34px">#</th>'
       +'<th style="padding:9px 10px">Oficina</th>'
       +'<th style="padding:9px 10px;text-align:center">Total</th>'
       +'<th style="padding:9px 10px;text-align:center;min-width:130px" title="Reparto de los riesgos por nivel inherente (gravedad original): rojo intolerable (4) → verde bajo (1)">Nivel de riesgo</th>'
@@ -3308,7 +3307,6 @@ async function renderEstadoPorOficina(recs){
       const ctrl = g.nCtrl>0 ? g.sumaCtrl/g.nCtrl : null;
       const desgCtrl = g.nCtrl>0 ? `Promedio de ${g.nCtrl} riesgo${g.nCtrl!==1?'s':''} nivel 4 (un 0% puede indicar monitoreo aún sin reportar)` : 'No hay riesgos de nivel 4 en esta oficina';
       html+=`<tr class="epo-fila" data-oficina="${ofi.toLowerCase().replace(/"/g,'')}" style="border-top:1px solid var(--line)">
-        <td style="padding:9px 10px;text-align:center;font-weight:700;color:var(--mist)">${i+1}</td>
         <td style="padding:9px 10px;font-weight:600">${ofi.replace(/</g,'&lt;')}</td>
         <td style="padding:9px 10px;text-align:center" title="${tt}${sinTratar>0?' · '+sinTratar+' aún sin respuesta':''}"><span style="cursor:help;border-bottom:1px dotted var(--mist)">${g.total}</span></td>
         <td style="padding:9px 10px">${barraNivel(g.niv)}</td>
@@ -3327,7 +3325,6 @@ async function renderEstadoPorOficina(recs){
     const ctrlGlobal = totNCtrl>0 ? totSumaCtrl/totNCtrl : null;
     const nivGlobal = filas.reduce((a,[,g])=>{a[1]+=g.niv[1];a[2]+=g.niv[2];a[3]+=g.niv[3];a[4]+=g.niv[4];return a;},{1:0,2:0,3:0,4:0});
     html+=`<tr style="border-top:2px solid var(--brand);font-weight:700;background:var(--paper)">
-      <td style="padding:9px 10px"></td>
       <td style="padding:9px 10px">TOTAL</td>
       <td style="padding:9px 10px;text-align:center">${tot.total}</td>
       <td style="padding:9px 10px">${barraNivel(nivGlobal)}</td>
