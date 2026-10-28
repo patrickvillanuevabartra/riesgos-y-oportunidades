@@ -8100,6 +8100,7 @@ function _rgRangoBarra(){
       • <b>Reportes de avance:</b> los ingresados entre «Desde» y «Hasta». El avance de cada riesgo es el % de su último reporte de ese periodo; sin reportes cuenta 0 %.<br>
       • <b>«Todo, a hoy»</b> da las mismas cifras que la tabla de Seguimiento.</div></details>
     <div id="rg_rango_estado" style="margin-top:6px;font-size:14px;font-weight:600;color:var(--brand)"></div>
+    <div style="margin-top:10px"><button class="btn btn-primary" onclick="descargarReporteAvanceRiesgosExcel()" style="padding:9px 16px;font-size:15px" title="Libro de Excel con las cifras de esta tabla y notas que explican cada columna">📥 Descargar este reporte en Excel</button></div>
   </div>`;
 }
 function _rgMarcarAtajo(){
@@ -8129,6 +8130,62 @@ async function rgBuscar(){
     +(esHoy?'':'<br><span style="color:#8a5a00">⚠️ El correo no menciona el rango de fechas: para enviar a los responsables usa «Todo, a hoy».</span>');
 }
 window.rgAtajo=rgAtajo; window.rgBuscar=rgBuscar;
+
+/* Excel del «Reporte de avance a los responsables» (mismo estilo que el de Indicadores):
+   las cifras son las de la tabla en pantalla, con el rango de fechas elegido. */
+async function descargarReporteAvanceRiesgosExcel(){
+  const F=window._REP_FILAS||[];
+  if(!F.length){ toast('No hay datos para descargar. Pulsa 🔍 Buscar primero.', true); return; }
+  let mapa={}; try{ mapa=await cargarMapaRespProceso()||{}; }catch(_){}
+  const norm=x=>String(x||'').replace(/\s+/g,' ').trim().toLowerCase();
+  const st=p=> p>=80?'ok':p>=50?'mid':'no';
+  const pc=(a,b)=> b? Math.round(a/b*100) : 0;
+  const R=window._RG_RANGO||{}, hoy=_rgHoy();
+  let fecha=''; try{ fecha=new Date().toLocaleDateString('es-PE',{day:'numeric',month:'long',year:'numeric'}); }catch(_){ fecha=hoy; }
+  const periodo = (!R.desde && (!R.hasta||R.hasta>=hoy)) ? 'Estado al '+fecha+' (todo lo registrado hasta hoy)'
+    : (R.desde ? 'Periodo: del '+_rgFechaTxt(R.desde)+' al '+_rgFechaTxt(R.hasta) : 'Con corte al '+_rgFechaTxt(R.hasta));
+  const tot=F.reduce((a,f)=>a+f.cifras.total,0), cr=F.reduce((a,f)=>a+f.cifras.conReportes,0), cu=F.reduce((a,f)=>a+f.cifras.culminadas,0);
+  const avg= tot? Math.round(F.reduce((a,f)=>a+f.cifras.avancePromedio*f.cifras.total,0)/tot) : 0;
+  const M=8;
+  const h=[
+    [{v:'Reporte de avance de las medidas por oficina',s:'tit',m:M}],
+    [{v:'Matriz de Riesgos y Oportunidades · SGOE ISO 21001 · Facultad de Ingeniería URP · '+periodo,s:'sub',m:M}],
+    [],
+    [{v:'CÓMO LEER ESTE REPORTE',s:'sec',m:M}],
+    [{v:'• Riesgos y oportunidades: cuántos tiene registrados la oficina (activos, sin contar archivados).',s:'midt',m:M}],
+    [{v:'• Con reportes: registros que tienen al menos un reporte de avance de sus medidas. Es la evidencia de que se está trabajando. El % es: con reportes ÷ total × 100.',s:'midt',m:M}],
+    [{v:'• Culminadas: registros cuyo último reporte indica 100 % de avance. El % es: culminadas ÷ total × 100.',s:'midt',m:M}],
+    [{v:'• Avance promedio: promedio del último % de avance reportado de cada registro; los que no tienen reportes cuentan como 0 %.',s:'midt',m:M}],
+    [{v:'• Etapa de avance (0 a 5): 0 Por empezar · sin reportes — 1 Primeros pasos · menos de 50 % con reportes — 2 En marcha · 50 % o más con reportes — 3 Buen ritmo · 80 % con reportes — 4 Destacado · 80 % con reportes y la mitad culminadas — 5 Excelencia · todo reportado y culminado.',s:'midt',m:M}],
+    [{v:'• Fechas: se cuentan los registros que ya existían en la fecha «Hasta» y los reportes ingresados en el periodo elegido.',s:'midt',m:M}],
+    [{v:'• Colores: verde 80 % o más · amarillo 50 % a 79 % · rojo menos de 50 %.',s:'midt',m:M}],
+    [],
+    [{v:'1. Resultado de toda la Facultad',s:'sec',m:M}],
+    ['Oficinas','Riesgos y oportunidades','Con reportes','% con reportes','Culminadas','% culminadas','Avance promedio'].map(v=>({v,s:'th'})),
+    [{v:F.length,s:'kpi'},{v:tot,s:'kpi'},{v:cr,s:'kpi'},{v:pc(cr,tot)+' %',s:st(pc(cr,tot))},{v:cu,s:'kpi'},{v:pc(cu,tot)+' %',s:st(pc(cu,tot))},{v:avg+' %',s:st(avg)}],
+    [],
+    [{v:'Oficinas en cada etapa',s:'sec',m:M}],
+    REP_NIVELES.map((n,i)=>({v:i+' '+n,s:'th'})),
+    REP_NIVELES.map((n,i)=>({v:F.filter(f=>f.nivel===i).length,s:'kpi'})),
+    [],
+    [{v:'2. Resultado por oficina (de mayor a menor avance promedio)',s:'sec',m:M}],
+    ['Oficina','Riesgos y oportunidades','Con reportes','% con reportes','Culminadas','% culminadas','Avance promedio','Etapa de avance','Responsable de proceso'].map(v=>({v,s:'th'})),
+    ['Oficina dueña de los registros','Total activos','Al menos un reporte de avance','Con reportes ÷ total','Último reporte al 100 %','Culminadas ÷ total','Último % de cada registro, promediado','De 0 Por empezar a 5 Excelencia','Según la tabla de responsables de proceso'].map(v=>({v,s:'exp'}))
+  ];
+  F.forEach(f=>{ const c=f.cifras, d=mapa[norm(f.oficina)]||{};
+    h.push([{v:f.oficina,s:'td'},{v:c.total,s:'num'},{v:c.conReportes,s:'num'},{v:pc(c.conReportes,c.total)+' %',s:st(pc(c.conReportes,c.total))},
+      {v:c.culminadas,s:'num'},{v:pc(c.culminadas,c.total)+' %',s:st(pc(c.culminadas,c.total))},{v:c.avancePromedio+' %',s:st(c.avancePromedio)},
+      {v:f.nivel+' '+REP_NIVELES[f.nivel],s:'td'},{v:d.responsable||'—',s:'td'}]); });
+  h.push([{v:'TOTAL',s:'totl'},{v:tot,s:'tot'},{v:cr,s:'tot'},{v:pc(cr,tot)+' %',s:'tot'},{v:cu,s:'tot'},{v:pc(cu,tot)+' %',s:'tot'},{v:avg+' %',s:'tot'},{v:'',s:'tot'},{v:'',s:'tot'}]);
+  const xml=_rxLibro([{ nombre:'Avance por oficina', anchos:[250,85,80,80,75,80,90,120,200], filas:h }]);
+  const blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='Reporte_avance_riesgos_'+((R.desde||R.hasta<hoy)?((R.desde||'inicio')+'_al_'+R.hasta):hoy)+'.xls';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast('Descargado. Si Excel avisa que el formato y la extensión no coinciden, pulse «Sí»: el contenido es correcto.');
+}
+window.descargarReporteAvanceRiesgosExcel=descargarReporteAvanceRiesgosExcel;
 
 function _repFilasHTML(filas){
   return filas.map((f,i)=>`<tr style="border-bottom:1px solid var(--line)">
