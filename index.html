@@ -3451,7 +3451,7 @@ function descargarEstadoPorOficina(){
   });
   h.push([{v:'TOTAL',s:'totl'},{v:tot.total,s:'tot'},{v:nR,s:'tot'},{v:nO,s:'tot'},{v:nivGlobal[4],s:'tot'},{v:nivGlobal[3],s:'tot'},{v:nivGlobal[2],s:'tot'},{v:nivGlobal[1],s:'tot'},
     {v:conRespTot,s:'tot'},{v:tot.total-conRespTot,s:'tot'},{v:totNConTrat>0?Math.round(avanceGlobal)+' %':'sin datos',s:'tot'},{v:ctrlGlobal!=null?Math.round(ctrlGlobal)+' %':'n/a',s:'tot'},{v:tot.e4,s:'tot'}]);
-  const xml=_rxLibro([{ nombre:'Riesgos por oficina', anchos:[250,55,60,85,80,65,65,65,80,80,90,100,75], filas:h, fijar:19 }]);
+  const xml=_rxLibro([{ nombre:'Riesgos por oficina', anchos:[250,55,60,85,80,65,65,65,80,80,90,100,75], filas:h }]);
   const blob=new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
