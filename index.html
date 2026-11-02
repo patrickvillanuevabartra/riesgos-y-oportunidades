@@ -354,6 +354,55 @@
   .est-pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:6px}
   .est-pend{background:#fdf0e6;color:var(--n3)} .est-proc{background:#fdf8e6;color:var(--n2)} .est-culm{background:#e8f3ec;color:var(--n1)} .est-obs{background:#f0e6f5;color:#7b3fa0}
 
+
+  /* ===== v30: Control y Seguimiento (ruta 1-4, formularios plegados, historial) ===== */
+  .mg-ruta{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 14px}
+  @media (max-width:760px){ .mg-ruta{grid-template-columns:repeat(2,1fr)} }
+  .mg-paso{border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;background:var(--card);cursor:pointer;text-align:left;font-family:inherit;transition:border-color .15s, box-shadow .15s}
+  .mg-paso:hover{border-color:var(--brand-2)}
+  .mg-paso.on{border-color:var(--brand);box-shadow:0 0 0 3px rgba(15,143,94,.12)}
+  .mg-paso .n{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--paper);color:var(--slate);font-weight:700;font-size:12.5px;margin-right:6px}
+  .mg-paso.on .n{background:var(--brand);color:#fff}
+  .mg-paso .t{font-weight:700;font-size:14.5px;color:var(--ink)}
+  .mg-paso .d{font-size:12.5px;color:var(--slate);margin-top:4px;line-height:1.4}
+  .mg-paso .e{display:inline-block;margin-top:6px;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:20px;background:#fff3e0;color:#9a5b00}
+  .mg-paso .e.ok{background:#e3f3ea;color:#1f7a3f}
+  .mg-card{border:1px solid var(--brand-2);border-radius:12px;background:#f6fbf8;padding:14px 16px;margin:0 0 14px;font-size:14.5px;color:var(--ink);line-height:1.55}
+  .mg-card h4{margin:0 0 8px;font-size:15.5px}
+  .mg-ec{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin:6px 0 10px}
+  .mg-ec .ind{font-size:16px;font-weight:700;color:var(--brand);max-width:340px;line-height:1.35}
+  .mg-ec .eq{font-size:22px;font-weight:700;color:var(--ink)}
+  .mg-ec .fr{display:inline-flex;flex-direction:column;text-align:center;min-width:200px;max-width:440px}
+  .mg-ec .fr span{padding:5px 10px;font-size:15px}
+  .mg-ec .fr .num{border-bottom:2px solid var(--ink);font-weight:600}
+  .mg-nuevo-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--paper);border:1.5px dashed var(--brand-2);border-radius:12px;padding:13px 16px;margin-bottom:16px;font-size:14px;color:var(--slate);line-height:1.45}
+  .mg-nuevo-bar .btn{font-size:15px;padding:10px 20px}
+  .mg-form-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  .mg-form-cab .tt{font-size:17px;font-weight:700;color:var(--ink)}
+  .hm-tit{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:4px 0 10px}
+  .hm-tit h3{margin:0;font-size:17px}
+  .hm-meta{border:1.5px solid var(--line);border-radius:14px;margin-bottom:14px;overflow:hidden;background:var(--card)}
+  .hm-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;padding:12px 14px;background:#f3faf6;border-bottom:1px solid var(--line)}
+  .hm-head .t{font-size:16px;font-weight:700;color:var(--brand)}
+  .hm-nums{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .hm-num{background:#fff;border:1px solid var(--line);border-radius:10px;padding:5px 10px;font-size:12px;color:var(--slate);line-height:1.25}
+  .hm-num b{display:block;font-size:16px;color:var(--ink)}
+  .hm-acc{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .hm-body{padding:10px 14px 12px}
+  .hm-seg{display:grid;grid-template-columns:110px 1fr auto;gap:12px;align-items:start;padding:10px 0;border-top:1px dashed var(--line)}
+  .hm-seg:first-child{border-top:0}
+  .hm-seg .f{font-size:13.5px;font-weight:700;color:var(--ink)}
+  .hm-seg .c{font-size:13.5px;line-height:1.55}
+  .hm-vacio{font-size:13.5px;color:var(--slate);background:var(--paper);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .hm-como{background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 13px;margin-top:9px;font-size:14px;line-height:1.6;color:var(--ink)}
+  .hm-como .t{font-size:12.5px;font-weight:700;color:var(--slate);margin-bottom:2px}
+  .hm-como .sin{color:#8a5a00}
+  .av-leyenda{font-size:12.5px;color:var(--slate);background:var(--paper);border-radius:8px;padding:6px 10px;margin:4px 0 10px;line-height:1.5}
+  .mc-tabs{display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 4px}
+  .mc-tab{border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:3px 8px;font-size:12px;font-weight:700;color:var(--slate);cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;line-height:1.3;text-align:left}
+  .mc-tab.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .mc-tab .dot{width:9px;height:9px;border-radius:50%;display:inline-block;border:1px solid #fff;flex:0 0 9px}
+  .mc-blq{border:1px solid var(--line);border-radius:10px;padding:7px 9px;background:var(--card);font-size:12.5px;line-height:1.45;margin-top:4px}
 </style>
 </head>
 <body>
@@ -796,7 +845,7 @@
   </div>
 
   <div id="modalMon" class="modal-overlay hidden">
-    <div class="modal" style="max-width:900px">
+    <div class="modal" style="max-width:1000px">
       <div class="modal-head">
         <div>
           <div class="eyebrow">Control y Seguimiento</div>
@@ -806,14 +855,12 @@
       </div>
       <div class="modal-body">
         <p class="hint" id="mon_ref_indicador" style="margin-top:0;margin-bottom:12px"></p>
-        <div style="display:flex;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:4px;margin-bottom:16px;width:fit-content;flex-wrap:wrap">
-          <button class="mon-tab active" data-t="metas" onclick="setMonTab('metas')" style="border:0;background:var(--brand);color:#fff;font-family:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:7px;cursor:pointer">📅 Metas</button>
-          <button class="mon-tab" data-t="rep" onclick="setMonTab('rep')" style="border:0;background:transparent;color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:7px;cursor:pointer">📊 Monitoreo del control</button>
-          <button class="mon-tab" data-t="cert" onclick="setMonTab('cert')" style="border:0;background:transparent;color:var(--slate);font-family:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:7px;cursor:pointer">🏅 Certificación</button>
-        </div>
+        <div id="mon_ruta"></div>
+        <div id="mon_pane_explica" class="hidden"></div>
         <div id="mon_pane_metas"></div>
         <div id="mon_pane_rep" class="hidden"></div>
         <div id="mon_pane_cert" class="hidden"></div>
+        <div id="mon_hist"></div>
       </div>
     </div>
   </div>
@@ -1141,6 +1188,9 @@ document.querySelectorAll('nav button').forEach(b => {
    ESTADO en memoria
    ============================================================ */
 const STATE = { matriz: [], maestras: {}, inventario: [], relNames: {}, subCache: null };
+// v30 — Lo que se guarda/borra en esta sesión se aplica al instante, aunque el servidor
+// todavía devuelva una copia anterior de las tablas.
+const _LOCALR = { nuevos:{}, subs:{ metas:{}, monitoreo:{}, reportes:{} }, borr:new Set() };
 
 /* ============================================================
    CACHÉ GLOBAL DE SUBREGISTROS (optimización de velocidad)
@@ -1162,6 +1212,7 @@ async function precargarSubcache(forzar){
   indexar(idx.reportes,   res[0]);
   indexar(idx.monitoreo,  res[1]);
   indexar(idx.metas,      res[2]);
+  Object.keys(_LOCALR.subs).forEach(b=>{ idx[b]=idx[b]||{}; Object.assign(idx[b], _LOCALR.subs[b]); });
   STATE.subCache = idx;
   return idx;
 }
@@ -1172,6 +1223,7 @@ window.invalidarSubcache = invalidarSubcache;
 // Devuelve {values, created_at} de un subregistro desde el caché indicado
 // ('reportes' | 'monitoreo' | 'metas'); si no está, lee individual (respaldo).
 async function getSub(bucket, id){
+  if(_LOCALR.subs[bucket] && _LOCALR.subs[bucket][id]) return _LOCALR.subs[bucket][id];
   const c = STATE.subCache;
   if(c && c[bucket] && c[bucket][id]) return c[bucket][id];
   // Respaldo: lectura individual
@@ -3652,6 +3704,12 @@ const SUBFORM_FIELD_ID = CONFIG.MATRIZ_FIELDS.reporte_acciones.id; // bfyfu...
 // nombre del subformulario. Prueba el field-id; si no, busca un array de IDs
 // (22 chars) que NO pertenezca a los OTROS subformularios conocidos del registro.
 function subIdsDe(r, fieldId){
+  const base = _subIdsDeOrig(r, fieldId).slice();
+  const extra = ((_LOCALR.nuevos[r && r.id]||{})[fieldId]) || [];
+  extra.forEach(x=>{ if(!base.includes(x)) base.push(x); });
+  return base.filter(x=>!_LOCALR.borr.has(x));
+}
+function _subIdsDeOrig(r, fieldId){
   const sv = r.subform_values || {};
   if(Array.isArray(sv[fieldId])) return sv[fieldId];
   // IDs de los otros dos subformularios, para no confundirlos
@@ -4957,7 +5015,8 @@ async function cargarCumplimientoMonitoreo(filasConMonitoreo){
         if(!isNaN(real)&&!isNaN(meta)&&meta!==0) pct=Math.round((real/meta)*1000)/10;
       } else { pct=Math.round(pct*10)/10; }
       const cel=document.getElementById('moncumpl-'+f.id);
-      if(cel) cel.innerHTML = !isNaN(pct) ? barraAvance(Math.max(0,Math.min(100,Math.round(pct)))) : '<span class="hint">—</span>';
+      let _html=null; try{ _html=await _mcCeldaHTML(f.id); }catch(_){ _html=null; }
+      if(cel) cel.innerHTML = _html ? _html : (!isNaN(pct) ? barraAvance(Math.max(0,Math.min(100,Math.round(pct)))) : '<span class="hint">—</span>');
     }catch(_){
       const cel=document.getElementById('moncumpl-'+f.id);
       if(cel) cel.innerHTML='<span class="hint">—</span>';
@@ -5286,7 +5345,10 @@ window.abrirReporteAcciones = abrirReporteAcciones;
 // ---- (2) Control y Seguimiento (3 pestañas: metas / monitoreo / certificación) ----
 let MON_RIESGO_ACTUAL = null;
 function setMonTab(t){
-  document.querySelectorAll('.mon-tab').forEach(b=>{ const on=b.dataset.t===t; b.style.background=on?'var(--brand)':'transparent'; b.style.color=on?'#fff':'var(--slate)'; });
+  window._MON_VISTA=t;
+  { const pe=document.getElementById('mon_pane_explica'); if(pe) pe.classList.toggle('hidden', t!=='explica'); }
+  { const h=document.getElementById('mon_hist'); if(h) h.classList.toggle('hidden', !(t==='metas'||t==='rep')); }
+  try{ if(typeof MON_RIESGO_ACTUAL!=='undefined' && MON_RIESGO_ACTUAL) monRenderRuta(MON_RIESGO_ACTUAL); }catch(_){ }
   document.getElementById('mon_pane_metas').classList.toggle('hidden', t!=='metas');
   document.getElementById('mon_pane_rep').classList.toggle('hidden', t!=='rep');
   const pc=document.getElementById('mon_pane_cert'); if(pc) pc.classList.toggle('hidden', t!=='cert');
@@ -5317,6 +5379,293 @@ async function medidasAl100(riesgoId){
   }catch(_){ return false; }
 }
 window.medidasAl100 = medidasAl100;
+
+
+/* =====================================================================
+   v30 — CONTROL Y SEGUIMIENTO más claro (mismo criterio que Indicadores)
+   · Ruta en 4 pasos (sin pestañas) · formularios que se abren con «+ Nuevo»
+   · historial: cada meta con sus reportes debajo · fórmula en cada número
+   · actualización en vivo · varias metas por periodo con nombre
+   ===================================================================== */
+if(CONFIG.PROG_METAS_FIELDS && !CONFIG.PROG_METAS_FIELDS.nombre) CONFIG.PROG_METAS_FIELDS.nombre = { id:'buySoBBSnbA4k2waWzvCoV', type:'string', col:'Nombre de la meta' };
+if(CONFIG.MONITOREO_FIELDS && !CONFIG.MONITOREO_FIELDS.id_meta) CONFIG.MONITOREO_FIELDS.id_meta = { id:'amjCoTWQncQ6NdPrH3k8oB', type:'string', col:'ID meta' };
+function _mEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _mN(x){ const n=parseFloat(String(x==null?'':x).replace('%','').replace(',','.')); return isNaN(n)?NaN:n; }
+function _mF(x){ const n=_mN(x); if(isNaN(n)) return '—'; return (Math.abs(n)<0.005?0:n).toLocaleString('es-PE',{maximumFractionDigits:2}); }
+// --- estado local ---
+function _lrFechaQ(){ const d=new Date(), p=n=>String(n).padStart(2,'0'); return p(d.getDate())+'-'+p(d.getMonth()+1)+'-'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }
+function _lrPorCol(MF, vals){ const o={}; Object.values(MF||{}).forEach(f=>{ if(f && f.id && f.col && Object.prototype.hasOwnProperty.call(vals,f.id)){ const v=vals[f.id]; o[f.col]=(v===''||v==null)?'':String(v); } }); return o; }
+function _lrPoner(bucket,id,rec){ _LOCALR.subs[bucket][id]=rec; if(STATE.subCache && STATE.subCache[bucket]) STATE.subCache[bucket][id]=rec; }
+function _lrNuevo(riesgoId, fieldId, bucket, subId, valsCol){
+  const n=(_LOCALR.nuevos[riesgoId]=_LOCALR.nuevos[riesgoId]||{}); (n[fieldId]=n[fieldId]||[]).push(subId);
+  _lrPoner(bucket, subId, { values:valsCol, created_at:_lrFechaQ() });
+}
+async function _lrEditar(bucket, subId, valsCol){
+  let prev=_LOCALR.subs[bucket][subId]; if(!prev){ try{ prev=await getSub(bucket, subId); }catch(_){ } }
+  prev=prev||{ values:{}, created_at:'' };
+  const v=Object.assign({}, prev.values||{}, valsCol); if(bucket==='monitoreo') delete v['% cumplimiento'];
+  _lrPoner(bucket, subId, { values:v, created_at:prev.created_at });
+}
+window._LOCALR=_LOCALR;
+
+// --- semáforo del % de cumplimiento (el mismo de la app: verde ≥80, ámbar 50-79, rojo <50) ---
+function _mcEstado(p){
+  const r=Math.round(p*10)/10;
+  if(r>100) return { t:'Superó la meta ★', c:'#1f7a3d' };
+  if(r>=100) return { t:'Meta cumplida', c:'#1f7a3d' };
+  if(r>=80) return { t:'Casi cumplida', c:'#1f7a3d' };
+  if(r>=50) return { t:'En camino', c:'#b8860b' };
+  if(r>0) return { t:'Cumplimiento bajo', c:'#c0392b' };
+  return { t:'Sin avance todavía', c:'#c0392b' };
+}
+function _mcPct(real, meta){ const r=_mN(real), m=_mN(meta); if(isNaN(r)||isNaN(m)||m===0) return null; return Math.round((r/m)*1000)/10; }
+function _mcCuenta(real, meta){ const p=_mcPct(real,meta); if(p===null) return ''; return `${_mF(real)} ÷ ${_mF(meta)} × 100 = <b>${_mF(p)} %</b>`; }
+const MC_LEYENDA='<b>Colores del cumplimiento:</b> 🟢 80 % o más · 🟡 50 a 79 % · 🔴 menos de 50 %. <b>% de cumplimiento = valor real ÷ valor meta × 100</b>; 100 % = meta cumplida.';
+function _mcEsRazon(riesgoId){ return String(tipoIndicadorDe(riesgoId)).toLowerCase().startsWith('raz'); }
+function _mcVars(riesgoId){ let v=null; try{ v=rfVariablesFormula(riesgoId); }catch(_){ } return v||{ arriba:'numerador', abajo:'denominador' }; }
+// «Valor = arriba (n) ÷ abajo (d) × 100 → n de d»
+function _mcDeDonde(riesgoId, ico, tit, val, num, den){
+  const V=_mcVars(riesgoId), esR=_mcEsRazon(riesgoId);
+  if(esR && num!=='' && num!=null && den!=='' && den!=null)
+    return `<div>${ico} <b>${tit}: ${_mF(val)}${esR?' %':''}</b> = ${_mEsc(V.arriba)} <b>(${_mF(num)})</b> ÷ ${_mEsc(V.abajo)} <b>(${_mF(den)})</b> × 100 → es decir, <b>${_mF(num)} de ${_mF(den)}</b></div>`;
+  if(!esR) return `<div>${ico} <b>${tit}: ${_mF(val)}</b> <span style="color:var(--slate)">— indicador absoluto: es el número registrado.</span></div>`;
+  return `<div>${ico} <b>${tit}: ${_mF(val)}${esR?' %':''}</b> <span class="sin">— se registró el valor sin numerador y denominador.</span></div>`;
+}
+
+// --- Agrupar los reportes bajo su meta ---
+function _mcAgrupar(metas, mons){
+  const grupos=metas.map((m,i)=>({ meta:m, idx:i, mons:[] })), sueltos=[];
+  const norm=x=>String(x||'').replace(/\s+/g,' ').trim().toLowerCase();
+  mons.forEach(x=>{
+    let g = x.idMeta ? grupos.find(q=>q.meta.id===x.idMeta) : null;
+    if(!g){ const mismos=grupos.filter(q=>norm(q.meta.periodo)===norm(x.periodo));
+      const sinNom=mismos.filter(q=>!String(q.meta.nombre||'').trim());
+      // reportes antiguos (sin «ID meta»): mismo valor de meta; si no, la meta sin nombre del periodo; si no, la única del periodo
+      g = mismos.find(q=>_mN(q.meta.meta)===_mN(x.meta)) || (sinNom.length===1?sinNom[0]:null) || (mismos.length===1?mismos[0]:null); }
+    if(g) g.mons.push(x); else sueltos.push(x);
+  });
+  const fK=f=>{ const m=String(f||'').match(/(\d{4})-(\d{2})-(\d{2})/); if(m) return m[1]+m[2]+m[3]; const d=String(f||'').match(/(\d{2})-(\d{2})-(\d{4})/); return d?d[3]+d[2]+d[1]:''; };
+  grupos.forEach(g=>g.mons.sort((a,b)=>fK(a.fecha).localeCompare(fK(b.fecha))));
+  return { grupos, sueltos };
+}
+async function _mcLeerMons(monIds){
+  await precargarSubcache();
+  const out=[];
+  for(const id of monIds){
+    const s=await getSub('monitoreo', id); if(!s) continue;
+    const v=s.values||{}; const g=c=>{ const x=v[c]; return (x && x!==c)?x:''; };
+    out.push({ id, fecha:g('Fecha de monitoreo'), meta:g('Valor meta'), real:g('Valor real obtenido'), num:g('Numerador real'), den:g('Denominador real'),
+      evid:g('Evidencia (link)'), periodo:g('Periodo'), idMeta:g('ID meta'), plan:g('Plan de remediación'), creado:s.created_at||'' });
+  }
+  return out;
+}
+
+// --- Ruta de 4 pasos ---
+function monRenderRuta(riesgoId){
+  const box=document.getElementById('mon_ruta'); if(!box) return;
+  const r=(STATE.matriz||[]).find(x=>x.id===riesgoId);
+  const F=CONFIG.MATRIZ_FIELDS;
+  const nMetas=r?subIdsDe(r, F.prog_metas.id).length:0, nMon=r?subIdsDe(r, F.reporte_monitoreo.id).length:0;
+  const cert=r?String((r.values||{})['Certificación de Implementación del Control']||''):'';
+  const certOk=cert && cert!=='Certificación de Implementación del Control';
+  const vista=window._MON_VISTA||'explica';
+  const paso=(k,n,t,d,e,ok)=>`<button type="button" class="mg-paso ${vista===k?'on':''}" onclick="setMonTab('${k}')"><div><span class="n">${n}</span><span class="t">${t}</span></div><div class="d">${d}</div><span class="e ${ok?'ok':''}">${e}</span></button>`;
+  box.innerHTML=`<div class="mg-ruta">
+    ${paso('explica',1,'Entiende el control','Qué mide el indicador y cómo se calcula el cumplimiento.','Ver explicación',true)}
+    ${paso('metas',2,'Programa la meta','A qué valor quieres llegar en cada periodo.', nMetas?('✓ '+nMetas+' meta'+(nMetas>1?'s':'')):'Pendiente', nMetas>0)}
+    ${paso('rep',3,'Reporta el monitoreo','Cada vez que mides: lo obtenido y sus evidencias.', nMon?('✓ '+nMon+' reporte'+(nMon>1?'s':'')):(nMetas?'Pendiente':'Primero la meta'), nMon>0)}
+    ${paso('cert',4,'Certifica el control','Confirma si el control ya opera y es eficaz.', certOk?('✓ '+_mEsc(cert)):'Pendiente', /certificad|operativ/i.test(cert))}
+  </div>`;
+}
+// --- Paso 1: explicación ---
+function monRenderExplica(riesgoId, r){
+  const box=document.getElementById('mon_pane_explica'); if(!box) return;
+  const v=(r&&r.values)||{}; const cur=c=>{ const x=v[c]; return (x && x!==c)?x:''; };
+  const ind=cur('Indicador'), formula=cur('Fórmula del indicador'), frec=cur('Frecuencia de medición');
+  const esR=_mcEsRazon(riesgoId); let V=null; try{ V=rfVariablesFormula(riesgoId); }catch(_){ }
+  const ec = (esR && V)
+    ? `<div class="mg-ec"><span class="ind">${_mEsc(ind||'Indicador')}</span><span class="eq">=</span><div class="fr"><span class="num">${_mEsc(V.arriba)}</span><span>${_mEsc(V.abajo)}</span></div><span class="eq">× 100</span></div>
+       <div>⬆ <b>Arriba</b>: lo que se cuenta (en la meta, lo que quieres alcanzar; en el reporte, lo logrado).<br>⬇ <b>Abajo</b>: el total. El sistema hace la división por ti.</div>`
+    : `<div class="mg-ec"><span class="ind">${_mEsc(ind||'Indicador')}</span>${formula?`<span class="eq">=</span><span style="font-size:15px">${_mEsc(formula)}</span>`:''}</div>
+       <div>${esR?'Indicador de <b>razón</b>: se registra numerador y denominador.':'Indicador <b>absoluto</b>: se registra un solo número.'}</div>`;
+  box.innerHTML=`<div class="mg-card"><h4>El control y su indicador, en palabras simples</h4>${ec}
+    <div style="margin-top:10px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 13px">
+      <b>¿Cómo sale el % de cumplimiento?</b> Se compara lo obtenido con la meta:<br>
+      <span style="font-size:16px"><b>% de cumplimiento = valor real ÷ valor meta × 100</b></span><br>
+      Ej.: meta <b>50</b> y valor real <b>48</b> → 48 ÷ 50 × 100 = <b>96 %</b>. <b>100 %</b> = meta cumplida.
+    </div>
+    ${frec?`<div style="margin-top:8px">📅 Se mide con frecuencia <b>${_mEsc(frec)}</b>.</div>`:''}
+    <div style="margin-top:12px"><button type="button" class="btn btn-primary" onclick="setMonTab('metas')">Entendido: ir a programar la meta →</button></div></div>`;
+}
+// --- Abrir/cerrar formularios ---
+function monForm(riesgoId, tipo, abrir, titulo){
+  const f=document.getElementById((tipo==='meta'?'metaform-':'monform-')+riesgoId);
+  const b=document.getElementById((tipo==='meta'?'metabar-':'monbar-')+riesgoId);
+  if(f) f.style.display=abrir?'':'none';
+  if(b && b.dataset.sc!=='1') b.style.display=abrir?'none':'';
+  if(abrir && titulo){ const t=document.getElementById((tipo==='meta'?'metaformtit-':'monformtit-')+riesgoId); if(t) t.textContent=titulo; }
+  if(abrir && f) setTimeout(()=>{ try{ f.scrollIntoView({behavior:'smooth',block:'start'}); }catch(_){ } }, 60);
+}
+async function monNuevo(riesgoId, tipo, metaIdx){
+  const r=(STATE.matriz||[]).find(x=>x.id===riesgoId); if(!r) return;
+  if(tipo==='mon' && !(window['_metas_'+riesgoId]||[]).length){ toast('Primero programa una meta (paso 2): el reporte siempre se compara con una meta.', true); setMonTab('metas'); tipo='meta'; }
+  setMonTab(tipo==='meta'?'metas':'rep');
+  // formulario limpio
+  if(tipo==='meta') await renderMonPaneMetas(riesgoId, r); else await renderMonPaneRep(riesgoId, r);
+  monForm(riesgoId, tipo, true, tipo==='meta'?'Nueva meta':'Nuevo reporte de monitoreo');
+  if(tipo==='mon' && metaIdx!=null){ const sl=document.getElementById('mon_metasel_'+riesgoId); if(sl){ sl.value=String(metaIdx); try{ jalarMeta(riesgoId); }catch(_){ } } }
+}
+window.monForm=monForm; window.monNuevo=monNuevo; window.monRenderRuta=monRenderRuta; window.monRenderExplica=monRenderExplica;
+
+// --- Historial: cada meta con sus reportes debajo ---
+async function renderMonHist(riesgoId, r){
+  const box=document.getElementById('mon_hist'); if(!box) return;
+  const F=CONFIG.MATRIZ_FIELDS;
+  const metas=await cargarMetasData(subIdsDe(r, F.prog_metas.id));
+  window['_metas_'+riesgoId]=metas;
+  const mons=await _mcLeerMons(subIdsDe(r, F.reporte_monitoreo.id));
+  const sc=(typeof _soloConsulta==='function') && _soloConsulta(r);
+  const esR=_mcEsRazon(riesgoId);
+  if(!metas.length && !mons.length){ box.innerHTML=`<div class="hm-tit"><h3>📚 Historial del control</h3></div><div class="hm-vacio"><span>Todavía no hay metas ni reportes. Empieza con el botón <b>«+ Nueva meta»</b> del paso 2.</span></div>`; return; }
+  const { grupos, sueltos }=_mcAgrupar(metas, mons);
+  const repHTML=(x, metaAct)=>{
+    const mt=(metaAct!==undefined && metaAct!=='' && metaAct!=null)?metaAct:x.meta;
+    const p=_mcPct(x.real, mt), est=p===null?null:_mcEstado(p);
+    const ancho=p===null?0:Math.max(0,Math.min(100,p));
+    return `<div class="hm-seg">
+      <div class="f">${fmtFecha(x.fecha)||'Sin fecha'}</div>
+      <div class="c">Real obtenido: <b style="font-size:15px">${_mF(x.real)}${esR?' %':''}</b>${(x.num!==''&&x.den!=='')?` <span style="color:var(--mist)">(${_mF(x.num)} de ${_mF(x.den)})</span>`:''} · Meta: <b>${_mF(mt)}${esR?' %':''}</b>
+        ${p!==null?`<div style="max-width:340px;margin-top:5px"><div style="font-size:12px;font-weight:700;color:var(--slate)">% de cumplimiento</div>
+          <div style="display:flex;align-items:center;gap:7px"><div style="flex:1;height:8px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:${ancho}%;height:100%;background:${est.c}"></div></div><b style="color:${est.c}">${_mF(p)} %</b></div>
+          <div style="font-size:12.5px;font-weight:700;color:${est.c}">● ${est.t}</div></div>
+          <div style="font-size:13px;color:var(--slate);margin-top:2px">📐 ${_mcCuenta(x.real, mt)}</div>`:''}
+        ${x.evid?`<div style="margin-top:4px">${typeof _evLinksHTML==='function'?_evLinksHTML(x.evid,'📎'):''}</div>`:'<div style="margin-top:4px;color:#a33a2c;font-size:12.5px">Sin evidencias adjuntas</div>'}
+      </div>
+      <div class="hm-acc"><button class="icon-btn" title="Ver detalle" onclick="verDetalleMon('${riesgoId}','${x.id}')">👁</button>
+        ${sc?'':`<button class="icon-btn" title="Editar este reporte" onclick="editarMonitoreo('${riesgoId}','${x.id}')">✏️</button><button class="icon-btn" title="Eliminar" onclick="eliminarSubregistro('${riesgoId}','${x.id}','monitoreo')">🗑️</button>`}</div>
+    </div>`;
+  };
+  let html=`<div class="hm-tit"><h3>📚 Historial del control</h3><span class="hint" style="font-size:13px">Cada meta con sus reportes de monitoreo debajo.</span></div><div class="av-leyenda">${MC_LEYENDA}</div>`;
+  grupos.slice().sort((a,b)=>String(b.meta.periodo||'').localeCompare(String(a.meta.periodo||''),'es',{numeric:true})).forEach(gq=>{
+    const m=gq.meta, ult=gq.mons[gq.mons.length-1];
+    const p=ult?_mcPct(ult.real, m.meta):null, est=p===null?null:_mcEstado(p);
+    html+=`<div class="hm-meta"><div class="hm-head"><div style="flex:1;min-width:260px">
+        <div class="t">🎯 Meta ${_mEsc(m.periodo||'sin periodo')}${m.nombre?` <span style="color:var(--ink)">· ${_mEsc(m.nombre)}</span>`:''}</div>
+        <div class="hm-nums">
+          <div class="hm-num">Valor meta<b>${_mF(m.meta)}${esR?' %':''}</b></div>
+          <div class="hm-num">Último real<b style="color:var(--brand)">${ult?_mF(ult.real)+(esR?' %':''):'—'}</b></div>
+          <div class="hm-num">% de cumplimiento<b style="color:${est?est.c:'inherit'}">${p===null?'—':_mF(p)+' %'}</b>${est?`<span style="display:block;font-size:11.5px;font-weight:600;color:${est.c}">${est.t}</span>`:''}</div>
+        </div>
+        <div class="hm-como"><div class="t">¿De dónde salen estos valores?</div>
+          ${_mcDeDonde(riesgoId,'🎯','Valor meta', m.meta, m.num, m.den)}
+          ${ult?_mcDeDonde(riesgoId,'📈','Último real', ult.real, ult.num, ult.den):''}
+          ${ult&&p!==null?`<div>📊 <b>% de cumplimiento: ${_mF(p)} %</b> = ${_mcCuenta(ult.real, m.meta)} <span style="color:var(--slate);font-size:12.5px">(valor real ÷ valor meta × 100)</span></div>`:`<div style="color:var(--slate)">📈 Aún no hay reportes: el % de cumplimiento se calculará con el primero.</div>`}
+        </div>
+        <div style="font-size:12.5px;color:var(--mist);margin-top:6px">Programada el ${fmtFecha(m.fecha)||'—'}${m.obs?' · 💬 '+_mEsc(m.obs):''}${m.plan?` · <a href="${String(m.plan).replace(/"/g,'&quot;')}" target="_blank" class="riesgo-link">📎 Plan de monitoreo</a>`:''}</div>
+      </div>
+      <div class="hm-acc"><button class="icon-btn" title="Ver detalle de la meta" onclick="verDetalleMeta('${riesgoId}','${m.id}')">👁</button>
+        ${sc?'':`<button class="icon-btn" title="Editar la meta" onclick="editarMeta('${riesgoId}','${m.id}')">✏️</button><button class="icon-btn" title="Eliminar la meta" onclick="eliminarSubregistro('${riesgoId}','${m.id}','meta')">🗑️</button>`}</div>
+      </div>
+      <div class="hm-body">${gq.mons.length?gq.mons.map(x=>repHTML(x, m.meta)).join(''):`<div class="hm-vacio"><span>Aún no hay reportes para esta meta.</span>${sc?'':`<button class="btn btn-primary btn-sm" onclick="monNuevo('${riesgoId}','mon',${gq.idx})">+ Registrar reporte</button>`}</div>`}
+        ${(gq.mons.length && !sc)?`<div style="margin-top:8px"><button class="btn btn-ghost btn-sm" onclick="monNuevo('${riesgoId}','mon',${gq.idx})">+ Registrar otro reporte de esta meta</button></div>`:''}</div></div>`;
+  });
+  if(sueltos.length) html+=`<div class="hm-meta"><div class="hm-head"><div><div class="t" style="color:#8a5a00">Reportes sin meta identificada</div><div style="font-size:12.5px;color:var(--mist);margin-top:4px">Ábrelos con ✏️, elige la meta en «Meta que estás monitoreando» y guarda.</div></div></div><div class="hm-body">${sueltos.map(x=>repHTML(x)).join('')}</div></div>`;
+  box.innerHTML=html;
+}
+window.renderMonHist=renderMonHist;
+
+// --- Varias metas en un mismo periodo: pregunta sencilla ---
+async function _monChequeoDup(riesgoId, editId){
+  const norm=x=>String(x||'').replace(/\s+/g,' ').trim().toLowerCase();
+  const per=(document.getElementById('meta_periodo_'+riesgoId)||{}).value||'';
+  const elNom=document.getElementById('meta_nombre_'+riesgoId); if(!elNom) return true;   // formulario antiguo sin «nombre»
+  const nom=elNom.value||'';
+  if(!String(per).trim()) return true;
+  let metas=window['_metas_'+riesgoId]||[];
+  const r=(STATE.matriz||[]).find(x=>x.id===riesgoId);
+  if(r){ try{ metas=await cargarMetasData(subIdsDe(r, CONFIG.MATRIZ_FIELDS.prog_metas.id)); }catch(_){ } }
+  const ex=metas.find(m=>m.id!==editId && norm(m.periodo)===norm(per) && norm(m.nombre)===norm(nom));
+  if(!ex) return true;
+  const propia=editId?metas.find(m=>m.id===editId):null;
+  const cambioPer=!!(propia && propia.periodo && norm(propia.periodo)!==norm(per));
+  const nuevaMeta=(document.getElementById('meta_meta_'+riesgoId)||{}).value||'—';
+  const caja=(tit,mt,nm,color)=>`<div style="flex:1;min-width:200px;border:2px solid ${color};border-radius:12px;padding:12px 14px;background:#fff">
+      <div style="font-size:14px;font-weight:700;color:${color};margin-bottom:4px">${tit}</div>
+      ${nm?`<div style="font-size:15px;font-weight:700">«${_mEsc(nm)}»</div>`:'<div style="font-size:14px;color:#6b7a71">(sin nombre)</div>'}
+      <div style="font-size:16px">Valor meta <b>${_mEsc(mt)}</b></div></div>`;
+  let m=document.getElementById('mon_dup_modal'); if(m) m.remove();
+  document.body.insertAdjacentHTML('beforeend', `<div id="mon_dup_modal" style="position:fixed;inset:0;background:rgba(15,30,22,.5);z-index:10060;display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="background:var(--card);border-radius:16px;max-width:620px;width:100%;max-height:90vh;overflow:auto;padding:22px 24px;font-size:16px;line-height:1.5;color:var(--ink)">
+      <h3 style="margin:0 0 6px;font-size:20px">En «${_mEsc(per)}» ya hay una meta</h3>
+      <div style="color:var(--slate);margin-bottom:12px">Compara las dos:</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">${caja('Meta que ya existe', ex.meta||'—', ex.nombre, '#6b7a71')}${caja('La que estás guardando', nuevaMeta, nom, '#0f8f5e')}</div>
+      <div id="mdd_p1"><div style="font-size:19px;font-weight:700;margin-bottom:12px">¿Son dos metas diferentes?</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button type="button" class="btn btn-primary" style="font-size:16px;padding:12px 20px" onclick="document.getElementById('mdd_p1').style.display='none';document.getElementById('mdd_p2').style.display='';setTimeout(()=>{const i=document.getElementById('mdd_nombre');if(i)i.focus();},50)">Sí, son diferentes</button>
+          <button type="button" class="btn btn-ghost" style="font-size:16px;padding:12px 20px" onclick="_monDupNo('${riesgoId}','${ex.id}',${cambioPer?`'${_mEsc(propia.periodo).replace(/'/g,'')}'`:'null'})">${cambioPer?'No, me equivoqué de periodo':'No, es la misma meta'}</button>
+        </div></div>
+      <div id="mdd_p2" style="display:none"><div style="font-size:17px;font-weight:700;margin-bottom:6px">Escribe un nombre para reconocer <u>la que estás guardando</u>:</div>
+        <input id="mdd_nombre" value="${_mEsc(norm(nom)===norm(ex.nombre)?'':nom)}" placeholder="Ej.: Laboratorio de Química" style="width:100%;font-size:17px;padding:11px 13px;border:2px solid var(--brand-2);border-radius:10px" oninput="document.getElementById('mdd_err').style.display='none'" onkeydown="if(event.key==='Enter')_monDupGuardar('${riesgoId}',${editId?`'${editId}'`:'null'})">
+        <div style="font-size:14px;color:var(--slate);margin-top:6px">Ejemplos: «Laboratorio de Química», «Sede Surco», «Primer semestre».</div>
+        <div id="mdd_err" style="display:none;color:#a33a2c;font-weight:700;margin-top:6px"></div>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+          <button type="button" class="btn btn-primary" style="font-size:16px;padding:12px 20px" onclick="_monDupGuardar('${riesgoId}',${editId?`'${editId}'`:'null'})">Guardar con este nombre</button>
+          <button type="button" class="btn btn-ghost" style="font-size:16px;padding:12px 20px" onclick="document.getElementById('mdd_p2').style.display='none';document.getElementById('mdd_p1').style.display=''">← Volver</button>
+        </div></div>
+      <div style="text-align:right;margin-top:14px"><button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('mon_dup_modal').remove()">Cancelar</button></div>
+    </div></div>`);
+  window._MDD_NOMBRE_EX=ex.nombre||'';
+  return false;
+}
+function _monDupGuardar(riesgoId, editId){
+  const i=document.getElementById('mdd_nombre'), e=document.getElementById('mdd_err');
+  const v=String(i&&i.value||'').trim(), norm=x=>String(x||'').trim().toLowerCase();
+  if(!v){ e.textContent='Escribe un nombre.'; e.style.display=''; i.focus(); return; }
+  if(norm(v)===norm(window._MDD_NOMBRE_EX)){ e.textContent='Ese nombre ya lo tiene la otra meta. Escribe uno diferente.'; e.style.display=''; i.focus(); return; }
+  const pn=document.getElementById('meta_nombre_'+riesgoId); if(pn) pn.value=v;
+  document.getElementById('mon_dup_modal').remove();
+  if(editId) actualizarMeta(riesgoId, editId); else guardarMeta(riesgoId);
+}
+function _monDupNo(riesgoId, idExistente, perOriginal){
+  const m=document.getElementById('mon_dup_modal'); if(m) m.remove();
+  if(perOriginal){ llenarPeriodoSel(riesgoId, perOriginal); const ep=document.getElementById('meta_periodo_'+riesgoId); if(ep){ ep.value=perOriginal; ep.dataset.touched='1'; } toast('Listo: se dejó el periodo «'+perOriginal+'». Revisa y guarda.'); return; }
+  editarMeta(riesgoId, idExistente); toast('Abrimos la meta que ya existe para que la revises o la actualices.');
+}
+window._monDupGuardar=_monDupGuardar; window._monDupNo=_monDupNo;
+
+// --- Tabla de Seguimiento: % de cumplimiento por meta (botones cerrados por defecto) ---
+function mcVerTab(btn){
+  const box=btn && btn.closest('.mc-box'); if(!box) return;
+  const cerrar=btn.classList.contains('on'), k=cerrar?null:btn.dataset.k;
+  box.querySelectorAll('.mc-blq').forEach(d=>{ d.style.display = d.dataset.k===k ? '' : 'none'; });
+  box.querySelectorAll('.mc-tab').forEach(b=>b.classList.toggle('on', !cerrar && b===btn));
+}
+window.mcVerTab=mcVerTab;
+async function _mcCeldaHTML(riesgoId){
+  const r=(STATE.matriz||[]).find(x=>x.id===riesgoId); if(!r) return null;
+  const F=CONFIG.MATRIZ_FIELDS;
+  const metas=await cargarMetasData(subIdsDe(r, F.prog_metas.id));
+  const mons=await _mcLeerMons(subIdsDe(r, F.reporte_monitoreo.id));
+  if(!mons.length) return null;
+  const esR=_mcEsRazon(riesgoId);
+  const { grupos, sueltos }=_mcAgrupar(metas, mons);
+  const lista=grupos.filter(g=>g.mons.length||true).map(g=>({ per:g.meta.periodo||'sin periodo', nom:g.meta.nombre||'', meta:g.meta.meta, mons:g.mons }));
+  if(sueltos.length) lista.push({ per:'Otros reportes', nom:'', meta:'', mons:sueltos });
+  const corto=t=>{ t=String(t||''); return t.length>16?t.slice(0,15)+'…':t; };
+  const tabs=lista.map((g,i)=>{ const u=g.mons[g.mons.length-1], p=u?_mcPct(u.real, g.meta||u.meta):null, c=p===null?'#b8c2bd':_mcEstado(p).c;
+    return `<button type="button" class="mc-tab" data-k="${i}" title="${_mEsc(g.per+(g.nom?' · '+g.nom:'')+': '+(p===null?'sin reporte':'cumplimiento '+_mF(p)+' %'))}" onclick="event.stopPropagation();mcVerTab(this)"><span class="dot" style="background:${c}"></span>${_mEsc(g.per)}${g.nom?' · '+_mEsc(corto(g.nom)):''}</button>`; }).join('');
+  const blqs=lista.map((g,i)=>{ const u=g.mons[g.mons.length-1];
+    if(!u) return `<div class="mc-blq" data-k="${i}" style="display:none">${g.nom?`<b style="color:var(--brand)">🎯 ${_mEsc(g.nom)}</b><br>`:''}Meta: <b>${_mF(g.meta)}${esR?' %':''}</b><br><span style="color:var(--slate)">Aún no hay reporte.</span></div>`;
+    const mt=g.meta!==''?g.meta:u.meta, p=_mcPct(u.real, mt), est=p===null?null:_mcEstado(p);
+    return `<div class="mc-blq" data-k="${i}" style="display:none">${g.nom?`<b style="color:var(--brand)">🎯 ${_mEsc(g.nom)}</b><br>`:''}
+      Real: <b>${_mF(u.real)}${esR?' %':''}</b> · Meta: <b>${_mF(mt)}${esR?' %':''}</b>
+      ${p!==null?`<div style="font-weight:800;color:${est.c};margin-top:3px">Cumplimiento: ${_mF(p)} %</div>
+      <div style="height:7px;background:var(--line);border-radius:4px;overflow:hidden;margin:2px 0"><div style="width:${Math.max(0,Math.min(100,p))}%;height:100%;background:${est.c}"></div></div>
+      <div style="font-size:11.5px;color:var(--slate)">📐 ${_mcCuenta(u.real, mt)}</div>
+      <div style="font-weight:700;color:${est.c}">● ${est.t}</div>`:''}
+      <div style="font-size:11.5px;color:var(--mist)">Último reporte: ${fmtFecha(u.fecha)||'—'}${g.mons.length>1?' · '+g.mons.length+' reportes':''}</div></div>`; }).join('');
+  return `<div class="mc-box"><div style="font-size:11.5px;font-weight:700;color:var(--slate)">Ver cumplimiento de:</div><div class="mc-tabs">${tabs}</div>${blqs}</div>`;
+}
 
 async function abrirMetasMonitoreo(riesgoId){
   let r = STATE.matriz.find(x=>x.id===riesgoId);
@@ -5355,8 +5704,10 @@ async function abrirMetasMonitoreo(riesgoId){
     `Indicador: <strong>${indicador||'(no definido en el riesgo)'}</strong>`
     + (formula?` · Fórmula: ${formula}`:'')
     + (frec?` · Frecuencia: <strong>${frec}</strong>`:'');
-  setMonTab('metas');
+  { const h=document.getElementById('mon_hist'); if(h) h.innerHTML=''; }
+  setMonTab('explica');
   document.getElementById('modalMon').classList.remove('hidden');
+  try{ monRenderExplica(riesgoId, r); }catch(_){ }
   await renderMonPaneMetas(riesgoId, r);
   await renderMonPaneRep(riesgoId, r);
   await renderMonPaneCert(riesgoId, r);
@@ -5384,11 +5735,15 @@ async function renderMonPaneMetas(riesgoId, r){
   const tipoMeta = tipoIndicadorDe(riesgoId);
   const esRazonMeta = String(tipoMeta).toLowerCase().startsWith('raz');
   cont.innerHTML = `
-    <div style="background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:16px 18px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:600;color:var(--slate);margin-bottom:12px">Nueva programación de meta</div>
+    <div class="mg-nuevo-bar" id="metabar-${riesgoId}" style="${(typeof _soloConsulta==='function' && _soloConsulta(r))?'display:none':''}"><button type="button" class="btn btn-primary" onclick="monNuevo('${riesgoId}','meta')">+ Nueva meta</button>
+      <span>Cada meta dice <b>a qué valor quieres llegar</b> en un periodo. Si en un mismo periodo tienes <b>varias metas</b>, ponle un <b>nombre</b> a cada una.</span></div>
+    <div id="metaform-${riesgoId}" style="display:none;background:var(--paper);border:1.5px solid var(--brand-2);border-radius:12px;padding:16px 18px;margin-bottom:16px">
+      <div class="mg-form-cab"><div class="tt" id="metaformtit-${riesgoId}">Nueva meta</div><button type="button" class="icon-btn" title="Cerrar sin guardar" onclick="cancelarEdicionMeta('${riesgoId}')">✕</button></div>
       <div class="grid">
         <div class="field"><label>Fecha de programación</label><input type="date" id="meta_fecha_${riesgoId}" onchange="sugerirPeriodoMeta('${riesgoId}')"></div>
         <div class="field"><label>Periodo <span style="color:var(--mist);font-weight:400">(elige o escribe)</span></label><select id="meta_periodo_sel_${riesgoId}" onchange="periodoSelChange('${riesgoId}')"></select><input id="meta_periodo_${riesgoId}" placeholder="Ej. Enero 2026, 2026-I" oninput="this.dataset.touched='1'" style="margin-top:6px;display:none"></div>
+        <div class="field full"><label>Nombre de la meta <span style="color:var(--mist);font-weight:400">(opcional)</span></label><input id="meta_nombre_${riesgoId}" maxlength="120" placeholder="Ej.: Laboratorio de Química, Sede Surco…">
+          <div class="hint" style="font-size:12.5px;margin-top:4px">Escríbelo cuando en <b>un mismo periodo</b> tengas <b>más de una meta</b>. Así cada una se distingue en el historial y en la tabla.</div></div>
         <div class="field"><label>${esRazonMeta?'Numerador meta':'Valor meta (absoluto)'}</label><input type="number" step="any" id="meta_num_${riesgoId}" oninput="calcValorMeta('${riesgoId}')"></div>
         ${esRazonMeta?`<div class="field"><label>Denominador meta</label><input type="number" step="any" id="meta_den_${riesgoId}" oninput="calcValorMeta('${riesgoId}')"></div>`:'<div class="field"></div>'}
         <div class="field"><label>Valor meta calculado ${esRazonMeta?'(%)':''}</label><div class="readonly-pill" id="meta_val_${riesgoId}">—</div><input type="hidden" id="meta_meta_${riesgoId}"></div>
@@ -5399,7 +5754,7 @@ async function renderMonPaneMetas(riesgoId, r){
       <p class="hint" style="margin-top:6px">Indicador <strong>${tipoMeta}</strong>. ${esRazonMeta?'El valor meta = numerador ÷ denominador × 100.':'El valor meta es el número que ingreses.'} El indicador y la fórmula se copian del riesgo.</p>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button type="button" class="btn btn-ghost" id="metacancel-${riesgoId}" onclick="cancelarEdicionMeta('${riesgoId}')" style="display:none">Cancelar</button><button type="button" class="btn btn-primary" onclick="guardarMeta('${riesgoId}')" id="metabtn-${riesgoId}">+ Guardar meta</button></div>
     </div>
-    <div id="metaslist-${riesgoId}">${metaIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin metas programadas aún.</p>'}</div>`;
+    <div id="metaslist-${riesgoId}" style="display:none">${metaIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin metas programadas aún.</p>'}</div>`;
   if(metaIds.length){
     try {
       const metasData = await cargarMetasData(metaIds);
@@ -5422,8 +5777,10 @@ async function renderMonPaneRep(riesgoId, r){
   const tipoMon = tipoIndicadorDe(riesgoId);
   const esRazonMon = String(tipoMon).toLowerCase().startsWith('raz');
   cont.innerHTML = `
-    <div style="background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:16px 18px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:600;color:var(--slate);margin-bottom:12px">Nuevo reporte de monitoreo del control</div>
+    <div class="mg-nuevo-bar" id="monbar-${riesgoId}" style="${(typeof _soloConsulta==='function' && _soloConsulta(r))?'display:none':''}"><button type="button" class="btn btn-primary" onclick="monNuevo('${riesgoId}','mon')">+ Nuevo reporte</button>
+      <span>Cada vez que mides el control: <b>cuánto obtuviste</b> y los <b>enlaces de tus evidencias</b>. Tus reportes aparecen abajo, debajo de su meta.</span></div>
+    <div id="monform-${riesgoId}" style="display:none;background:var(--paper);border:1.5px solid var(--brand-2);border-radius:12px;padding:16px 18px;margin-bottom:16px">
+      <div class="mg-form-cab"><div class="tt" id="monformtit-${riesgoId}">Nuevo reporte de monitoreo</div><button type="button" class="icon-btn" title="Cerrar sin guardar" onclick="cancelarEdicionMon('${riesgoId}')">✕</button></div>
       <div class="grid">
         <div class="field full"><label>Meta que estás monitoreando</label><select id="mon_metasel_${riesgoId}" onchange="jalarMeta('${riesgoId}')"><option value="">Seleccione la meta…</option></select></div>
         <div class="field"><label>Periodo evaluado <span style="color:var(--mist);font-weight:400">(heredado de la meta)</span></label><input id="mon_periodo_${riesgoId}" readonly style="background:var(--paper)" placeholder="— elige la meta —"></div>
@@ -5439,20 +5796,22 @@ async function renderMonPaneRep(riesgoId, r){
       <p class="hint" style="margin-top:6px">Indicador <strong>${tipoMon}</strong>. ${esRazonMon?'El valor real = numerador ÷ denominador × 100.':'El valor real es el número que ingreses.'} El % cumplimiento = valor real ÷ valor meta × 100. Puedes registrar mediciones parciales hasta alcanzar el 100%.</p>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button type="button" class="btn btn-ghost" id="moncancel-${riesgoId}" onclick="cancelarEdicionMon('${riesgoId}')" style="display:none">Cancelar</button><button type="button" class="btn btn-primary" onclick="guardarMonitoreo('${riesgoId}')" id="monbtn-${riesgoId}">+ Guardar reporte de monitoreo</button></div>
     </div>
-    <div id="monlist-${riesgoId}">${monIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes de monitoreo aún.</p>'}</div>`;
+    <div id="monlist-${riesgoId}" style="display:none">${monIds.length?'<p class="hint">Cargando…</p>':'<p class="hint">Sin reportes de monitoreo aún.</p>'}</div>`;
   // Poblar desplegable de metas
   if(metaIds.length){
     try {
       const metasData = await cargarMetasData(metaIds);
       window['_metas_'+riesgoId] = metasData;
       const sel = document.getElementById('mon_metasel_'+riesgoId);
-      if(sel){ metasData.forEach((m,i)=>{ const op=document.createElement('option'); op.value=i; op.textContent=(m.periodo?m.periodo+' · ':'')+(fmtFecha(m.fecha)||'(sin fecha)')+' · meta '+(m.meta||'—'); sel.appendChild(op); }); }
+      if(sel){ metasData.forEach((m,i)=>{ const op=document.createElement('option'); op.value=i; op.textContent=(m.periodo||'(sin periodo)')+(m.nombre?' · '+m.nombre:'')+' · meta '+(m.meta||'—'); sel.appendChild(op); }); }
     }catch(e){}
   }
   if(monIds.length){
     try { document.getElementById('monlist-'+riesgoId).innerHTML = await renderMonitoreoHTML(monIds, riesgoId); }catch(e){}
   }
   try{ rfMejorarFormulario(riesgoId,'mon'); }catch(_){ }
+  try{ await renderMonHist(riesgoId, r); }catch(e){ console.warn('historial monitoreo', e); }
+  try{ monRenderRuta(riesgoId); }catch(_){ }
 }
 window.renderMonPaneRep = renderMonPaneRep;
 
@@ -5584,7 +5943,7 @@ async function cargarMetasData(ids){
         num:g('Numerador meta'), den:g('Denominador meta'),
         indicador:g('Indicador'), formula:g('Fórmula ')||g('Fórmula'),
         plan:g('Plan de monitoreo para el cumplimiento de la meta'),
-        obs:g('Observación'), periodo:g('Periodo')
+        obs:g('Observación'), periodo:g('Periodo'), nombre:g('Nombre de la meta')
       });
     }catch(e){}
   }
@@ -6057,7 +6416,10 @@ async function guardarMeta(riesgoId){
   if(g('meta_plan')) vals[MF.plan_link.id] = g('meta_plan');
   if(g('meta_obs')) vals[MF.observacion.id] = g('meta_obs');
   if(MF.periodo && g('meta_periodo')) vals[MF.periodo.id] = g('meta_periodo');
+  if(MF.nombre) vals[MF.nombre.id] = String(g('meta_nombre')||'').trim();
   if(!g('meta_fecha') && g('meta_meta')===''){ toast('Indica al menos la fecha o el valor meta.', true); return; }
+  if(btn && btn.disabled) return;                 // segundo clic mientras guarda
+  if(!(await _monChequeoDup(riesgoId, null))) return;
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
   try{
     const newId = genId22();
@@ -6066,6 +6428,7 @@ async function guardarMeta(riesgoId){
     subforms[F.prog_metas.id][newId] = vals;
     // 1) Guardar el subformulario (meta) con json_subforms_values
     await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', { json_subforms_values: JSON.stringify(subforms) });
+    _lrNuevo(riesgoId, F.prog_metas.id, 'metas', newId, _lrPorCol(MF, vals));
     // 2) Guardar los campos de control/indicador del riesgo (llamada aparte, método de formulario)
     try { const _cc=_camposControlForm(); if(Object.keys(_cc).length) await API.saveForm(riesgoId, _cc); } catch(e){ console.warn('No se guardaron los campos de control:', e.message); }
     toast('Meta agregada.');
@@ -6102,6 +6465,7 @@ async function guardarMonitoreo(riesgoId){
   if(g('mon_evid')) vals[MF.evidencia.id] = g('mon_evid');
   if(g('mon_plan')) vals[MF.plan_remediacion.id] = g('mon_plan');
   if(MF.periodo && g('mon_periodo')) vals[MF.periodo.id] = g('mon_periodo');
+  { const sl=document.getElementById('mon_metasel_'+riesgoId), ms=window['_metas_'+riesgoId]||[]; if(MF.id_meta && sl && sl.value!=='' && ms[sl.value]) vals[MF.id_meta.id]=ms[sl.value].id; }
   // % cumplimiento es fórmula en QuintaDB; no se envía (lo calcula QuintaDB)
   if(!g('mon_fecha') && g('mon_real')===''){ toast('Indica al menos la fecha o el valor real.', true); return; }
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Guardando…';
@@ -6112,6 +6476,7 @@ async function guardarMonitoreo(riesgoId){
     subforms[F.reporte_monitoreo.id][newId] = vals;
     // 1) Guardar el subformulario (reporte de monitoreo)
     await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+riesgoId+'.json','PUT', { json_subforms_values: JSON.stringify(subforms) });
+    _lrNuevo(riesgoId, F.reporte_monitoreo.id, 'monitoreo', newId, _lrPorCol(MF, vals));
     // 2) Guardar los campos de control/indicador del riesgo (llamada aparte)
     try { const _cc=_camposControlForm(); if(Object.keys(_cc).length) await API.saveForm(riesgoId, _cc); } catch(e){ console.warn('No se guardaron los campos de control:', e.message); }
     toast('Reporte de monitoreo agregado.');
@@ -6129,6 +6494,7 @@ async function eliminarSubregistro(riesgoId, subId, tipo){
   if(!confirm('¿Eliminar este '+(tipo==='meta'?'registro de meta':'reporte de monitoreo')+'? Esta acción no se puede deshacer.')) return;
   try{
     await API.call('/apps/'+CONFIG.APP_ID+'/dtypes/'+subId+'.json','DELETE');
+    _LOCALR.borr.add(subId);
     toast('Registro eliminado.');
     invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
@@ -6146,7 +6512,7 @@ async function editarMeta(riesgoId, metaId){
     const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
     // Si el modal nuevo está abierto, asegurar la pestaña de metas; si no, abrir el acordeón (compat.)
     const modalMon=document.getElementById('modalMon');
-    if(modalMon && !modalMon.classList.contains('hidden')){ setMonTab('metas'); }
+    if(modalMon && !modalMon.classList.contains('hidden')){ if(window._MON_VISTA!=='metas') setMonTab('metas'); monForm(riesgoId,'meta',true,'✏️ Editar meta'+(g('Periodo')?' · '+g('Periodo'):'')+(g('Nombre de la meta')?' · '+g('Nombre de la meta'):'')); }
     else { const det = document.querySelector('#ed_monitoreo_cont details'); if(det) det.open = true; }
     const set=(id,val)=>{ const el=document.getElementById(id+'_'+riesgoId); if(el) el.value=val; };
     set('meta_fecha', fechaParaInput(g('Fecha de programación')));
@@ -6156,6 +6522,7 @@ async function editarMeta(riesgoId, metaId){
     set('meta_plan', g('Plan de monitoreo para el cumplimiento de la meta'));
     set('meta_obs', g('Observación'));
     set('meta_periodo', g('Periodo'));
+    set('meta_nombre', g('Nombre de la meta'));
     calcValorMeta(riesgoId); // refrescar el pill del valor calculado
     const elPer=document.getElementById('meta_periodo_'+riesgoId); if(elPer) elPer.dataset.touched='1';
     llenarPeriodoSel(riesgoId, g('Periodo')); // reflejar en el select (o "(actual)" si es antiguo)
@@ -6171,7 +6538,6 @@ window.editarMeta = editarMeta;
 
 // Cancela el modo edición de una meta: recarga el panel con el formulario limpio
 async function cancelarEdicionMeta(riesgoId){
-  invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
   const rr = STATE.matriz.find(x=>x.id===riesgoId);
   if(rr){ await renderMonPaneMetas(riesgoId, rr); setMonTab('metas'); }
 }
@@ -6193,9 +6559,13 @@ async function actualizarMeta(riesgoId, metaId){
   vals[MF.plan_link.id] = g('meta_plan');
   vals[MF.observacion.id] = g('meta_obs');
   if(MF.periodo) vals[MF.periodo.id] = g('meta_periodo');
+  if(MF.nombre) vals[MF.nombre.id] = String((document.getElementById('meta_nombre_'+riesgoId)||{}).value||'').trim();
+  if(btn && btn.disabled) return;
+  if(!(await _monChequeoDup(riesgoId, metaId))) return;
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Actualizando…';
   try{
     await API.saveForm(metaId, vals, CONFIG.ENTITIES.PROG_METAS);
+    await _lrEditar('metas', metaId, _lrPorCol(MF, vals));
     toast('Meta actualizada.');
     invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
@@ -6212,7 +6582,7 @@ async function editarMonitoreo(riesgoId, monId){
     const v = (sub && sub.values) || {};
     const g = (col)=>{ const x=v[col]; return (x && x!==col)?x:''; };
     const modalMon=document.getElementById('modalMon');
-    if(modalMon && !modalMon.classList.contains('hidden')){ setMonTab('rep'); }
+    if(modalMon && !modalMon.classList.contains('hidden')){ if(window._MON_VISTA!=='rep') setMonTab('rep'); monForm(riesgoId,'mon',true,'✏️ Editar reporte de monitoreo'); }
     else { const dets = document.querySelectorAll('#ed_monitoreo_cont details'); if(dets[1]) dets[1].open = true; }
     const set=(id,val)=>{ const el=document.getElementById(id+'_'+riesgoId); if(el) el.value=val; };
     set('mon_fecha', fechaParaInput(g('Fecha de monitoreo')));
@@ -6223,6 +6593,13 @@ async function editarMonitoreo(riesgoId, monId){
     set('mon_evid', g('Evidencia (link)'));
     if(typeof _evSyncDesdeInput==='function') _evSyncDesdeInput('mon_evid_'+riesgoId);
     set('mon_periodo', g('Periodo'));
+    { // marcar en el desplegable la meta a la que pertenece este reporte
+      const sl=document.getElementById('mon_metasel_'+riesgoId), ms=window['_metas_'+riesgoId]||[];
+      let ix=ms.findIndex(m=>m.id && m.id===g('ID meta'));
+      if(ix<0) ix=ms.findIndex(m=>String(m.periodo||'')===String(g('Periodo')||'') && parseFloat(m.meta)===parseFloat(g('Valor meta')));
+      if(ix<0){ const mp=ms.filter(m=>String(m.periodo||'')===String(g('Periodo')||'')); if(mp.length===1) ix=ms.indexOf(mp[0]); }
+      if(sl && ix>=0){ sl.value=String(ix); try{ jalarMeta(riesgoId); }catch(_){ } }
+    }
     calcValorReal(riesgoId); // refresca el valor real y el % cumplimiento
     const btn=document.getElementById('monbtn-'+riesgoId);
     btn.textContent='Actualizar reporte';
@@ -6235,7 +6612,6 @@ window.editarMonitoreo = editarMonitoreo;
 
 // Cancela el modo edición de un reporte de monitoreo: recarga el panel limpio
 async function cancelarEdicionMon(riesgoId){
-  invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
   const rr = STATE.matriz.find(x=>x.id===riesgoId);
   if(rr){ await renderMonPaneRep(riesgoId, rr); setMonTab('rep'); }
 }
@@ -6321,9 +6697,11 @@ async function actualizarMonitoreo(riesgoId, monId){
   vals[MF.evidencia.id] = g('mon_evid');
   if(document.getElementById('mon_plan')) vals[MF.plan_remediacion.id] = g('mon_plan');
   if(MF.periodo) vals[MF.periodo.id] = g('mon_periodo');
+  { const sl=document.getElementById('mon_metasel_'+riesgoId), ms=window['_metas_'+riesgoId]||[]; if(MF.id_meta && sl && sl.value!=='' && ms[sl.value]) vals[MF.id_meta.id]=ms[sl.value].id; }
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Actualizando…';
   try{
     await API.saveForm(monId, vals, CONFIG.ENTITIES.MONITOREO);
+    await _lrEditar('monitoreo', monId, _lrPorCol(MF, vals));
     toast('Reporte actualizado.');
     invalidarSubcache(); STATE.matriz=[]; await loadMatriz(true);
     const rr = STATE.matriz.find(x=>x.id===riesgoId);
