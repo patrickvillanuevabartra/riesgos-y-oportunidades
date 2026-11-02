@@ -5490,7 +5490,7 @@ function monRenderExplica(riesgoId, r){
        <div>${esR?'Indicador de <b>razón</b>: se registra numerador y denominador.':'Indicador <b>absoluto</b>: se registra un solo número.'}</div>`;
   const _u=window.URP;
   box.innerHTML=`<div class="mg-card"><div class="urp-guia">${_u?_u.img():''}<div class="urp-cuerpo">
-    <div class="urp-globo">¡Hola! Soy <b>Urpito</b>, del <b>SGOE FI URP</b> 👋 Te explico cómo se mide este control. Después te acompaño a programar la meta.</div>
+    <div class="urp-globo">¡Hola! Soy <b>Urpito</b>, del <b>SGOE FI URP</b> 😊 Te explico cómo se mide este control. Después te acompaño a programar la meta.</div>
     <h4>El control y su indicador, en palabras simples</h4>${ec}
     <div style="margin-top:10px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 13px">
       <b>¿Cómo sale el % de cumplimiento?</b> Se compara lo obtenido con la meta:<br>
@@ -5499,7 +5499,7 @@ function monRenderExplica(riesgoId, r){
     </div>
     ${frec?`<div style="margin-top:8px">📅 Se mide con frecuencia <b>${_mEsc(frec)}</b>.</div>`:''}
     <div style="margin-top:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap"><button type="button" class="btn btn-primary" onclick="setMonTab('metas')">Entendido: ir a programar la meta →</button>
-      ${_u?`<button type="button" class="urp-ocultar" onclick="URP.alternar()">${_u.on()?'Ocultar a Urpito':'👋 Mostrar a Urpito'}</button>`:''}</div></div></div></div>`;
+      ${_u?`<button type="button" class="urp-ocultar" onclick="URP.alternar()">${_u.on()?'Ocultar a Urpito':'😊 Mostrar a Urpito'}</button>`:''}</div></div></div></div>`;
 }
 // --- Abrir/cerrar formularios ---
 function monForm(riesgoId, tipo, abrir, titulo){
@@ -9196,7 +9196,7 @@ window.syncProcActualizar = syncProcActualizar;
   function saludoIngreso(){
     if(!CFG.antes) return;
     const ref=document.querySelector(CFG.antes); if(!ref || document.getElementById('urp_login')) return;
-    ref.insertAdjacentHTML('beforebegin', `<div class="urp-login" id="urp_login">${img('urp-mini')}<div class="urp-globo">¡Hola! Soy <b>Urpito</b>, del <b>SGOE FI URP</b> 👋 ${CFG.saludo||'Ingresa para empezar; te acompaño.'}</div></div>`);
+    ref.insertAdjacentHTML('beforebegin', `<div class="urp-login" id="urp_login">${img('urp-mini')}<div class="urp-globo">¡Hola! Soy <b>Urpito</b>, del <b>SGOE FI URP</b> 😊 ${CFG.saludo||'Ingresa para empezar; te acompaño.'}</div></div>`);
   }
   // 2) Asistente de ayuda: Urpito es su cara
   function asistente(){
@@ -9227,7 +9227,7 @@ window.syncProcActualizar = syncProcActualizar;
     const k='urpito_hola_'+(CFG.app||location.pathname)+'_'+new Date().toISOString().slice(0,10);
     try{ if(localStorage.getItem(k)) return; localStorage.setItem(k,'1'); }catch(_){ }
     if(document.getElementById('urp_bienvenida')) return;
-    document.body.insertAdjacentHTML('beforeend', `<div id="urp_bienvenida" role="status"><div class="urp-globo">¡Hola! Soy <b>Urpito</b>, del <b>SGOE FI URP</b> 👋<br>${CFG.tip}
+    document.body.insertAdjacentHTML('beforeend', `<div id="urp_bienvenida" role="status"><div class="urp-globo">¡Hola! Soy <b>Urpito</b>, del <b>SGOE FI URP</b> 😊<br>${CFG.tip}
       <div class="urp-bot"><button type="button" class="urp-ok" onclick="document.getElementById('urp_bienvenida').remove()">Entendido</button>
       <button type="button" class="urp-ocultar" onclick="document.getElementById('urp_bienvenida').remove();URP.alternar()">No mostrar a Urpito</button></div></div>${img('urp-cuerpo-img')}</div>`);
     setTimeout(()=>{ const x=document.getElementById('urp_bienvenida'); if(x) x.remove(); }, 20000);
