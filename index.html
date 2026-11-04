@@ -7095,8 +7095,15 @@ function verDetalle(riesgoId){
       const e = estatusPostTratamiento(n, _esOport);
       return e ? (e.titulo+'. '+e.detalle) : 'Sin reevaluar';
     }
-    const val = v[col];
+    let val = v[col];
     if(!val || val===col) return '';
+    // Un error de fórmula de QuintaDB guardado como texto no se muestra como dato
+    if(/uninitialized constant|Qformula::/i.test(String(val))) return '';
+    // El correo del responsable se toma vivo de la tabla «Responsable de proceso»
+    if(col==='Correo responsable' && typeof MAPA_RESP_PROCESO!=='undefined' && MAPA_RESP_PROCESO){
+      const k=String(oficinaDe(r)||'').replace(/\s+/g,' ').trim().toLowerCase(); const m=MAPA_RESP_PROCESO[k];
+      if(m && m.correo) val=m.correo;
+    }
     return val;
   };
   const html = filas.map(([etq,col])=>{
