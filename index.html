@@ -9262,5 +9262,440 @@ window.syncProcActualizar = syncProcActualizar;
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 })();
 </script>
+<!-- ===================== ANALISTA DE GESTIÓN (Urpito) · Matriz de Riesgos ===================== -->
+<style id="an-css">
+  .an-card{display:flex;gap:14px;align-items:center;background:linear-gradient(90deg,#eefaf3,#fff);border:1.5px solid #0fa968;border-radius:14px;padding:12px 16px;margin:0 0 16px}
+  .an-card img.urp-mini{width:64px}
+  .an-card .an-card-txt{flex:1;min-width:0;font-size:15px;line-height:1.45}
+  .an-card .an-card-txt b{color:#0b6b46}
+  .an-btn{background:var(--brand);color:#fff;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-size:15px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .an-btn:hover{filter:brightness(1.06)}
+  .an-btn:disabled{opacity:.55;cursor:not-allowed}
+  .an-btn.sec{background:#fff;color:var(--brand);border:1.5px solid var(--brand)}
+  .an-btn.gris{background:#fff;color:var(--slate);border:1.5px solid var(--line)}
+  #anModal .modal{max-width:860px}
+  #anModal .modal-head h2{font-size:21px}
+  #anModal .an-cuerpo{padding:18px 24px 22px;font-size:15px;line-height:1.55}
+  .an-lbl{display:block;font-weight:700;font-size:15.5px;margin:14px 0 6px}
+  .an-lbl small{font-weight:400;color:var(--mist);font-size:13px}
+  #anTexto{width:100%;min-height:110px;font:inherit;font-size:16px;line-height:1.5;padding:11px 13px;border:1.5px solid var(--line);border-radius:10px;resize:vertical}
+  #anTexto:focus{outline:none;border-color:var(--brand)}
+  #anOficina{font:inherit;font-size:15px;padding:9px 11px;border:1.5px solid var(--line);border-radius:10px;width:100%;max-width:520px}
+  .an-ejemplos{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+  .an-ejemplos button{text-align:left;font:inherit;font-size:13.5px;background:var(--paper);border:1px dashed #9fc9b3;border-radius:9px;padding:7px 11px;cursor:pointer;color:var(--slate)}
+  .an-ejemplos button:hover{background:#eefaf3}
+  .an-tipos{display:flex;gap:8px;flex-wrap:wrap}
+  .an-tipos label{display:flex;gap:7px;align-items:center;border:1.5px solid var(--line);border-radius:10px;padding:8px 13px;cursor:pointer;font-size:15px}
+  .an-tipos input{width:18px;height:18px;accent-color:var(--brand)}
+  .an-tipos label:has(input:checked){border-color:var(--brand);background:#eefaf3;font-weight:600}
+  .an-acciones{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;align-items:center}
+  .an-espera{display:flex;gap:12px;align-items:center;margin-top:16px;padding:12px 14px;background:#f2f8f5;border-radius:12px;font-size:15px}
+  .an-espera .spinner{width:22px;height:22px}
+  .an-err{margin-top:14px;padding:11px 14px;background:#fdeceb;border:1px solid #f0b3ac;color:#a93226;border-radius:10px;font-size:15px}
+  .an-aviso{display:flex;gap:10px;align-items:flex-start;padding:10px 13px;border-radius:10px;background:#fff8e6;border:1px solid #f2d48a;font-size:14px;margin:0 0 14px}
+  .an-sec{border:1px solid var(--line);border-radius:12px;padding:12px 15px;margin:0 0 12px;background:#fff}
+  .an-sec h4{font-size:16px;margin:0 0 6px;display:flex;gap:8px;align-items:center;color:#0b3d2a}
+  .an-sec h4 .an-num{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--brand);color:#fff;font-size:14px;flex:0 0 auto}
+  .an-sec .an-norma{font-size:12px;font-weight:600;color:var(--mist);background:var(--paper);border-radius:6px;padding:1px 7px;margin-left:auto}
+  .an-sec p{margin:4px 0}
+  .an-sec ul{margin:4px 0 4px 20px}
+  .an-k{color:var(--mist);font-size:13.5px}
+  .an-eval{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+  .an-eval > div{background:var(--paper);border-radius:10px;padding:9px 12px}
+  .an-formula{margin-top:8px;padding:9px 12px;border-left:4px solid var(--brand);background:#f2f8f5;border-radius:6px;font-size:14.5px}
+  .an-dup{border-color:#e6a49a;background:#fff6f4}
+  .an-ok{color:#1f7a3d;font-weight:600}
+  .an-pie{font-size:13px;color:var(--mist);margin-top:10px}
+  .an-banner{display:flex;gap:10px;align-items:center;margin:0 0 14px;padding:10px 14px;border-radius:12px;background:#eefaf3;border:1.5px solid #0fa968;font-size:14.5px}
+  .an-banner img.urp-mini{width:46px}
+  .an-banner button{margin-left:auto;background:none;border:0;font-size:22px;color:var(--mist);cursor:pointer}
+  .asis-suge button.an-chip{border-color:#0f8f5e;font-weight:700;color:#0b6b46;background:#eefaf3}
+  @media (max-width:640px){ .an-card{flex-wrap:wrap} .an-eval{grid-template-columns:1fr} #anModal .an-cuerpo{padding:14px} }
+</style>
+
+<div class="modal-overlay hidden" id="anModal" role="dialog" aria-modal="true" aria-labelledby="anTitulo">
+  <div class="modal">
+    <div class="modal-head">
+      <div><div class="eyebrow">Asistente de gestión</div><h2 id="anTitulo">Analizar una situación con Urpito</h2></div>
+      <button class="modal-close" type="button" onclick="anCerrar()" aria-label="Cerrar">×</button>
+    </div>
+    <div class="an-cuerpo" id="anCuerpo"></div>
+  </div>
+</div>
+
+<script id="an-js">
+/* ===== Analista de gestión (Urpito) =====
+   La persona cuenta en dos o tres líneas algo que pasó. Urpito lo analiza con el
+   pensamiento basado en riesgos (ISO 21001: 4.1 contexto, 4.2 partes interesadas,
+   6.1 riesgos y oportunidades) usando los datos REALES del sistema: el inventario
+   de procesos, los riesgos ya registrados de la oficina, las partes interesadas y
+   las amenazas/oportunidades del contexto.
+   Todo lo que propone es un BORRADOR: nada se guarda solo. El administrador puede
+   llevarlo al formulario de registro para revisarlo y guardarlo con su clic; las
+   demás personas pueden copiarlo o enviarlo a la Subcomisión.
+   Usa un Worker propio (analista-riesgos), separado del asistente de ayuda. */
+(function(){
+  const ANALISTA_URL = 'https://analista-riesgos.patrick-villanueva.workers.dev';
+  const CORREO_SUBCOMISION = 'patrick.villanueva@urp.edu.pe';
+  const EJEMPLOS = [
+    'En el ciclo 2026-II, cinco docentes no subieron su sílabo al aula virtual en la primera semana de clases. Ya había pasado en el 2026-I.',
+    'Las balanzas del laboratorio no tienen registro de calibración desde el 2024 y los estudiantes las usan en sus prácticas calificadas.',
+    'Una empresa minera nos ofreció un convenio para recibir a 20 estudiantes de últimos ciclos en prácticas preprofesionales.'
+  ];
+  const AN = { ocupado:false, ultimo:null, procesos:[], riesgos:[], oficina:'', situacion:'' };
+
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const norm = s => String(s||'').replace(/\s+/g,' ').trim().toLowerCase();
+  const urp = cls => (window.URP && URP.on && URP.on()) ? URP.img(cls||'urp-mini') : '';
+  const lista = a => (Array.isArray(a)?a:(a?[a]:[])).map(x=>String(x||'').trim()).filter(Boolean);
+
+  /* ---------- Entradas: tarjeta en Seguimiento y Registrar + botón en el asistente ---------- */
+  function tarjeta(){
+    return `<div class="an-card" data-an="1">${urp('urp-mini')}
+      <div class="an-card-txt"><b>¿Pasó algo en tu oficina que te preocupa, o ves una oportunidad?</b><br>
+      Cuéntamelo en dos o tres líneas y te ayudo a analizarlo como riesgo u oportunidad: con qué proceso se relaciona, qué tan grave es, qué control conviene y cómo medirlo.</div>
+      <button type="button" class="an-btn" onclick="anAbrir()">🧭 Analizar una situación</button></div>`;
+  }
+  function ponerTarjetas(){
+    ['view-seguimiento','view-registrar'].forEach(id=>{
+      const v=document.getElementById(id); if(!v || v.querySelector('.an-card')) return;
+      const ph=v.querySelector('.page-head'); if(ph) ph.insertAdjacentHTML('afterend', tarjeta());
+    });
+    // Botón en las sugerencias del asistente de ayuda
+    const s=document.getElementById('asis-suge');
+    if(s && s.children.length && !s.querySelector('.an-chip')){
+      s.insertAdjacentHTML('afterbegin','<button class="an-chip" onclick="asisCerrar&&asisCerrar();anAbrir()">🧭 Analizar una situación</button>');
+    }
+  }
+
+  /* ---------- Paso 1: contar la situación ---------- */
+  async function oficinasPosibles(){
+    let ofs=[];
+    try{
+      if(typeof puedeVerTodo==='function' && puedeVerTodo()){
+        const o=await loadMaestra('RESPONSABLES'); ofs=(o||[]).map(x=>x.label).filter(Boolean);
+      } else if(typeof SESION!=='undefined' && SESION){
+        ofs=(SESION.oficinas&&SESION.oficinas.length)?SESION.oficinas.slice():(SESION.oficina?[SESION.oficina]:[]);
+      }
+    }catch(_){}
+    ofs=ofs.filter(o=>!(window._esMarcaVerTodo && _esMarcaVerTodo(o)));
+    return [...new Set(ofs.map(o=>String(o).replace(/\s+/g,' ').trim()))].sort((a,b)=>a.localeCompare(b,'es'));
+  }
+
+  async function anAbrir(){
+    const m=document.getElementById('anModal'); if(!m) return;
+    m.classList.remove('hidden');
+    const bv=document.getElementById('urp_bienvenida'); if(bv) bv.remove();   // que el globo de bienvenida no tape la ventana
+    await pintarPaso1();
+  }
+  function anCerrar(){ const m=document.getElementById('anModal'); if(m) m.classList.add('hidden'); }
+
+  async function pintarPaso1(){
+    const c=document.getElementById('anCuerpo');
+    const ofs=await oficinasPosibles();
+    const previa = AN.oficina || (typeof SESION!=='undefined' && SESION && SESION.oficina) || '';
+    const selOf = ofs.length>1
+      ? `<select id="anOficina"><option value="">Elige la oficina…</option>${ofs.map(o=>`<option ${norm(o)===norm(previa)?'selected':''}>${esc(o)}</option>`).join('')}</select>`
+      : `<input type="hidden" id="anOficina" value="${esc(ofs[0]||previa)}"><div style="font-size:15.5px;font-weight:600">${esc(ofs[0]||previa||'—')}</div>`;
+    c.innerHTML = `
+      <div class="urp-fila" style="margin-bottom:6px">${urp('urp-mini')}<div class="urp-globo" style="margin:0">
+        ¡Hola! Soy <b>Urpito</b>. Cuéntame qué pasó, <b>como se lo contarías a un colega</b>. Yo reviso tus procesos y los riesgos que tu oficina ya registró, y te propongo cómo analizarlo según la norma ISO 21001. <b>Tú decides</b>: nada se guarda solo.</div></div>
+      <label class="an-lbl" for="anTexto">1. ¿Qué pasó? <small>(dos o tres líneas: qué ocurrió, cuántas veces y a quién afectó)</small></label>
+      <textarea id="anTexto" maxlength="1500" placeholder="Por ejemplo: Este ciclo, tres docentes entregaron tarde las notas del examen parcial y los estudiantes reclamaron.">${esc(AN.situacion)}</textarea>
+      <div class="an-k" style="margin-top:6px">¿No sabes cómo empezar? Toca un ejemplo para verlo:</div>
+      <div class="an-ejemplos">${EJEMPLOS.map((e,i)=>`<button type="button" onclick="anEjemplo(${i})">${esc(e)}</button>`).join('')}</div>
+      <label class="an-lbl">2. ¿De qué oficina es?</label>${selOf}
+      <label class="an-lbl">3. ¿Te parece un riesgo o una oportunidad?</label>
+      <div class="an-tipos">
+        <label><input type="radio" name="anTipo" value="" checked> Que Urpito lo decida</label>
+        <label><input type="radio" name="anTipo" value="Riesgo"> Riesgo (algo malo que puede pasar)</label>
+        <label><input type="radio" name="anTipo" value="Oportunidad"> Oportunidad (algo bueno que se puede aprovechar)</label>
+      </div>
+      <div class="an-acciones"><button type="button" class="an-btn" id="anBtnAnalizar" onclick="anAnalizar()">🧭 Analizar con Urpito</button>
+        <button type="button" class="an-btn gris" onclick="anCerrar()">Cancelar</button></div>
+      <div id="anEstado"></div>`;
+    setTimeout(()=>{ const t=document.getElementById('anTexto'); if(t) t.focus(); }, 60);
+  }
+  function anEjemplo(i){ const t=document.getElementById('anTexto'); if(t){ t.value=EJEMPLOS[i]||''; t.focus(); } }
+
+  /* ---------- Datos reales del sistema que acompañan la consulta ---------- */
+  function segsDe(r){ try{ return (typeof _segmentosRuta==='function') ? _segmentosRuta(r) : []; }catch(_){ return []; } }
+  async function contexto(oficina){
+    // Procesos del inventario: lista numerada (Urpito responde con el número)
+    let inv=[]; try{ inv=await loadInventario(); }catch(_){}
+    const vistos=new Set(); AN.procesos=[];
+    inv.forEach(r=>{ const s=segsDe(r); if(s.length<2) return; const k=s.join(' › '); if(vistos.has(k)) return; vistos.add(k); AN.procesos.push(s); });
+    const procesos=AN.procesos.map((s,i)=>({ id:i+1, ruta:s.slice(1).join(' › ').slice(0,320) }));
+    // Riesgos y oportunidades ya registrados de la oficina (activos)
+    let recs=[]; try{ if(!STATE.matriz || !STATE.matriz.length) await loadMatriz(); recs=STATE.matriz||[]; }catch(_){}
+    AN.riesgos=[];
+    recs.forEach(r=>{
+      try{
+        if(typeof esArchivado==='function' && esArchivado(r)) return;
+        if(oficina && norm(oficinaDe(r))!==norm(oficina)) return;
+        const op=esOportunidad(r);
+        const ni=op?nivelOportInherenteDe(r):nivelInherenteDe(r);
+        const o=(typeof origenDe==='function')?origenDe(r):{};
+        AN.riesgos.push({ id:r.id, codigo:codigoDe(r)||'', tipo:op?'Oportunidad':'Riesgo',
+          descripcion:_txtPlano(descripcionDe(r)||'').slice(0,260), proceso:String(o.dato||'').slice(0,200), nivel:ni&&ni.nivel||'' });
+      }catch(_){}
+    });
+    const nombres = async (k,col)=>{ try{ return ((await loadMaestra(k,col))||[]).map(x=>x.label).filter(Boolean); }catch(_){ return []; } };
+    const [partes, amenazas, oportunidades] = await Promise.all([nombres('PARTES'), nombres('AMENAZAS','Amenaza'), nombres('OPORTUNIDADES','Oportunidad')]);
+    return { oficina, procesos, riesgos_registrados: AN.riesgos.map(({id,...x})=>x), partes_interesadas:partes, amenazas, oportunidades };
+  }
+
+  /* ---------- Consulta al analista ---------- */
+  async function anAnalizar(){
+    if(AN.ocupado) return;                       // evita el doble clic
+    const t=(document.getElementById('anTexto').value||'').trim();
+    const ofEl=document.getElementById('anOficina'); const oficina=ofEl?String(ofEl.value||'').trim():'';
+    const tipo=(document.querySelector('input[name="anTipo"]:checked')||{}).value||'';
+    const est=document.getElementById('anEstado');
+    if(t.length<25){ est.innerHTML='<div class="an-err">Cuéntame un poco más: escribe al menos dos líneas sobre lo que pasó.</div>'; try{ est.scrollIntoView({block:'nearest'}); }catch(_){} return; }
+    if(ofEl && ofEl.tagName==='SELECT' && !oficina){ est.innerHTML='<div class="an-err">Elige la oficina a la que corresponde la situación.</div>'; ofEl.focus(); return; }
+    AN.ocupado=true; AN.situacion=t; AN.oficina=oficina; AN.tipo=tipo;
+    const btn=document.getElementById('anBtnAnalizar'); if(btn) btn.disabled=true;
+    est.innerHTML=`<div class="an-espera"><span class="spinner"></span><div><b>Urpito está analizando…</b><br><span class="an-k">Reviso tus procesos y los riesgos ya registrados. Puede tardar hasta un minuto.</span></div></div>`;
+    try{ est.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch(_){}
+    try{
+      const ctx=await contexto(oficina);
+      const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(), 170000);
+      let r, data;
+      try{
+        r=await fetch(ANALISTA_URL,{ method:'POST', headers:{'Content-Type':'application/json'}, signal:ctrl.signal,
+          body:JSON.stringify({ situacion:t, oficina, tipo, contexto:ctx }) });
+        data=await r.json().catch(()=>({}));
+      } finally { clearTimeout(to); }
+      if(!r.ok || !data.ok || !data.analisis){ throw new Error(data.error || 'Urpito no pudo responder ahora.'); }
+      AN.ultimo = validar(data.analisis);
+      pintarResultado();
+    }catch(e){
+      const msg = (e.name==='AbortError') ? 'Urpito tardó demasiado en responder.' :
+        (/Failed to fetch|NetworkError|Load failed/i.test(e.message) ? 'No pude conectarme con Urpito. Revisa tu conexión a internet.' : e.message);
+      est.innerHTML=`<div class="an-err">${esc(msg)} Inténtalo de nuevo en un momento. Tu texto sigue guardado arriba.</div>`;
+      try{ est.scrollIntoView({behavior:'smooth', block:'nearest'}); }catch(_){}
+    }finally{
+      AN.ocupado=false; const b=document.getElementById('anBtnAnalizar'); if(b) b.disabled=false;
+    }
+  }
+
+  /* ---------- Validar lo que propone contra los datos reales ----------
+     Urpito puede equivocarse: aquí se comprueba que el proceso y el código
+     existan y que la probabilidad e impacto usen las escalas del sistema. */
+  const OPC = ()=>{ const F=CONFIG.MATRIZ_FIELDS; return {
+    prob:F.prob_riesgo_inh.options, impR:F.imp_riesgo_inh.options, impO:F.imp_oport_inh.options }; };
+  function escala(val, opciones){
+    const s=String(val||'').trim(); if(opciones.includes(s)) return s;
+    const n=(s.match(/^(\d)/)||[])[1]; if(n){ const o=opciones.find(x=>x.startsWith(n+':')); if(o) return o; }
+    const o=opciones.find(x=>norm(x.split(':')[1])===norm(s)); return o||'';
+  }
+  function validar(a){
+    a = (a && typeof a==='object') ? a : {};
+    const o=OPC(); const v={ ...a, avisos:[] };
+    v.tipo = (a.tipo==='Oportunidad') ? 'Oportunidad' : 'Riesgo';
+    const esOp = v.tipo==='Oportunidad';
+    v.probabilidad = escala(a.probabilidad, o.prob);
+    v.impacto = escala(a.impacto, esOp?o.impO:o.impR);
+    if(!v.probabilidad || !v.impacto) v.avisos.push('La probabilidad o el impacto no vinieron en la escala del sistema: elígelos tú en el formulario.');
+    v.causas=lista(a.causas); v.consecuencias=lista(a.consecuencias); v.preguntas=lista(a.preguntas); v.advertencias=lista(a.advertencias);
+    // Proceso: debe ser un número del inventario
+    const pid=parseInt(a.proceso_id,10);
+    v.procesoSegs = (pid>=1 && pid<=AN.procesos.length) ? AN.procesos[pid-1] : null;
+    if(a.proceso_id!=null && a.proceso_id!=='' && !v.procesoSegs) v.avisos.push('Urpito mencionó un proceso que no está en el inventario; no lo tomé en cuenta.');
+    // ¿Ya registrado?: el código debe existir en la oficina
+    v.duplicado=null;
+    if(a.ya_registrado && a.ya_registrado.codigo){
+      const r=AN.riesgos.find(x=>norm(x.codigo)===norm(a.ya_registrado.codigo));
+      if(r) v.duplicado={ ...r, por_que:String(a.ya_registrado.por_que||'') };
+    }
+    // Respuesta según el tipo
+    const RESP = esOp ? ((typeof RESPUESTAS_OPORTUNIDAD!=='undefined')?RESPUESTAS_OPORTUNIDAD:['Explotar','Mejorar','Compartir','Aceptar']) : ((typeof RESPUESTAS_RIESGO!=='undefined')?RESPUESTAS_RIESGO:['Eliminar','Mitigar','Trasladar','Asumir']);
+    v.respuesta = RESP.find(x=>norm(x)===norm(a.respuesta)) || '';
+    v.fuente = ['Contexto','Partes interesadas','Proceso'].find(x=>norm(x)===norm(a.fuente)) || (v.procesoSegs?'Proceso':'');
+    v.indicador = (a.indicador && typeof a.indicador==='object') ? a.indicador : {};
+    // Índice y nivel con las mismas reglas del sistema
+    const p=parseInt(v.probabilidad,10)||0, i=parseInt(v.impacto,10)||0;
+    v.indice=p*i; v.nivel = v.indice ? (esOp?nivelOportDe(v.indice):nivelDe(v.indice)) : 0;
+    return v;
+  }
+
+  /* ---------- Paso 2: mostrar el análisis ---------- */
+  function sec(n, titulo, norma, cuerpo, cls){
+    return `<div class="an-sec ${cls||''}"><h4><span class="an-num">${n}</span>${titulo}${norma?`<span class="an-norma">${norma}</span>`:''}</h4>${cuerpo}</div>`;
+  }
+  const ul = a => a.length ? `<ul>${a.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>` : '<p class="an-k">—</p>';
+
+  function pintarResultado(){
+    const a=AN.ultimo; const c=document.getElementById('anCuerpo');
+    if(a.es_pertinente===false){
+      c.innerHTML=`<div class="urp-fila">${urp('urp-mini')}<div class="urp-globo" style="margin:0">${esc(a.mensaje_no_pertinente||'Esto no parece una situación de gestión que deba analizarse como riesgo u oportunidad.')}<br><br>Si tienes una duda sobre cómo usar el aplicativo, pregúntame en el botón de <b>Ayuda</b>.</div></div>
+        <div class="an-acciones"><button class="an-btn sec" type="button" onclick="anVolver()">✏️ Cambiar el texto</button><button class="an-btn gris" type="button" onclick="anCerrar()">Cerrar</button></div>`;
+      return;
+    }
+    const esOp=a.tipo==='Oportunidad';
+    const n=a.nivel; const col=((typeof NIVEL_COLORS!=='undefined')&&NIVEL_COLORS[n])||'var(--mist)';
+    const badge = (typeof badgeNivel==='function' && n) ? badgeNivel(n, esOp) : (n?('Nivel '+n):'Pendiente');
+    const accion = (typeof accionNivel==='function' && n) ? accionNivel(n, esOp) : '';
+    const puede = (typeof puedeCrear==='function') && puedeCrear();
+    let h='';
+    h+=`<div class="an-aviso">${urp('urp-mini')}<div><b>Esta es una propuesta de Urpito, no una decisión.</b> Revisa cada punto con tu equipo: tú conoces mejor tu oficina. Urpito puede equivocarse.</div></div>`;
+    h+=`<div class="an-k" style="margin-bottom:10px"><b>Lo que contaste:</b> «${esc(AN.situacion)}» · <b>Oficina:</b> ${esc(AN.oficina||'—')}</div>`;
+    h+=sec(1,'Lo que entendí','',`<p>${esc(a.resumen||'')}</p>`);
+    if(a.avisos.length) h+=`<div class="an-err" style="margin:0 0 12px">${a.avisos.map(esc).join('<br>')}</div>`;
+    if(a.duplicado){
+      h+=sec('!','¿Ya está registrado?','',`<p><b>Parece que ya existe:</b> ${esc(a.duplicado.codigo)} — ${esc(a.duplicado.descripcion)}</p><p>${esc(a.duplicado.por_que)}</p><p class="an-k">Antes de crear uno nuevo, revisa ese registro: quizá basta con reforzar su medida o reevaluarlo.</p>`,'an-dup');
+    } else {
+      h+=`<p class="an-ok" style="margin:-4px 0 12px">✔ No encontré un registro igual entre los ${AN.riesgos.length} activos de tu oficina.</p>`;
+    }
+    h+=sec(2,'¿De dónde viene?','ISO 21001 · 4.1 Contexto',`<p><b>Contexto ${esc(String(a.contexto_tipo||'').toLowerCase())}.</b> ${esc(a.contexto||'')}</p>`);
+    h+=sec(3,'¿A quién afecta y qué espera?','4.2 Partes interesadas',`<p><b>${esc(a.parte_interesada||'—')}.</b> ${esc(a.requisito_parte||'')}</p>`);
+    h+=sec(4, esOp?'La oportunidad':'El riesgo','6.1 Riesgos y oportunidades',
+      `<p><b>${esc(a.descripcion||'')}</b></p><div class="an-eval"><div><span class="an-k">Causas</span>${ul(a.causas)}</div><div><span class="an-k">Consecuencias</span>${ul(a.consecuencias)}</div></div>`);
+    h+=sec(5,'¿Qué tan importante es?','Evaluación inherente',
+      `<div class="an-eval"><div><span class="an-k">Probabilidad</span><br><b>${esc(a.probabilidad||'—')}</b><br><span class="an-k">${esc(a.probabilidad_porque||'')}</span></div>
+       <div><span class="an-k">Impacto</span><br><b>${esc(a.impacto||'—')}</b><br><span class="an-k">${esc(a.impacto_porque||'')}</span></div></div>
+       <div class="an-formula"><b>Índice de prioridad = Probabilidad × Impacto = ${parseInt(a.probabilidad,10)||'?'} × ${parseInt(a.impacto,10)||'?'} = ${a.indice||'?'}</b> → ${badge}<br>
+       <span class="an-k">El índice multiplica los dos valores de la escala (probabilidad de 1 a 4 e impacto de 1 a ${esOp?3:4}); según su resultado se ubica el nivel del 1 (bajo) al 4 (${esOp?'muy alto':'intolerable'}), con las mismas reglas del formulario de registro.</span>
+       ${accion?`<br><span style="border-left:3px solid ${col};padding-left:8px;display:inline-block;margin-top:6px">${accion}</span>`:''}</div>`);
+    h+=sec(6,'¿En qué proceso va?','Inventario de procesos',
+      a.procesoSegs ? `<p><b>${esc(a.procesoSegs.slice(1).join(' › '))}</b></p><p class="an-k">${esc(a.proceso_porque||'')}</p>`
+                    : `<p>Urpito no encontró un proceso del inventario que encaje. ${esc(a.proceso_porque||'')}</p>`);
+    h+=sec(7,'¿Qué conviene hacer?','Respuesta y control',
+      `<p><b>Respuesta:</b> ${esc(a.respuesta||'—')}</p><p><b>Medida (control concreto):</b> ${esc(a.medida||'')}</p><p><b>Evidencia que quedaría:</b> ${esc(a.evidencia||'')}</p>`);
+    const ind=a.indicador||{};
+    h+=sec(8,'¿Cómo sabremos si funciona?','Indicador',
+      `<p><b>${esc(ind.nombre||'—')}</b></p><div class="an-formula">Fórmula: ${esc(ind.formula||'—')}<br><span class="an-k">Frecuencia de medición: ${esc(ind.frecuencia||'—')}. Mide si la medida está logrando su efecto: mientras más cerca de la meta, mejor controlado está ${esOp?'el aprovechamiento de la oportunidad':'el riesgo'}.</span></div>`);
+    h+=sec(9,'¿Qué efecto tiene?','Estudiantes y Facultad',
+      `<p>${esc(a.efecto||'')}</p>${a.costo_no_calidad?`<p><b>Costo de no hacerlo:</b> ${esc(a.costo_no_calidad)}</p>`:''}`);
+    if(a.preguntas.length) h+=sec('?','Para afinar el análisis, conviene responder','',ul(a.preguntas));
+    if(a.advertencias.length) h+=sec('⚠','Ten en cuenta','',ul(a.advertencias));
+    h+=`<div class="an-acciones">
+      ${puede?`<button class="an-btn" type="button" onclick="anLlevarAlFormulario()">📝 Llevar al formulario de registro</button>`:''}
+      <button class="an-btn sec" type="button" onclick="anCopiar()">📋 Copiar el análisis</button>
+      ${puede?'':`<button class="an-btn sec" type="button" onclick="anEnviar()">✉️ Enviar a la Subcomisión</button>`}
+      <button class="an-btn gris" type="button" onclick="anVolver()">✏️ Cambiar el texto</button></div>
+      <p class="an-pie">${puede?'El formulario se llena con esta propuesta, pero <b>no se guarda</b> hasta que lo revises y pulses «Guardar registro».'
+        :'Solo el administrador registra riesgos nuevos. Envía este análisis a la Subcomisión de Sistematización o cópialo para tu equipo.'}</p>`;
+    c.innerHTML=h;
+    const mod=document.querySelector('#anModal .modal'); if(mod) mod.scrollTop=0;
+  }
+  function anVolver(){ pintarPaso1(); }
+
+  /* ---------- Texto plano del análisis (copiar / correo) ---------- */
+  function textoPlano(){
+    const a=AN.ultimo; if(!a) return '';
+    const L=[];
+    L.push('ANÁLISIS DE UNA SITUACIÓN (propuesta de Urpito · Matriz de Riesgos y Oportunidades SGOE FI URP)');
+    L.push('Oficina: '+(AN.oficina||'—'));
+    L.push('Situación: '+AN.situacion);
+    L.push('');
+    L.push('1. Lo que entendí: '+(a.resumen||''));
+    if(a.duplicado) L.push('¡Ojo! Podría estar ya registrado: '+a.duplicado.codigo+' — '+a.duplicado.descripcion);
+    L.push('2. Contexto (4.1): '+(a.contexto_tipo?a.contexto_tipo+'. ':'')+(a.contexto||''));
+    L.push('3. Parte interesada (4.2): '+(a.parte_interesada||'')+'. '+(a.requisito_parte||''));
+    L.push('4. '+a.tipo+' (6.1): '+(a.descripcion||''));
+    if(a.causas.length) L.push('   Causas: '+a.causas.join('; '));
+    if(a.consecuencias.length) L.push('   Consecuencias: '+a.consecuencias.join('; '));
+    L.push('5. Evaluación: probabilidad '+(a.probabilidad||'?')+' × impacto '+(a.impacto||'?')+' = índice '+(a.indice||'?')+' (nivel '+(a.nivel||'?')+')');
+    if(a.procesoSegs) L.push('6. Proceso: '+a.procesoSegs.slice(1).join(' › '));
+    L.push('7. Respuesta: '+(a.respuesta||'')+'. Medida: '+(a.medida||'')+' Evidencia: '+(a.evidencia||''));
+    const ind=a.indicador||{}; L.push('8. Indicador: '+(ind.nombre||'')+' = '+(ind.formula||'')+' ('+(ind.frecuencia||'')+')');
+    L.push('9. Efecto: '+(a.efecto||'')+(a.costo_no_calidad?(' Costo: '+a.costo_no_calidad):''));
+    if(a.preguntas.length) L.push('Preguntas pendientes: '+a.preguntas.join(' / '));
+    return L.join('\n');
+  }
+  async function anCopiar(){
+    const t=textoPlano();
+    try{ await navigator.clipboard.writeText(t); toast('Análisis copiado. Pégalo donde lo necesites (Ctrl+V).'); }
+    catch(_){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); toast('Análisis copiado.'); }catch(e){ toast('No se pudo copiar automáticamente.', true); } ta.remove(); }
+  }
+  function anEnviar(){
+    const quien=(typeof SESION!=='undefined'&&SESION)?(SESION.nombre||SESION.usuario||''):'';
+    const asunto='Propuesta de riesgo u oportunidad — '+(AN.oficina||'');
+    let cuerpo=textoPlano()+'\n\nEnviado por: '+quien;
+    if(cuerpo.length>1700) cuerpo=cuerpo.slice(0,1700)+'…\n(Texto recortado: el análisis completo se puede copiar desde el aplicativo.)';
+    location.href='mailto:'+CORREO_SUBCOMISION+'?subject='+encodeURIComponent(asunto)+'&body='+encodeURIComponent(cuerpo);
+  }
+
+  /* ---------- Llevar la propuesta al formulario de registro (solo administrador) ---------- */
+  const espera = ms => new Promise(r=>setTimeout(r,ms));
+  function elegirPorTexto(sel, texto){
+    if(!sel || !texto) return false;
+    const op=[...sel.options].find(o=>norm(o.text)===norm(texto)) || [...sel.options].find(o=>o.value && norm(o.text).includes(norm(texto)));
+    if(op){ sel.value=op.value; return true; } return false;
+  }
+  const html = arr => arr.length>1 ? '<ul>'+arr.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>' : esc(arr[0]||'');
+  async function anLlevarAlFormulario(){
+    const a=AN.ultimo; if(!a) return;
+    if(!(typeof puedeCrear==='function' && puedeCrear())){ toast('Solo el administrador puede registrar riesgos nuevos.', true); return; }
+    anCerrar();
+    const btnReg=document.querySelector('nav button[data-view="registrar"]'); if(btnReg) btnReg.click();
+    await espera(200);
+    try{ await ensureRelOptions(); }catch(_){}
+    const fTipo=document.getElementById('f_tipo');
+    if(fTipo && fTipo.options.length<=1){ try{ await initCascada(); }catch(_){} }
+    const set=(id,val)=>{ const el=document.getElementById(id); if(el && val!=null) el.value=val; };
+    const form=document.getElementById('formRiesgo'); AN.llenando=true; if(form) form.reset(); setTimeout(()=>{ AN.llenando=false; }, 50);
+    try{ limpiarEditoresRTE('f_'); }catch(_){}
+    try{ limpiarMultiselects(); limpiarInterruptorCtrl(); limpiarPillsResponsable(); }catch(_){}
+    set('f_fecha', new Date(Date.now()-5*3600*1000).toISOString().slice(0,10));
+    set('f_tipo_ro', a.tipo); showEval(a.tipo);
+    if(a.fuente){ set('f_fuente', a.fuente); showOrigin(a.fuente); }
+    set('f_actividad', a.actividad||'');
+    setCampoDesc(a.tipo==='Oportunidad'?'f_oport_desc':'f_riesgo_desc', esc(a.descripcion||''));
+    setCampoDesc('f_causas', html(a.causas));
+    setCampoDesc('f_consec', html(a.consecuencias));
+    if(a.tipo==='Oportunidad'){ set('f_prob_o_inh', a.probabilidad); set('f_imp_o_inh', a.impacto); }
+    else { set('f_prob_r_inh', a.probabilidad); set('f_imp_r_inh', a.impacto); }
+    actualizarDescEval();
+    // Origen
+    if(a.fuente==='Partes interesadas'){
+      if(elegirPorTexto(document.getElementById('f_parte'), a.parte_interesada)) try{ autocompletarParte('f_parte','f_requisitos','f_expectativas'); }catch(_){}
+    }
+    if(a.fuente==='Contexto' && a.elemento_contexto){
+      const cont=document.getElementById(a.tipo==='Oportunidad'?'f_oportunidad_rel':'f_amenaza');
+      if(cont){ const lab=[...cont.querySelectorAll('label.ms-item')].find(l=>norm(l.textContent)===norm(a.elemento_contexto)); if(lab){ lab.querySelector('input').checked=true; try{ actualizarMsLabel(cont.id); }catch(_){} } }
+    }
+    if(a.procesoSegs && fTipo){
+      const ids=['f_tipo','f_n0','f_n1','f_n2','f_n3','f_proc'];
+      for(let k=0;k<ids.length && k<a.procesoSegs.length;k++){
+        const sel=document.getElementById(ids[k]); if(!sel) break;
+        if(!elegirPorTexto(sel, a.procesoSegs[k])) break;
+        if(typeof sel.onchange==='function') sel.onchange();
+      }
+    }
+    // Tratamiento: medida nueva (aún no hay control)
+    try{ setExisteCtrl('f','No'); }catch(_){}
+    if(a.respuesta) set('f_respuesta', a.respuesta);
+    const medida = esc(a.medida||'') + (a.evidencia?('<br><b>Evidencia:</b> '+esc(a.evidencia)):'') +
+      (a.indicador&&a.indicador.nombre?('<br><b>Cómo medirlo:</b> '+esc(a.indicador.nombre)+' = '+esc(a.indicador.formula||'')+' ('+esc(a.indicador.frecuencia||'')+')'):'');
+    setCampoDesc('f_medida', medida);
+    if(elegirPorTexto(document.getElementById('f_responsable'), AN.oficina)) try{ autocompletarRespProceso('f_responsable','f_resp_proc','f_resp_cel','f_resp_cor'); }catch(_){}
+    try{ calcIndice(); }catch(_){}
+    // Aviso visible arriba del formulario
+    const vista=document.getElementById('view-registrar');
+    const prev=document.getElementById('anBanner'); if(prev) prev.remove();
+    if(form) form.insertAdjacentHTML('beforebegin', `<div class="an-banner" id="anBanner">${urp('urp-mini')}<div><b>Urpito llenó este formulario con su propuesta.</b> Revisa y corrige cada campo antes de pulsar «Guardar registro»: nada se ha guardado todavía.${a.duplicado?' <b>Ojo:</b> podría estar ya registrado como '+esc(a.duplicado.codigo)+'.':''}</div><button type="button" onclick="this.parentElement.remove()" aria-label="Cerrar aviso">×</button></div>`);
+    if(vista && vista.scrollIntoView) vista.scrollIntoView({behavior:'smooth', block:'start'});
+    toast('Formulario llenado con la propuesta de Urpito. Revísalo antes de guardar.');
+  }
+
+  window.anAbrir=anAbrir; window.anCerrar=anCerrar; window.anEjemplo=anEjemplo; window.anAnalizar=anAnalizar;
+  window.anVolver=anVolver; window.anCopiar=anCopiar; window.anEnviar=anEnviar; window.anLlevarAlFormulario=anLlevarAlFormulario;
+  window._AN=AN;
+
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ const m=document.getElementById('anModal'); if(m && !m.classList.contains('hidden')) anCerrar(); } });
+  function iniciar(){
+    ponerTarjetas();
+    // Al guardar o limpiar el formulario, el aviso de «borrador de Urpito» desaparece
+    const f=document.getElementById('formRiesgo');
+    if(f) f.addEventListener('reset', ()=>setTimeout(()=>{ const b=document.getElementById('anBanner'); if(b && !AN.llenando) b.remove(); }, 0));
+    const obs=new MutationObserver(()=>{ clearTimeout(obs._t); obs._t=setTimeout(ponerTarjetas, 200); });
+    obs.observe(document.body,{ childList:true, subtree:true });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
+})();
+</script>
 </body>
 </html>
